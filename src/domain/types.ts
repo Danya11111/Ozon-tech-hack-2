@@ -188,7 +188,7 @@ export interface SimulationState {
 }
 
 
-export type PresentationMode = 'engineering' | 'presentation';
+export type PresentationMode = 'engineering' | 'presentation' | 'guided';
 export type DemoPreferredAction = 'start' | 'step' | 'reset' | 'pause';
 export type DemoFocusArea = 'scene' | 'classification' | 'timeline' | 'pid' | 'eventLog' | 'criteria' | 'safety';
 export type CriteriaStatus = 'covered' | 'partially covered' | 'demo step available';

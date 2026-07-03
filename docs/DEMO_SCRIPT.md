@@ -1,56 +1,28 @@
 # Demo Script
 
-Open https://arhipovdan.ru/ and switch Header to `Presentation Mode`.
+Open https://arhipovdan.ru/ and switch Header to `Guided Demo`.
 
-## 3-Minute Defense
+## 30-Second Pitch
 
-### 0:00-0:25 — System Overview
+"We built an engineering simulation of the OZON sorting cell. It models the full loop: detection -> classification -> command -> routing. We cover happy paths to B/C/D, fault handling, and timing. The Guided Demo view shows the live proof."
 
-Demo step: `System overview`.
+## 3-Minute Guided Demo
 
-Say: the system models the full loop: detection -> classification -> actuator command -> physical route.
+1. Open **Guided Demo**.
+2. Click **Start Guided Demo**.
+3. Point to the **Current Proof Card** and the **Scene**.
+   - "Watch how detection leads to classification and routing."
+4. Click **Next** to show `Oversized item to C`.
+   - "Dimensions fail first, priority C."
+5. Click **Next** to show `Round object to D`.
+   - "Dimensions pass, but roundness triggers D."
+6. Click **Next** through `Boundary`, `Low confidence`, `Jam`, `Emergency stop`.
+   - On faults: click "Apply fault scenario" to confirm.
+   - "The line stops safely on emergency."
 
-Watch: engineering SVG scene, sensors, stop-gate, pushers and B/C/D routes.
+## 5-Minute Guided Demo
 
-### 0:25-0:55 — Normal Item To B
-
-Demo step: `Normal item to B`.
-
-Apply scenario, use `Run suggested action` or `Step state`.
-
-Say: dimensions pass, roundness is below threshold, category B opens the gate and sends the item straight.
-
-### 0:55-1:25 — Oversized To C
-
-Demo step: `Oversized item to C`.
-
-Say: dimensions fail first, so C has priority even before shape routing.
-
-Watch: decision tree FAIL, `ROUTE_TO_C`, lower roll-cage.
-
-### 1:25-1:55 — Round Object To D
-
-Demo step: `Round object to D`.
-
-Say: dimensions pass, but roundness >= 0.8, so the item goes to D for repack/shape issue.
-
-### 1:55-2:25 — Fault And Safety
-
-Demo step: `Jam / fault handling` or `Emergency stop`.
-
-With Safe Demo ON, confirm the fault scenario intentionally.
-
-Say: abnormal states stop conveyor motion and require Reset.
-
-### 2:25-3:00 — Criteria Coverage
-
-Demo step: `Performance and synchronization`, then focus criteria panel.
-
-Say: this checklist maps every OZON criterion to scenario, component and doc evidence.
-
-## 5-Minute Defense
-
-Use all 10 demo steps:
+Use all 10 demo steps in Guided Demo View:
 
 1. System overview.
 2. Normal item to B.
@@ -65,11 +37,20 @@ Use all 10 demo steps:
 
 For each step:
 
-1. Read `What to watch`.
-2. Apply recommended scenario.
-3. Use `Step state` or `Run suggested action`.
-4. Point to the highlighted focus area.
-5. Close with the presenter phrase.
+1. Read the **Demo Narration Card**.
+2. Use **Next** or the **Primary Action Button**.
+3. Point to the highlighted values in the **Proof Card**.
+4. Read the **Presenter Phrase** from the screen.
+
+## What to say on each step
+
+Use the `presenterPhrase` text shown in the **Demo Narration Card**. It is specifically written to be short and clear for the jury.
+
+## What to do if demo gets stuck
+
+- Click **Reset Demo**.
+- If still stuck, switch back to **Engineering Mode** and use manual scenario selection.
+- Proceed manually.
 
 ## Fallback If Domain Does Not Open
 

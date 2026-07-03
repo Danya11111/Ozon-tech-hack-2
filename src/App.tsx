@@ -5,6 +5,8 @@ import { SCENARIOS } from './data/scenarios';
 import { createSimulation, setRunning, stepSimulation, stepSimulationToNextState } from './domain/simulation';
 import type { DemoStep, PresentationMode, ScenarioId, SimulationState } from './domain/types';
 
+import GuidedDemoView from './components/GuidedDemoView';
+
 const TICK_MS = 250;
 
 function isFaultDemoStep(step: DemoStep): boolean {
@@ -13,7 +15,7 @@ function isFaultDemoStep(step: DemoStep): boolean {
 
 export default function App() {
   const [activeScenarioId, setActiveScenarioId] = useState<ScenarioId>('normal_flow');
-  const [presentationMode, setPresentationMode] = useState<PresentationMode>('engineering');
+  const [presentationMode, setPresentationMode] = useState<PresentationMode>('guided');
   const [safeDemoEnabled, setSafeDemoEnabled] = useState(true);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
   const [pendingFaultStepId, setPendingFaultStepId] = useState<string | undefined>();
@@ -87,7 +89,30 @@ export default function App() {
     setActiveScenarioId(DEMO_STEPS[0].scenarioId);
   };
 
-  return (
+  return presentationMode === 'guided' ? (
+    <GuidedDemoView
+      simulation={simulation}
+      scenarios={SCENARIOS}
+      activeScenarioId={activeScenarioId}
+      presentationMode={presentationMode}
+      safeDemoEnabled={safeDemoEnabled}
+      demoSteps={DEMO_STEPS}
+      demoStepIndex={demoStepIndex}
+      currentDemoStep={currentDemoStep}
+      pendingFaultStepId={pendingFaultStepId}
+      onStart={handleStart}
+      onPause={handlePause}
+      onReset={handleReset}
+      onStep={handleStep}
+      onScenarioChange={handleScenarioChange}
+      onPresentationModeChange={setPresentationMode}
+      onSafeDemoChange={setSafeDemoEnabled}
+      onDemoStepChange={handleDemoStepChange}
+      onApplyDemoStepScenario={handleApplyDemoStepScenario}
+      onRunPreferredAction={handleRunPreferredAction}
+      onRestartDemo={handleRestartDemo}
+    />
+  ) : (
     <Dashboard
       simulation={simulation}
       scenarios={SCENARIOS}

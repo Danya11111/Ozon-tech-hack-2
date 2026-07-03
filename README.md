@@ -30,6 +30,27 @@ https://www.arhipovdan.ru/
 http://127.0.0.1:3100/
 ```
 
+### Guided Demo
+
+Рекомендуемый путь для жюри — использовать **Guided Demo** view.
+В Header переключите режим на `Guided Demo`.
+Это чистое демо-представление для защиты (1 экран без скролла).
+
+Отличия Guided Demo от Engineering Dashboard:
+- Guided Demo показывает только ключевую информацию для защиты (Proof Card, Narration, Snapshot), скрывая длинные логи и графики.
+- Engineering Mode дает полный доступ ко всем метрикам, логам, PID-графику и дереву классификации.
+
+Рекомендуемый путь:
+- Start Guided Demo
+- Next
+- Oversized
+- Round
+- Low confidence
+- Jam
+- Emergency stop
+
+В Guided Demo закрываются критерии: classification correctness, routing, timing, fault handling.
+
 ## Presentation Mode
 
 В Header есть переключатель:

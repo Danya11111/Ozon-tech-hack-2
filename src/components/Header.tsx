@@ -34,7 +34,8 @@ export default function Header({
       <div className="header-status">
         <div className="mode-toggle" role="group" aria-label="Dashboard mode">
           <button className={presentationMode === 'engineering' ? 'active' : ''} onClick={() => onPresentationModeChange('engineering')}>Engineering Mode</button>
-          <button className={presentationMode === 'presentation' ? 'active' : ''} onClick={() => onPresentationModeChange('presentation')}>Presentation Mode</button>
+          <button className={presentationMode === 'presentation' ? 'active' : ''} onClick={() => onPresentationModeChange('presentation')}>Presentation Dashboard</button>
+          <button className={presentationMode === 'guided' ? 'active' : ''} onClick={() => onPresentationModeChange('guided')}>Guided Demo</button>
         </div>
         {presentationMode === 'presentation' ? (
           <button className={safeDemoEnabled ? 'safe-demo-toggle active' : 'safe-demo-toggle'} onClick={() => onSafeDemoChange(!safeDemoEnabled)}>

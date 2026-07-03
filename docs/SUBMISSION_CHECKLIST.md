@@ -11,6 +11,13 @@ Before final submission:
 - [ ] Presentation Mode opens.
 - [ ] Demo steps checked.
 - [ ] Safe Demo confirmation checked for jam/emergency.
+- [ ] Guided Demo verified on 1920x1080 (no scroll).
+- [ ] Guided Demo verified on 1440x900.
+- [ ] Start Guided Demo button works.
+- [ ] Next/Previous buttons work.
+- [ ] Reset Demo button works.
+- [ ] Fault confirmation works in Guided Demo.
+- [ ] Engineering Mode is not broken.
 - [ ] OZON Criteria Coverage Panel checked.
 - [ ] Engineering Mode still works.
 - [ ] Scenarios checked: normal_flow, oversized_item, round_object, boundary_dimensions, close_items, low_confidence, jam, emergency_stop.
