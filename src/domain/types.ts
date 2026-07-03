@@ -186,3 +186,31 @@ export interface SimulationState {
   events: EventLogEntry[];
   activeRoute?: Category;
 }
+
+
+export type PresentationMode = 'engineering' | 'presentation';
+export type DemoPreferredAction = 'start' | 'step' | 'reset' | 'pause';
+export type DemoFocusArea = 'scene' | 'classification' | 'timeline' | 'pid' | 'eventLog' | 'criteria' | 'safety';
+export type CriteriaStatus = 'covered' | 'partially covered' | 'demo step available';
+
+export interface DemoStep {
+  id: string;
+  title: string;
+  scenarioId: ScenarioId;
+  preferredAction: DemoPreferredAction;
+  focusArea: DemoFocusArea;
+  explanation: string;
+  whatToWatch: string;
+  juryValue: string;
+  relatedCriteria: string[];
+  presenterPhrase: string;
+}
+
+export interface OzonCriterion {
+  id: string;
+  title: string;
+  status: CriteriaStatus;
+  evidence: string;
+  relatedScenarioIds: ScenarioId[];
+  relatedDoc: string;
+}

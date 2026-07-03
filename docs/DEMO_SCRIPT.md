@@ -1,69 +1,98 @@
 # Demo Script
 
-Target duration: 3-5 minutes.
+Open https://arhipovdan.ru/ and switch Header to `Presentation Mode`.
 
-## 1. Open The Dashboard
+## 3-Minute Defense
 
-Open https://arhipovdan.ru/.
+### 0:00-0:25 — System Overview
 
-Explain that this is a 2D engineering simulation, not a decorative animation: the SVG scene shows a scaled work zone, conveyor dimensions, sensors, stop-gate, pushers and roll-cages.
+Demo step: `System overview`.
 
-## 2. Normal Flow
+Say: the system models the full loop: detection -> classification -> actuator command -> physical route.
 
-Select `Normal flow`, press `Start`.
+Watch: engineering SVG scene, sensors, stop-gate, pushers and B/C/D routes.
 
-Explain:
+### 0:25-0:55 — Normal Item To B
 
-- item enters zone A;
-- camera captures bbox;
-- laser measures height;
-- ultrasonic confirms gate position;
-- gate holds item;
-- classifier selects B/C/D;
-- route command is shown on the scene;
-- event log records the full cycle.
+Demo step: `Normal item to B`.
 
-Question closed: can the system show a full sorting cycle end-to-end?
+Apply scenario, use `Run suggested action` or `Step state`.
 
-## 3. Step-By-Step Decision
+Say: dimensions pass, roundness is below threshold, category B opens the gate and sends the item straight.
 
-Press `Reset`, then use `Step state`.
+### 0:55-1:25 — Oversized To C
 
-Explain each state in the timeline. Show that Step advances by logical state, not by arbitrary animation time.
+Demo step: `Oversized item to C`.
 
-Question closed: can the jury inspect synchronization and state transitions?
+Say: dimensions fail first, so C has priority even before shape routing.
 
-## 4. Oversized And Round Rules
+Watch: decision tree FAIL, `ROUTE_TO_C`, lower roll-cage.
 
-Select `Oversized item`, step to classification.
+### 1:25-1:55 — Round Object To D
 
-Show decision tree:
+Demo step: `Round object to D`.
 
-- dimensions check fails;
-- category C selected;
-- roundness is lower priority because dimensions are checked first.
+Say: dimensions pass, but roundness >= 0.8, so the item goes to D for repack/shape issue.
 
-Then select `Round object` and show D when dimensions pass and roundness >= 0.8.
+### 1:55-2:25 — Fault And Safety
 
-Question closed: how is classification proved?
+Demo step: `Jam / fault handling` or `Emergency stop`.
 
-## 5. Robustness Scenarios
+With Safe Demo ON, confirm the fault scenario intentionally.
 
-Show `close_items`, `low_confidence`, `jam`, `emergency_stop`.
+Say: abnormal states stop conveyor motion and require Reset.
 
-Explain:
+### 2:25-3:00 — Criteria Coverage
 
-- close items generate spacing warning and queue length;
-- low confidence uses rule-based fallback;
-- jam enters FAULT and stops conveyor;
-- emergency stop enters EMERGENCY_STOP and requires Reset.
+Demo step: `Performance and synchronization`, then focus criteria panel.
 
-Question closed: what happens outside the happy path?
+Say: this checklist maps every OZON criterion to scenario, component and doc evidence.
 
-## 6. PID And Metrics
+## 5-Minute Defense
 
-Point to PID panel and metrics cards.
+Use all 10 demo steps:
 
-Explain that PID is simplified: actual speed approaches target in normal flow and decays toward zero in fault/emergency.
+1. System overview.
+2. Normal item to B.
+3. Oversized item to C.
+4. Round object to D.
+5. Boundary dimensions.
+6. Low confidence fallback.
+7. Close items queue.
+8. Jam / fault handling.
+9. Emergency stop.
+10. Performance and synchronization.
 
-Question closed: how is conveyor control represented without overbuilding physics?
+For each step:
+
+1. Read `What to watch`.
+2. Apply recommended scenario.
+3. Use `Step state` or `Run suggested action`.
+4. Point to the highlighted focus area.
+5. Close with the presenter phrase.
+
+## Fallback If Domain Does Not Open
+
+1. SSH to server.
+2. Check local frontend:
+
+```bash
+curl -I http://127.0.0.1:3100/
+```
+
+3. Check Docker project:
+
+```bash
+docker compose -p owl -f /opt/arhipovdan/app/docker-compose.server.yml ps
+```
+
+4. If screenshots/video are prepared later, show them while explaining the same demo steps.
+
+## What Each Screen Proves
+
+- SVG scene proves physical route and actuator command.
+- Classification panel proves why category B/C/D was selected.
+- Timeline proves synchronization and step-by-step behavior.
+- PID panel proves conveyor control-loop behavior.
+- Event Log proves traceability.
+- Criteria panel proves coverage of OZON evaluation points.

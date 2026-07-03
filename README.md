@@ -2,7 +2,7 @@
 
 Инженерный frontend MVP для задачи хакатона OZON Tech: «Интеллектуальная роботизированная система сортировки товаров».
 
-Проект показывает 2D/SVG dashboard сортировочной линии: рабочую зону 6000 x 10000 мм, конвейер шириной 500 мм, зоны A/B/C/D, roll-cage C/D, датчики, stop-gate, толкатели, классификацию, маршрутизацию, timeline цикла, PID-имитацию, метрики и event log.
+Проект показывает 2D/SVG dashboard сортировочной линии: рабочую зону 6000 x 10000 мм, конвейер шириной 500 мм, зоны A/B/C/D, roll-cage C/D, датчики, stop-gate, толкатели, классификацию, маршрутизацию, timeline цикла, PID-имитацию, метрики, event log и режим защиты для жюри.
 
 ## Стек
 
@@ -15,14 +15,87 @@
 
 Нет Three.js, backend, реального ML и тяжелых UI-библиотек.
 
+## Как открыть демо
+
+Публично:
+
+```text
+https://arhipovdan.ru/
+https://www.arhipovdan.ru/
+```
+
+Локально на сервере:
+
+```text
+http://127.0.0.1:3100/
+```
+
+## Presentation Mode
+
+В Header есть переключатель:
+
+- `Engineering Mode` — полный инженерный dashboard.
+- `Presentation Mode` — режим защиты с demo narrative, подсказками докладчика, фокусом на текущую область и criteria checklist.
+
+В Presentation Mode панель demo steps показывает:
+
+- номер текущего шага;
+- что сейчас происходит;
+- что смотреть на экране;
+- что это доказывает для жюри;
+- связанные OZON criteria;
+- готовую presenter phrase.
+
+Кнопки:
+
+- `Previous step` / `Next step`;
+- `Restart demo`;
+- `Apply scenario`;
+- `Run suggested action`.
+
+Для `jam` и `emergency_stop` при `Safe Demo: ON` требуется явное повторное подтверждение fault-сценария.
+
+## Demo Steps
+
+1. System overview.
+2. Normal item to B.
+3. Oversized item to C.
+4. Round object to D.
+5. Boundary dimensions.
+6. Low confidence fallback.
+7. Close items queue.
+8. Jam / fault handling.
+9. Emergency stop.
+10. Performance and synchronization.
+
+## OZON Criteria Coverage Panel
+
+Панель `OZON criteria coverage` показывает, какие критерии закрыты и где это доказано:
+
+- category correctness;
+- classification rules;
+- boundary cases;
+- physical routing;
+- manipulation logic;
+- geometry variety;
+- safety;
+- timing and throughput;
+- CV-to-actuator integration;
+- engineering realism;
+- reproducibility/docs.
+
+Фильтры: `all`, `covered`, `partially covered`, `demo step available`.
+
+## Event Log JSON
+
+`Copy JSON` в Event Log использует browser clipboard API. Если clipboard недоступен в браузере, экспорт не критичен для защиты: используйте визуальный Event Log с фильтрами, timestamp, state, command/category и severity. DevTools открывать не требуется.
+
 ## Запуск локально
 
 ```bash
 npm install
 npm run dev
 ```
-
-Открыть: http://127.0.0.1:3100/
 
 ## Запуск через Docker
 
@@ -90,13 +163,7 @@ State machine управляет циклом:
 
 ## Simplified PID
 
-PID-панель показывает упрощенную имитацию control loop:
-
-- target speed;
-- actual speed;
-- error;
-- correction;
-- mini graph последних тиков скорости.
+PID-панель показывает упрощенную имитацию control loop: target speed, actual speed, error, correction и mini graph последних тиков скорости.
 
 В normal flow actual speed приближается к target. В `jam` и `emergency_stop` target становится 0, actual speed визуально падает к 0.
 
@@ -106,7 +173,7 @@ PID-панель показывает упрощенную имитацию cont
 npm run test
 ```
 
-Покрыты classifier, PID и целостность сценариев.
+Покрыты classifier, PID, сценарии, demo steps и OZON criteria.
 
 ## Документация
 
@@ -114,6 +181,7 @@ npm run test
 - `docs/DEMO_SCRIPT.md` — 3-5 минутный сценарий защиты.
 - `docs/SCENARIOS.md` — ожидаемые результаты сценариев.
 - `docs/JURY_QA.md` — короткие ответы на вопросы жюри.
+- `docs/SUBMISSION_CHECKLIST.md` — checklist перед сдачей.
 
 ## Ограничения MVP
 

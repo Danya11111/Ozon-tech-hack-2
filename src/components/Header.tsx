@@ -1,14 +1,28 @@
-import type { SimulationState } from '../domain/types';
+import type { PresentationMode, SimulationState } from '../domain/types';
 
 interface HeaderProps {
   simulation: SimulationState;
+  presentationMode: PresentationMode;
+  safeDemoEnabled: boolean;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
   onStep: () => void;
+  onPresentationModeChange: (mode: PresentationMode) => void;
+  onSafeDemoChange: (enabled: boolean) => void;
 }
 
-export default function Header({ simulation, onStart, onPause, onReset, onStep }: HeaderProps) {
+export default function Header({
+  simulation,
+  presentationMode,
+  safeDemoEnabled,
+  onStart,
+  onPause,
+  onReset,
+  onStep,
+  onPresentationModeChange,
+  onSafeDemoChange,
+}: HeaderProps) {
   const locked = simulation.machineState === 'FAULT' || simulation.machineState === 'EMERGENCY_STOP';
 
   return (
@@ -18,6 +32,15 @@ export default function Header({ simulation, onStart, onPause, onReset, onStep }
         <h1>OZON Tech Sorter Simulation</h1>
       </div>
       <div className="header-status">
+        <div className="mode-toggle" role="group" aria-label="Dashboard mode">
+          <button className={presentationMode === 'engineering' ? 'active' : ''} onClick={() => onPresentationModeChange('engineering')}>Engineering Mode</button>
+          <button className={presentationMode === 'presentation' ? 'active' : ''} onClick={() => onPresentationModeChange('presentation')}>Presentation Mode</button>
+        </div>
+        {presentationMode === 'presentation' ? (
+          <button className={safeDemoEnabled ? 'safe-demo-toggle active' : 'safe-demo-toggle'} onClick={() => onSafeDemoChange(!safeDemoEnabled)}>
+            Safe Demo: {safeDemoEnabled ? 'ON' : 'OFF'}
+          </button>
+        ) : null}
         <div className={`status-pill status-${simulation.systemStatus.toLowerCase()}`}>
           <span />
           {simulation.systemStatus}
