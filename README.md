@@ -1,115 +1,47 @@
 # OZON Tech Sorter Simulation
 
-Инженерный frontend MVP для задачи хакатона OZON Tech: «Интеллектуальная роботизированная система сортировки товаров».
+Интеллектуальная роботизированная система сортировки товаров (Frontend MVP).
 
-Проект показывает 2D/SVG dashboard сортировочной линии: рабочую зону 6000 x 10000 мм, конвейер шириной 500 мм, зоны A/B/C/D, roll-cage C/D, датчики, stop-gate, толкатели, классификацию, маршрутизацию, timeline цикла, PID-имитацию, метрики, event log и режим защиты для жюри.
+Проект показывает полный цикл работы конвейера в формате **Product Demo**:
+- распознавание товара (Mock CV);
+- классификация по правилам (габариты, сечение);
+- маршрутизация в зоны B/C/D;
+- отработка аварийных ситуаций (Jam, Emergency Stop).
+
+UI переработан под **Product Demo Landing Page**, который:
+- работает без горизонтального скролла на любых экранах;
+- адаптирован для Mobile, Tablet и Desktop;
+- включает Storyline (Detection → Classification → Command → Routing);
+- предлагает список Jury Scenarios и OZON Criteria;
+- прячет сложный Engineering Dashboard в сворачиваемый аккордеон.
 
 ## Стек
 
-- Vite
-- React
-- TypeScript
-- SVG/CSS для инженерной 2D-сцены
+- Vite, React, TypeScript
+- CSS/SVG (адаптивная сцена)
 - Vitest для доменных тестов
-- Docker + nginx для production static hosting
-
-Нет Three.js, backend, реального ML и тяжелых UI-библиотек.
+- Docker + nginx (production static hosting)
 
 ## Как открыть демо
 
 Публично:
-
 ```text
 https://arhipovdan.ru/
 https://www.arhipovdan.ru/
 ```
 
 Локально на сервере:
-
 ```text
 http://127.0.0.1:3100/
 ```
 
-### Guided Demo
+## Структура Demo-страницы
 
-Рекомендуемый путь для жюри — использовать **Guided Demo** view.
-В Header переключите режим на `Guided Demo`.
-Это чистое демо-представление для защиты (1 экран без скролла).
-
-Отличия Guided Demo от Engineering Dashboard:
-- Guided Demo показывает только ключевую информацию для защиты (Proof Card, Narration, Snapshot), скрывая длинные логи и графики.
-- Engineering Mode дает полный доступ ко всем метрикам, логам, PID-графику и дереву классификации.
-
-Рекомендуемый путь:
-- Start Guided Demo
-- Next
-- Oversized
-- Round
-- Low confidence
-- Jam
-- Emergency stop
-
-В Guided Demo закрываются критерии: classification correctness, routing, timing, fault handling.
-
-## Presentation Mode
-
-В Header есть переключатель:
-
-- `Engineering Mode` — полный инженерный dashboard.
-- `Presentation Mode` — режим защиты с demo narrative, подсказками докладчика, фокусом на текущую область и criteria checklist.
-
-В Presentation Mode панель demo steps показывает:
-
-- номер текущего шага;
-- что сейчас происходит;
-- что смотреть на экране;
-- что это доказывает для жюри;
-- связанные OZON criteria;
-- готовую presenter phrase.
-
-Кнопки:
-
-- `Previous step` / `Next step`;
-- `Restart demo`;
-- `Apply scenario`;
-- `Run suggested action`.
-
-Для `jam` и `emergency_stop` при `Safe Demo: ON` требуется явное повторное подтверждение fault-сценария.
-
-## Demo Steps
-
-1. System overview.
-2. Normal item to B.
-3. Oversized item to C.
-4. Round object to D.
-5. Boundary dimensions.
-6. Low confidence fallback.
-7. Close items queue.
-8. Jam / fault handling.
-9. Emergency stop.
-10. Performance and synchronization.
-
-## OZON Criteria Coverage Panel
-
-Панель `OZON criteria coverage` показывает, какие критерии закрыты и где это доказано:
-
-- category correctness;
-- classification rules;
-- boundary cases;
-- physical routing;
-- manipulation logic;
-- geometry variety;
-- safety;
-- timing and throughput;
-- CV-to-actuator integration;
-- engineering realism;
-- reproducibility/docs.
-
-Фильтры: `all`, `covered`, `partially covered`, `demo step available`.
-
-## Event Log JSON
-
-`Copy JSON` в Event Log использует browser clipboard API. Если clipboard недоступен в браузере, экспорт не критичен для защиты: используйте визуальный Event Log с фильтрами, timestamp, state, command/category и severity. DevTools открывать не требуется.
+1. **Hero Section:** краткая суть проекта и цепочки действий.
+2. **Product Demo Section:** живая сцена (`SorterScene`) и карточка текущего результата.
+3. **Scenarios Cards:** карточки для проверки нестандартных товаров (негабарит, шар, затор).
+4. **Criteria Cards:** чек-лист покрытия требований OZON.
+5. **Engineering Details:** подробные отладочные панели (Event Log, PID, метрики).
 
 ## Запуск локально
 

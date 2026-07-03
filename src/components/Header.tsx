@@ -1,59 +1,31 @@
-import type { PresentationMode, SimulationState } from '../domain/types';
+import type { SimulationState } from '../domain/types';
 
 interface HeaderProps {
   simulation: SimulationState;
-  presentationMode: PresentationMode;
-  safeDemoEnabled: boolean;
-  onStart: () => void;
-  onPause: () => void;
-  onReset: () => void;
-  onStep: () => void;
-  onPresentationModeChange: (mode: PresentationMode) => void;
-  onSafeDemoChange: (enabled: boolean) => void;
 }
 
-export default function Header({
-  simulation,
-  presentationMode,
-  safeDemoEnabled,
-  onStart,
-  onPause,
-  onReset,
-  onStep,
-  onPresentationModeChange,
-  onSafeDemoChange,
-}: HeaderProps) {
-  const locked = simulation.machineState === 'FAULT' || simulation.machineState === 'EMERGENCY_STOP';
-
+export default function Header({ simulation }: HeaderProps) {
   return (
-    <header className="header">
-      <div>
-        <p className="eyebrow">Intelligent robotic sorting line</p>
-        <h1>OZON Tech Sorter Simulation</h1>
+    <header className="site-header">
+      <div className="header-logo">
+        <span className="logo-icon">O</span>
+        <div className="logo-text">
+          <span className="logo-title">OZON Tech</span>
+          <span className="logo-subtitle">Sorter Simulation</span>
+        </div>
       </div>
-      <div className="header-status">
-        <div className="mode-toggle" role="group" aria-label="Dashboard mode">
-          <button className={presentationMode === 'engineering' ? 'active' : ''} onClick={() => onPresentationModeChange('engineering')}>Engineering Mode</button>
-          <button className={presentationMode === 'presentation' ? 'active' : ''} onClick={() => onPresentationModeChange('presentation')}>Presentation Dashboard</button>
-          <button className={presentationMode === 'guided' ? 'active' : ''} onClick={() => onPresentationModeChange('guided')}>Guided Demo</button>
-        </div>
-        {presentationMode === 'presentation' ? (
-          <button className={safeDemoEnabled ? 'safe-demo-toggle active' : 'safe-demo-toggle'} onClick={() => onSafeDemoChange(!safeDemoEnabled)}>
-            Safe Demo: {safeDemoEnabled ? 'ON' : 'OFF'}
-          </button>
-        ) : null}
-        <div className={`status-pill status-${simulation.systemStatus.toLowerCase()}`}>
-          <span />
-          {simulation.systemStatus}
-        </div>
-        <div className="scenario-label">Scenario: {simulation.scenario.name}</div>
-        <div className="scenario-label">Sim t+{(simulation.simTimeMs / 1000).toFixed(1)}s</div>
-        <div className="header-actions">
-          <button onClick={onStart} disabled={locked}>Start</button>
-          <button onClick={onPause}>Pause</button>
-          <button onClick={onReset}>Reset</button>
-          <button onClick={onStep} disabled={locked}>Step state</button>
-        </div>
+      
+      <div className="header-nav">
+        <a href="#demo" className="nav-link">Демо</a>
+        <a href="#scenarios" className="nav-link">Сценарии</a>
+        <a href="#criteria" className="nav-link">Критерии</a>
+        <a href="#engineering" className="nav-link">Инженерный режим</a>
+      </div>
+      
+      <div className="header-status-compact">
+        <div className={`status-dot ${simulation.systemStatus.toLowerCase()}`}></div>
+        <span>{simulation.systemStatus}</span>
+        <span className="sim-time">t+{(simulation.simTimeMs / 1000).toFixed(1)}s</span>
       </div>
     </header>
   );

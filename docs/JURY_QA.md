@@ -60,18 +60,14 @@ The stop-gate fixes the item. B opens the gate, C extends pusher C, D extends pu
 
 The system enters FAULT, conveyor target speed becomes 0, actual speed decays toward 0, and Reset is required.
 
-## 16. Why is the interface divided into Guided and Engineering?
+## 16. Why is the interface a Product Demo Page now?
 
-Guided Demo is focused solely on the defense presentation, showing only the Proof Card, Scene, and Narrative, ensuring clarity in a 3-minute pitch. Engineering Mode provides full access to logs, PID, and internal state.
+To avoid cognitive overload during the pitch. The jury needs to understand the decision and see the route clearly without distraction from raw JSON logs or PID graphs, especially on laptop projectors or mobile devices.
 
-## 17. How does Guided Demo prove engineering realism?
+## 17. How does the Demo prove engineering realism?
 
-Even in Guided Demo, the scene and proof card are driven by the real underlying state machine, classifier, and metric engine—not a pre-rendered video.
+Even in the Product Demo Section, the scene and proof card are driven by the real underlying state machine, classifier, and metric engine—not a pre-rendered video.
 
 ## 18. Where to see the full event log and PID?
 
-In the Engineering Dashboard.
-
-## 19. Why aren't all panels shown in Guided Demo?
-
-To avoid cognitive overload during the pitch. The jury needs to understand the decision and see the route clearly without distraction from raw JSON logs or PID graphs.
+Scroll down and open the "Engineering Details (Engineering Mode)" accordion.
