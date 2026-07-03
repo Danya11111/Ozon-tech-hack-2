@@ -9,6 +9,8 @@ interface HeaderProps {
 }
 
 export default function Header({ simulation, onStart, onPause, onReset, onStep }: HeaderProps) {
+  const locked = simulation.machineState === 'FAULT' || simulation.machineState === 'EMERGENCY_STOP';
+
   return (
     <header className="header">
       <div>
@@ -21,11 +23,12 @@ export default function Header({ simulation, onStart, onPause, onReset, onStep }
           {simulation.systemStatus}
         </div>
         <div className="scenario-label">Scenario: {simulation.scenario.name}</div>
+        <div className="scenario-label">Sim t+{(simulation.simTimeMs / 1000).toFixed(1)}s</div>
         <div className="header-actions">
-          <button onClick={onStart}>Start</button>
+          <button onClick={onStart} disabled={locked}>Start</button>
           <button onClick={onPause}>Pause</button>
           <button onClick={onReset}>Reset</button>
-          <button onClick={onStep}>Step</button>
+          <button onClick={onStep} disabled={locked}>Step state</button>
         </div>
       </div>
     </header>

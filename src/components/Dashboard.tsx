@@ -8,6 +8,7 @@ import EventLog from './EventLog';
 import ScenarioPanel from './ScenarioPanel';
 import SensorPanel from './SensorPanel';
 import PidPanel from './PidPanel';
+import TimelinePanel from './TimelinePanel';
 import type { Scenario, ScenarioId, SimulationState } from '../domain/types';
 
 interface DashboardProps {
@@ -46,12 +47,13 @@ export default function Dashboard({
         </section>
         <aside className="right-rail">
           <CurrentItemPanel simulation={simulation} />
-          <ClassificationPanel currentItem={simulation.currentItem} />
+          <ClassificationPanel simulation={simulation} />
           <StateMachinePanel currentState={simulation.machineState} />
           <SensorPanel simulation={simulation} />
         </aside>
         <section className="bottom-row">
           <MetricsPanel metrics={simulation.metrics} />
+          <TimelinePanel simulation={simulation} />
           <PidPanel pid={simulation.pid} metrics={simulation.metrics} status={simulation.systemStatus} />
           <EventLog events={simulation.events} />
           <ScenarioPanel

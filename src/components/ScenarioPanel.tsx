@@ -11,7 +11,7 @@ export default function ScenarioPanel({ scenarios, activeScenarioId, onScenarioC
     <section className="panel scenario-panel">
       <div className="panel-heading">
         <p className="eyebrow">Scenario panel</p>
-        <h2>Test cases</h2>
+        <h2>Jury test cases</h2>
       </div>
       <div className="scenario-buttons">
         {scenarios.map((scenario) => (
@@ -22,6 +22,9 @@ export default function ScenarioPanel({ scenarios, activeScenarioId, onScenarioC
           >
             <strong>{scenario.name}</strong>
             <span>{scenario.description}</span>
+            <em>Goal: {scenario.goal}</em>
+            <em>Expected: {scenario.expectedCategorySummary}</em>
+            <em>Shows: {scenario.demonstrates}</em>
           </button>
         ))}
       </div>

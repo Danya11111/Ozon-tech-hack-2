@@ -30,6 +30,7 @@ export type SensorKind = 'camera' | 'laser' | 'ultrasound';
 export type EventType = 'system' | 'sensor' | 'classification' | 'actuator' | 'routing' | 'warning' | 'fault';
 export type EventStatus = 'info' | 'success' | 'warning' | 'error';
 export type PusherState = 'idle' | 'extended' | 'retracting';
+export type TimelineStatus = 'done' | 'active' | 'pending' | 'skipped';
 
 export interface DimensionsMm {
   width: number;
@@ -65,6 +66,9 @@ export interface Scenario {
   id: ScenarioId;
   name: string;
   description: string;
+  goal: string;
+  expectedCategorySummary: string;
+  demonstrates: string;
   items: Item[];
   initialStatus?: SystemStatus;
 }
@@ -76,6 +80,8 @@ export interface EventLogEntry {
   type: EventType;
   message: string;
   category?: Category;
+  command?: string;
+  state?: MachineState;
   status: EventStatus;
 }
 
@@ -88,6 +94,7 @@ export interface Metrics {
   cvLatencyMs: number;
   actuatorLatencyMs: number;
   queueLength: number;
+  queueDelayMs: number;
   conveyorSpeedMps: number;
   pidTargetSpeedMps: number;
   pidActualSpeedMps: number;
@@ -141,6 +148,14 @@ export interface PidState {
   actualSpeedMps: number;
   pidError: number;
   correction: number;
+  speedHistoryMps: number[];
+}
+
+export interface CycleTimelineEntry {
+  state: MachineState;
+  startedAtMs?: number;
+  durationMs: number;
+  status: TimelineStatus;
 }
 
 export interface SimulatedItem {

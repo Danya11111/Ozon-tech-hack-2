@@ -10,6 +10,7 @@ export function createMetrics(): Metrics {
     cvLatencyMs: 0,
     actuatorLatencyMs: 0,
     queueLength: 0,
+    queueDelayMs: 0,
     conveyorSpeedMps: 0,
     pidTargetSpeedMps: 0.42,
     pidActualSpeedMps: 0,

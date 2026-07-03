@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Dashboard from './components/Dashboard';
 import { SCENARIOS } from './data/scenarios';
-import { createSimulation, setRunning, stepSimulation } from './domain/simulation';
+import { createSimulation, setRunning, stepSimulation, stepSimulationToNextState } from './domain/simulation';
 import type { ScenarioId, SimulationState } from './domain/types';
 
 const TICK_MS = 250;
@@ -33,7 +33,7 @@ export default function App() {
   const handleStart = () => setSimulation((current) => setRunning(current, true));
   const handlePause = () => setSimulation((current) => setRunning(current, false));
   const handleReset = () => setSimulation(createSimulation(activeScenario));
-  const handleStep = () => setSimulation((current) => stepSimulation(setRunning(current, false), 500, true));
+  const handleStep = () => setSimulation((current) => stepSimulationToNextState(current));
   const handleScenarioChange = (scenarioId: ScenarioId) => setActiveScenarioId(scenarioId);
 
   return (

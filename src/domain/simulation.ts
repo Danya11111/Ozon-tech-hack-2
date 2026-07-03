@@ -3,6 +3,7 @@ import { createMetrics, recordCycle } from './metrics';
 import { createPidState, updatePid } from './pid';
 import type {
   Category,
+  CycleTimelineEntry,
   EventLogEntry,
   MachineState,
   Scenario,
@@ -10,7 +11,7 @@ import type {
   SystemStatus,
 } from './types';
 
-const STATE_DURATIONS_MS: Partial<Record<MachineState, number>> = {
+export const STATE_DURATIONS_MS: Record<Exclude<MachineState, 'IDLE' | 'FAULT' | 'EMERGENCY_STOP'>, number> = {
   MOVING_TO_CAMERA: 1200,
   DETECTING: 900,
   MOVING_TO_GATE: 1300,
@@ -22,6 +23,18 @@ const STATE_DURATIONS_MS: Partial<Record<MachineState, number>> = {
   RETURN_HOME: 700,
 };
 
+export const CYCLE_STATE_ORDER: MachineState[] = [
+  'MOVING_TO_CAMERA',
+  'DETECTING',
+  'MOVING_TO_GATE',
+  'WAITING_AT_GATE',
+  'CLASSIFYING',
+  'ROUTE_TO_B',
+  'ROUTE_TO_C',
+  'ROUTE_TO_D',
+  'RETURN_HOME',
+];
+
 const ROUTE_STATE_BY_CATEGORY: Record<Category, MachineState> = {
   B: 'ROUTE_TO_B',
   C: 'ROUTE_TO_C',
@@ -30,7 +43,9 @@ const ROUTE_STATE_BY_CATEGORY: Record<Category, MachineState> = {
 
 let eventCounter = 0;
 
-function event(timestampMs: number, entry: Omit<EventLogEntry, 'id' | 'timestampMs'>): EventLogEntry {
+type EventInput = Omit<EventLogEntry, 'id' | 'timestampMs'>;
+
+function event(timestampMs: number, entry: EventInput): EventLogEntry {
   eventCounter += 1;
   return {
     id: `evt-${eventCounter}`,
@@ -39,10 +54,10 @@ function event(timestampMs: number, entry: Omit<EventLogEntry, 'id' | 'timestamp
   };
 }
 
-function appendEvent(state: SimulationState, entry: Omit<EventLogEntry, 'id' | 'timestampMs'>): SimulationState {
+function appendEvent(state: SimulationState, entry: EventInput): SimulationState {
   return {
     ...state,
-    events: [event(state.simTimeMs, entry), ...state.events].slice(0, 80),
+    events: [event(state.simTimeMs, { state: state.machineState, ...entry }), ...state.events].slice(0, 120),
   };
 }
 
@@ -63,8 +78,10 @@ function transitionTo(state: SimulationState, nextState: MachineState): Simulati
     next = appendEvent(next, {
       itemId: item.id,
       type: 'sensor',
-      message: `Camera captured bbox, confidence ${Math.round(item.confidence * 100)}%`,
+      message: `Camera bbox ${item.dimensionsMm.width}x${item.dimensionsMm.depth} mm, confidence ${Math.round(item.confidence * 100)}%`,
       category: state.currentItem?.classification.category,
+      command: 'CAMERA_CAPTURE',
+      state: nextState,
       status: item.confidence < 0.65 ? 'warning' : 'info',
     });
   }
@@ -74,6 +91,8 @@ function transitionTo(state: SimulationState, nextState: MachineState): Simulati
       itemId: item.id,
       type: 'actuator',
       message: 'Stop-gate closed, item fixed before classification',
+      command: 'GATE_CLOSE',
+      state: nextState,
       status: 'info',
     });
   }
@@ -84,6 +103,8 @@ function transitionTo(state: SimulationState, nextState: MachineState): Simulati
       type: 'classification',
       message: `${state.currentItem.classification.label}: ${state.currentItem.classification.reason}`,
       category: state.currentItem.classification.category,
+      command: 'CLASSIFY_RULE_BASED',
+      state: nextState,
       status: state.currentItem.classification.warnings.length > 0 ? 'warning' : 'success',
     });
   }
@@ -94,6 +115,8 @@ function transitionTo(state: SimulationState, nextState: MachineState): Simulati
       type: 'routing',
       message: `Route selected: ${state.currentItem.classification.category}`,
       category: state.currentItem.classification.category,
+      command: nextState,
+      state: nextState,
       status: 'success',
     });
   }
@@ -104,7 +127,7 @@ function transitionTo(state: SimulationState, nextState: MachineState): Simulati
 function startNextItem(state: SimulationState): SimulationState {
   const item = state.scenario.items[state.itemIndex];
   if (!item) {
-    return { ...state, machineState: 'IDLE', running: false, systemStatus: 'PAUSED' };
+    return { ...state, machineState: 'IDLE', running: false, systemStatus: 'PAUSED', currentItem: undefined };
   }
 
   const classification = classifyItem(item);
@@ -118,6 +141,7 @@ function startNextItem(state: SimulationState): SimulationState {
     },
     machineState: 'MOVING_TO_CAMERA',
     elapsedInStateMs: 0,
+    activeRoute: undefined,
     itemIndex: state.itemIndex + 1,
   };
 
@@ -125,6 +149,8 @@ function startNextItem(state: SimulationState): SimulationState {
     itemId: item.id,
     type: 'system',
     message: `Item entered zone A: ${item.name}`,
+    command: 'FEED_ITEM',
+    state: 'MOVING_TO_CAMERA',
     status: 'info',
   });
 
@@ -133,6 +159,8 @@ function startNextItem(state: SimulationState): SimulationState {
       itemId: item.id,
       type: 'warning',
       message: 'Queue/spacing warning: next item detected too close, processing sequentially',
+      command: 'QUEUE_HOLD_NEXT_ITEM',
+      state: 'MOVING_TO_CAMERA',
       status: 'warning',
     });
   }
@@ -143,6 +171,8 @@ function startNextItem(state: SimulationState): SimulationState {
       type: 'warning',
       message: warning,
       category: classification.category,
+      command: 'RULE_BASED_FALLBACK',
+      state: 'MOVING_TO_CAMERA',
       status: 'warning',
     });
   }
@@ -162,6 +192,10 @@ function completeCurrentItem(state: SimulationState): SimulationState {
   let next = appendEvent(
     {
       ...state,
+      currentItem: {
+        ...state.currentItem,
+        cycleTimeMs,
+      },
       metrics,
     },
     {
@@ -169,13 +203,13 @@ function completeCurrentItem(state: SimulationState): SimulationState {
       type: 'routing',
       message: `Cycle completed in ${(cycleTimeMs / 1000).toFixed(1)}s`,
       category: state.currentItem.classification.category,
+      command: 'CYCLE_COMPLETE',
       status: success ? 'success' : 'error',
     },
   );
 
   next = {
     ...next,
-    currentItem: undefined,
     activeRoute: undefined,
   };
 
@@ -315,6 +349,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
       itemId: next.currentItem?.item.id,
       type: 'fault',
       message: 'Emergency stop pressed, all movement stopped',
+      command: 'EMERGENCY_STOP',
       status: 'error',
     });
     next = { ...next, machineState: 'EMERGENCY_STOP', running: false, systemStatus: 'EMERGENCY_STOP' };
@@ -327,6 +362,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
       type: 'fault',
       message: 'Jam detected at stop-gate, conveyor stopped',
       category: next.currentItem?.classification.category,
+      command: 'CONVEYOR_STOP_FAULT',
       status: 'error',
     });
     next = { ...next, machineState: 'FAULT', running: false, systemStatus: 'FAULT' };
@@ -350,7 +386,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
     next = startNextItem(next);
   }
 
-  const duration = STATE_DURATIONS_MS[next.machineState];
+  const duration = next.machineState in STATE_DURATIONS_MS ? STATE_DURATIONS_MS[next.machineState as keyof typeof STATE_DURATIONS_MS] : undefined;
   if (duration && next.elapsedInStateMs >= duration) {
     switch (next.machineState) {
       case 'MOVING_TO_CAMERA':
@@ -376,7 +412,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
         next = completeCurrentItem(next);
         break;
       case 'RETURN_HOME':
-        next = next.itemIndex < next.scenario.items.length ? startNextItem(next) : { ...next, machineState: 'IDLE', running: false, systemStatus: 'PAUSED', elapsedInStateMs: 0 };
+        next = next.itemIndex < next.scenario.items.length ? startNextItem(next) : { ...next, currentItem: undefined, machineState: 'IDLE', running: false, systemStatus: 'PAUSED', elapsedInStateMs: 0 };
         break;
       default:
         break;
@@ -388,6 +424,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
   const queueLength = Math.max(next.scenario.items.length - next.itemIndex, 0) + (next.currentItem ? 1 : 0);
   const cvLatencyMs = next.sensors.camera.cvLatencyMs || next.metrics.cvLatencyMs;
   const actuatorLatencyMs = next.actuators.pusherC !== 'idle' || next.actuators.pusherD !== 'idle' ? 115 : next.machineState === 'ROUTE_TO_B' ? 55 : 0;
+  const queueDelayMs = next.scenario.id === 'close_items' && queueLength > 1 ? 450 : 0;
 
   next = {
     ...next,
@@ -398,6 +435,7 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
       cvLatencyMs,
       actuatorLatencyMs,
       queueLength,
+      queueDelayMs,
       conveyorSpeedMps: pid.actualSpeedMps,
       pidTargetSpeedMps: pid.targetSpeedMps,
       pidActualSpeedMps: pid.actualSpeedMps,
@@ -405,4 +443,58 @@ export function stepSimulation(state: SimulationState, deltaMs: number, forceSte
   };
 
   return deriveSensorsAndActuators(next);
+}
+
+export function stepSimulationToNextState(state: SimulationState): SimulationState {
+  if (state.machineState === 'FAULT' || state.machineState === 'EMERGENCY_STOP') {
+    return state;
+  }
+
+  const runningState = setRunning({ ...state, running: true, systemStatus: 'RUNNING' }, true);
+  let deltaMs = 1;
+
+  if (runningState.scenario.id === 'emergency_stop') {
+    deltaMs = Math.max(1, 1800 - runningState.simTimeMs);
+  } else if (runningState.scenario.id === 'jam' && runningState.machineState === 'WAITING_AT_GATE') {
+    deltaMs = Math.max(1, 700 - runningState.elapsedInStateMs);
+  } else if (runningState.machineState in STATE_DURATIONS_MS) {
+    const duration = STATE_DURATIONS_MS[runningState.machineState as keyof typeof STATE_DURATIONS_MS];
+    deltaMs = Math.max(1, duration - runningState.elapsedInStateMs);
+  }
+
+  const stepped = stepSimulation(runningState, deltaMs, true);
+  return setRunning(stepped, false);
+}
+
+export function buildCycleTimeline(state: SimulationState): CycleTimelineEntry[] {
+  const current = state.currentItem;
+  const activeRoute = current ? ROUTE_STATE_BY_CATEGORY[current.classification.category] : undefined;
+  let cursor = current?.startedAtMs ?? state.simTimeMs;
+
+  return CYCLE_STATE_ORDER.map((machineState) => {
+    const isRouteState = machineState.startsWith('ROUTE_TO_');
+    const skipped = isRouteState && machineState !== activeRoute;
+    const durationMs = STATE_DURATIONS_MS[machineState as keyof typeof STATE_DURATIONS_MS] ?? 0;
+    const startedAtMs = current && !skipped ? cursor : undefined;
+    let status: CycleTimelineEntry['status'] = current ? 'pending' : 'pending';
+
+    if (skipped) {
+      status = 'skipped';
+    } else if (current && machineState === state.machineState) {
+      status = 'active';
+    } else if (current && startedAtMs !== undefined && state.simTimeMs >= startedAtMs + durationMs) {
+      status = 'done';
+    }
+
+    if (!skipped) {
+      cursor += durationMs;
+    }
+
+    return {
+      state: machineState,
+      startedAtMs,
+      durationMs,
+      status,
+    };
+  });
 }

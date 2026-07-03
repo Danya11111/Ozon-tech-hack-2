@@ -9,6 +9,7 @@ const metricLabels: Array<[keyof Metrics, string, string]> = [
   ['cvLatencyMs', 'CV latency', 'ms'],
   ['actuatorLatencyMs', 'Actuator latency', 'ms'],
   ['queueLength', 'Queue length', 'items'],
+  ['queueDelayMs', 'Queue delay', 'ms'],
   ['conveyorSpeedMps', 'Conveyor speed', 'm/s'],
   ['pidTargetSpeedMps', 'PID target', 'm/s'],
   ['pidActualSpeedMps', 'PID actual', 'm/s'],
