@@ -1,5 +1,6 @@
 import type { SimulatedItem, SimulationState } from '../../domain/types';
 import { itemPosition3D, ROUTE_COLORS } from './itemMotion';
+import { DIMENSION_LIMITS } from '../../domain/classifier';
 
 interface Props {
   simulation: SimulationState;
@@ -21,7 +22,7 @@ export default function Item3D({ simulation, currentItem }: Props) {
   const isRound =
     currentItem.item.shape.includes('round') ||
     currentItem.item.shape.includes('cylinder') ||
-    currentItem.item.roundness >= 0.8;
+    currentItem.item.roundness >= DIMENSION_LIMITS.roundnessThreshold;
   const detecting = simulation.machineState === 'DETECTING';
   const fault =
     simulation.machineState === 'FAULT' || simulation.machineState === 'EMERGENCY_STOP';
