@@ -646,6 +646,22 @@ button:disabled {
   gap: 10px;
 }
 
+.auto-demo-status {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #e5f2ff;
+  font-weight: 600;
+}
+
+.auto-demo-status strong {
+  color: #38bdf8;
+  text-transform: capitalize;
+}
+
 /* ---------- Proof card ---------- */
 
 .proof-card {

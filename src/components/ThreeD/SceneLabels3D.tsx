@@ -87,13 +87,14 @@ export default function SceneLabels3D({
         large
       />
 
-      {/* Накопитель — always visible */}
-      <Badge
-        position={[TWIN_LAYOUT.accumulatorX, 0.95, 0.65]}
-        text="Накопитель"
-        color="#5eead4"
-        large
-      />
+      {/* Накопитель — only in technical mode (убран из clean view) */}
+      {technicalLabelsEnabled && (
+        <Badge
+          position={[TWIN_LAYOUT.accumulatorX, 0.95, 0.65]}
+          text="Накопитель"
+          color="#5eead4"
+        />
+      )}
 
       {/* === STEP-BASED LABELS (shown only when active) === */}
       

@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import CurrentProofCard from './CurrentProofCard';
 import ThreeFallback from './ThreeD/ThreeFallback';
+import ThreeErrorBoundary from './ThreeD/ThreeErrorBoundary';
 import { prefer3DByDefault, useWebGLSupport } from './ThreeD/useWebGL';
 import type { SimulationState } from '../domain/types';
+import type { DemoDirectorState } from '../domain/demoDirector';
 
 const SorterDigitalTwin = lazy(() => import('./ThreeD/SorterDigitalTwin'));
 
@@ -11,19 +13,27 @@ type ViewMode = '3d' | '2d';
 interface Props {
   simulation: SimulationState;
   demoStepTitle: string;
+  demoDirector: DemoDirectorState;
   onStartDemo: () => void;
   onNext: () => void;
   onReset: () => void;
   onOpenEngineering: () => void;
+  onStartAutoDemo: () => void;
+  onToggleAutoDemo: () => void;
+  onStopAutoDemo: () => void;
 }
 
 export default function ProductDemoSection({
   simulation,
   demoStepTitle,
+  demoDirector,
   onStartDemo,
   onNext,
   onReset,
   onOpenEngineering,
+  onStartAutoDemo,
+  onToggleAutoDemo,
+  onStopAutoDemo,
 }: Props) {
   const webgl = useWebGLSupport();
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth));
@@ -104,16 +114,24 @@ export default function ProductDemoSection({
           </p>
           <div className="demo-scene-container demo-scene-3d">
             {show3D ? (
-              <Suspense fallback={<div className="three-loading">Загрузка 3D digital twin…</div>}>
-                <SorterDigitalTwin
-                  simulation={simulation}
-                  simplified={simplified}
-                  onContextLost={() => {
-                    setContextLost(true);
-                    setViewMode('2d');
-                  }}
-                />
-              </Suspense>
+              <ThreeErrorBoundary
+                onError={(error) => {
+                  console.error('3D Canvas failed:', error);
+                  setContextLost(true);
+                  setViewMode('2d');
+                }}
+              >
+                <Suspense fallback={<div className="three-loading">Загрузка 3D digital twin…</div>}>
+                  <SorterDigitalTwin
+                    simulation={simulation}
+                    simplified={simplified}
+                    onContextLost={() => {
+                      setContextLost(true);
+                      setViewMode('2d');
+                    }}
+                  />
+                </Suspense>
+              </ThreeErrorBoundary>
             ) : (
               <ThreeFallback simulation={simulation} reason={fallbackReason} />
             )}
@@ -153,12 +171,34 @@ export default function ProductDemoSection({
           </div>
 
           <div className="demo-controls">
-            <button type="button" className="btn-primary" onClick={onStartDemo}>
-              Start demo
-            </button>
-            <button type="button" className="btn-primary" onClick={onNext}>
-              Next step
-            </button>
+            {/* Auto Demo Controls */}
+            {!demoDirector.isAutoDemoRunning ? (
+              <button type="button" className="btn-primary" onClick={onStartAutoDemo}>
+                🎬 Запустить автодемо
+              </button>
+            ) : (
+              <>
+                <button type="button" className="btn-primary" onClick={onToggleAutoDemo}>
+                  {demoDirector.paused ? '▶ Продолжить' : '⏸ Пауза'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={onStopAutoDemo}>
+                  ⏹ Остановить
+                </button>
+              </>
+            )}
+            
+            {/* Manual Controls (secondary when auto demo not running) */}
+            {!demoDirector.isAutoDemoRunning && (
+              <>
+                <button type="button" className="btn-secondary" onClick={onStartDemo}>
+                  Start demo (manual)
+                </button>
+                <button type="button" className="btn-secondary" onClick={onNext}>
+                  Next step
+                </button>
+              </>
+            )}
+            
             <button type="button" className="btn-secondary" onClick={onReset}>
               Reset
             </button>
@@ -166,6 +206,15 @@ export default function ProductDemoSection({
               Engineering details
             </button>
           </div>
+          
+          {/* Auto Demo Status */}
+          {demoDirector.isAutoDemoRunning && (
+            <div className="auto-demo-status">
+              <span>Auto Demo: </span>
+              <strong>{demoDirector.currentStep.replace(/_/g, ' ')}</strong>
+              <span> ({demoDirector.paused ? 'Paused' : 'Running'})</span>
+            </div>
+          )}
         </aside>
       </div>
     </section>

@@ -9,8 +9,17 @@ import CriteriaCards from './components/CriteriaCards';
 import EngineeringDetails, { type EngineeringDetailsHandle } from './components/EngineeringDetails';
 import { DEMO_STEPS } from './data/demoSteps';
 import { SCENARIOS } from './data/scenarios';
-import { createSimulation, stepSimulationToNextState } from './domain/simulation';
+import { createSimulation, stepSimulationToNextState, setRunning } from './domain/simulation';
 import type { ScenarioId, SimulationState } from './domain/types';
+import {
+  createDemoDirectorState,
+  startAutoDemo,
+  pauseAutoDemo,
+  resumeAutoDemo,
+  stopAutoDemo,
+  updateAutoDemo,
+  type DemoDirectorState,
+} from './domain/demoDirector';
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -28,10 +37,77 @@ export default function App() {
 
   const currentDemoStep = DEMO_STEPS[demoStepIndex];
   const [simulation, setSimulation] = useState<SimulationState>(() => createSimulation(activeScenario));
+  
+  // Auto Demo Director state
+  const [demoDirector, setDemoDirector] = useState<DemoDirectorState>(() =>
+    createDemoDirectorState(activeScenario),
+  );
+  
+  // Use refs to avoid triggering re-renders on every frame
+  const rafIdRef = useRef<number | null>(null);
+  const lastUpdateRef = useRef(performance.now());
+  const UPDATE_INTERVAL = 100; // Update UI only every 100ms instead of every frame
 
   useEffect(() => {
     setSimulation(createSimulation(activeScenario));
+    setDemoDirector(createDemoDirectorState(activeScenario));
   }, [activeScenario]);
+  
+  // Auto Demo loop - throttled updates to prevent render loop
+  useEffect(() => {
+    if (!demoDirector.isAutoDemoRunning || demoDirector.paused) {
+      // Clean up RAF on stop/pause
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      return;
+    }
+
+    let lastTime = performance.now();
+
+    const tick = () => {
+      const now = performance.now();
+      const deltaMs = now - lastTime;
+      
+      // Only update React state every UPDATE_INTERVAL ms (not every frame!)
+      if (now - lastUpdateRef.current >= UPDATE_INTERVAL) {
+        lastTime = now;
+        lastUpdateRef.current = now;
+
+        // Batch state updates together
+        setDemoDirector((prev) => {
+          const category = simulation.currentItem?.classification.category;
+          return updateAutoDemo(prev, deltaMs, category);
+        });
+
+        setSimulation((current) => {
+          if (current.machineState === 'IDLE' && !current.currentItem) {
+            return setRunning(stepSimulationToNextState(current), true);
+          }
+          if (
+            current.machineState === 'RETURN_HOME' ||
+            current.machineState === 'FAULT' ||
+            current.machineState === 'EMERGENCY_STOP'
+          ) {
+            return createSimulation(activeScenario);
+          }
+          return setRunning(current, true);
+        });
+      }
+
+      rafIdRef.current = requestAnimationFrame(tick);
+    };
+
+    rafIdRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario]); // Removed circular dependency!
 
   const handleStartDemo = () => {
     scrollToId('demo');
@@ -83,6 +159,38 @@ export default function App() {
   const handleShowCPriority = () => {
     handleScenarioChange('c_priority');
   };
+  
+  // Auto Demo handlers
+  const handleStartAutoDemo = () => {
+    scrollToId('demo');
+    setDemoDirector((prev) => startAutoDemo(prev));
+    setSimulation(createSimulation(activeScenario));
+  };
+
+  const handlePauseAutoDemo = () => {
+    setDemoDirector((prev) => pauseAutoDemo(prev));
+  };
+
+  const handleResumeAutoDemo = () => {
+    setDemoDirector((prev) => resumeAutoDemo(prev));
+  };
+
+  const handleStopAutoDemo = () => {
+    setDemoDirector((prev) => stopAutoDemo(prev));
+    setSimulation(createSimulation(activeScenario));
+  };
+
+  const handleToggleAutoDemo = () => {
+    if (demoDirector.isAutoDemoRunning) {
+      if (demoDirector.paused) {
+        handleResumeAutoDemo();
+      } else {
+        handlePauseAutoDemo();
+      }
+    } else {
+      handleStartAutoDemo();
+    }
+  };
 
   return (
     <div className="product-page">
@@ -104,10 +212,14 @@ export default function App() {
         <ProductDemoSection
           simulation={simulation}
           demoStepTitle={currentDemoStep.title}
+          demoDirector={demoDirector}
           onStartDemo={handleStartDemo}
           onNext={handleNext}
           onReset={handleReset}
           onOpenEngineering={handleOpenEngineering}
+          onStartAutoDemo={handleStartAutoDemo}
+          onToggleAutoDemo={handleToggleAutoDemo}
+          onStopAutoDemo={handleStopAutoDemo}
         />
 
         <StorylineStepper simulation={simulation} />
