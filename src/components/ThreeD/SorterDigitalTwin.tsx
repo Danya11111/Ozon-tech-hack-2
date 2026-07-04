@@ -10,6 +10,7 @@ import Item3D from './Item3D';
 import RouteArrows3D from './RouteArrows3D';
 import SceneLabels3D from './SceneLabels3D';
 import { PHYSICS_ENGINE_ENABLED } from './itemMotion';
+import { NOMINAL_CONVEYOR_SPEED_MPS } from '../../domain/simulation';
 
 export interface SorterDigitalTwinProps {
   simulation: SimulationState;
@@ -96,6 +97,7 @@ function TwinScene({
         machineState={simulation.machineState}
         currentItem={simulation.currentItem}
         simplified={simplified}
+        conveyorTargetMps={NOMINAL_CONVEYOR_SPEED_MPS}
       />
 
       {stopped ? (
@@ -139,6 +141,8 @@ export default function SorterDigitalTwin({
         <span className="twin-chip">{simulation.scenario.name}</span>
         {category ? <span className={`twin-chip category-${category}`}>Zone {category}</span> : null}
         <span className="twin-chip">{command}</span>
+        <span className="twin-chip">Conveyor {NOMINAL_CONVEYOR_SPEED_MPS.toFixed(2)} m/s</span>
+        <span className="twin-chip">Min 10×10×10 mm</span>
         {showFps ? <span className="twin-chip">FPS ~{fps}</span> : null}
         <span className="twin-chip muted-chip">
           Motion: {PHYSICS_ENGINE_ENABLED ? 'physics' : 'state-machine'}

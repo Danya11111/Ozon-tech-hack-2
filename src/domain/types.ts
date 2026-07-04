@@ -20,6 +20,7 @@ export type ScenarioId =
   | 'normal_flow'
   | 'oversized_item'
   | 'round_object'
+  | 'c_priority'
   | 'boundary_dimensions'
   | 'close_items'
   | 'low_confidence'

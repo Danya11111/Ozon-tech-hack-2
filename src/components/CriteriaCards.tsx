@@ -37,10 +37,10 @@ const PRODUCT_CRITERIA: CriteriaCard[] = [
   {
     id: 'rule-priority',
     title: 'Приоритет правил',
-    evidence: 'Сначала габариты (C), затем форма (D), иначе основной поток B.',
+    evidence: 'Сначала габариты (C), затем форма (D). Негабарит + круглый → только C.',
     status: 'covered',
-    linkedScenario: 'boundary_dimensions',
-    linkedLabel: 'Пограничные размеры',
+    linkedScenario: 'c_priority',
+    linkedLabel: 'C-priority',
   },
   {
     id: 'routing',

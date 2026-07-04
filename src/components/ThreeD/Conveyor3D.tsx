@@ -7,6 +7,7 @@ interface Props {
 export default function Conveyor3D({ stopped }: Props) {
   const color = stopped ? '#7f1d1d' : '#1e3a54';
   const beltColor = stopped ? '#991b1b' : '#334155';
+  const accColor = stopped ? '#7f1d1d' : '#0f766e';
 
   return (
     <group>
@@ -22,11 +23,26 @@ export default function Conveyor3D({ stopped }: Props) {
         <meshStandardMaterial color={beltColor} roughness={0.9} />
       </mesh>
 
-      {/* Accumulator / buffer at end of feed conveyor */}
-      <mesh position={[TWIN_LAYOUT.accumulatorX, TWIN_LAYOUT.beltY - 0.05, 0]}>
-        <boxGeometry args={[0.9, 0.28, 0.7]} />
-        <meshStandardMaterial color={stopped ? '#7f1d1d' : '#0f766e'} roughness={0.7} />
-      </mesh>
+      {/* Accumulator / buffer at end of feed conveyor — explicit raised pocket */}
+      <group position={[TWIN_LAYOUT.accumulatorX, TWIN_LAYOUT.beltY, 0]}>
+        <mesh position={[0, -0.02, 0]}>
+          <boxGeometry args={[1.05, 0.12, 0.82]} />
+          <meshStandardMaterial color={accColor} roughness={0.65} emissive={accColor} emissiveIntensity={0.15} />
+        </mesh>
+        {/* Side walls of accumulator */}
+        <mesh position={[0, 0.12, 0.38]}>
+          <boxGeometry args={[1.05, 0.28, 0.06]} />
+          <meshStandardMaterial color="#14b8a6" />
+        </mesh>
+        <mesh position={[0, 0.12, -0.38]}>
+          <boxGeometry args={[1.05, 0.28, 0.06]} />
+          <meshStandardMaterial color="#14b8a6" />
+        </mesh>
+        <mesh position={[-0.48, 0.12, 0]}>
+          <boxGeometry args={[0.06, 0.28, 0.82]} />
+          <meshStandardMaterial color="#14b8a6" />
+        </mesh>
+      </group>
     </group>
   );
 }

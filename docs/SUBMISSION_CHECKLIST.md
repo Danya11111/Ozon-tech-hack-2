@@ -26,7 +26,7 @@ Before final submission:
 - [ ] App is responsive on Desktop (1920×1080), Laptop (1440×900) and Mobile (390×844).
 - [ ] NO horizontal scroll on body / `#root` / product page.
 - [ ] Mobile: one column, buttons ≥ 44px, scene scales.
-- [ ] Scenarios checked: normal_flow, oversized_item, round_object, boundary_dimensions, close_items, low_confidence, jam, emergency_stop.
+- [ ] Scenarios checked: normal_flow, oversized_item, round_object, c_priority, boundary_dimensions, close_items, low_confidence, jam, emergency_stop.
 - [ ] Docs present: README, ARCHITECTURE, DEMO_SCRIPT, SCENARIOS, JURY_QA, UI_UX_REDESIGN_AUDIT, THREE_D_FEASIBILITY, SUBMISSION_CHECKLIST.
 - [ ] Cursor rules present in `.cursor/rules/` (including 3D / physics / WebGL rules).
 - [ ] Branch ready for manual push to `origin/dan_branch`.

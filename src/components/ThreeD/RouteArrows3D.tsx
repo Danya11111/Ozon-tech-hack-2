@@ -29,13 +29,13 @@ function RouteBeam({
 
   return (
     <mesh position={mid} rotation={[0, -angle, 0]}>
-      <boxGeometry args={[length, 0.04, active ? 0.12 : 0.06]} />
+      <boxGeometry args={[length, active ? 0.06 : 0.04, active ? 0.14 : 0.08]} />
       <meshStandardMaterial
         color={color}
         transparent
-        opacity={active ? 0.95 : 0.25}
+        opacity={active ? 1 : 0.45}
         emissive={color}
-        emissiveIntensity={active ? 0.5 : 0.05}
+        emissiveIntensity={active ? 0.55 : 0.18}
       />
     </mesh>
   );
@@ -44,12 +44,13 @@ function RouteBeam({
 export default function RouteArrows3D({ category, machineState }: Props) {
   const routing = machineState.startsWith('ROUTE_TO_');
   const classifying = machineState === 'CLASSIFYING';
-  const preview = classifying || routing;
+  const preview = classifying || routing || Boolean(category);
   const y = TWIN_LAYOUT.beltY + 0.05;
   const from: [number, number, number] = [TWIN_LAYOUT.gateX, y, 0];
 
   return (
     <group>
+      {/* Always draw B/C/D routes in distinct colors; active route is brighter */}
       <RouteBeam
         start={from}
         end={[TWIN_LAYOUT.zoneBX, y, 0]}

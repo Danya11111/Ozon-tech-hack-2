@@ -28,6 +28,12 @@ const SCENARIO_UI: Record<
     badge: 'Зона D',
     badgeTone: 'd',
   },
+  c_priority: {
+    title: 'C-priority',
+    summary: 'Негабарит + круглый: габариты важнее формы, маршрут только в C.',
+    badge: 'C priority',
+    badgeTone: 'c',
+  },
   boundary_dimensions: {
     title: 'Пограничные размеры',
     summary: 'Проверка строгих min/max границ габаритов.',

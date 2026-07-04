@@ -23,9 +23,9 @@ function ZoneBox({
       <meshStandardMaterial
         color={color}
         transparent
-        opacity={active ? 0.45 : 0.18}
+        opacity={active ? 0.5 : 0.22}
         emissive={color}
-        emissiveIntensity={active ? 0.35 : 0.05}
+        emissiveIntensity={active ? 0.4 : 0.12}
       />
     </mesh>
   );
@@ -37,23 +37,23 @@ export default function SortingZones3D({ activeCategory, activeRoute }: Props) {
 
   return (
     <group>
-      {/* Zone A feed */}
+      {/* Zone A feed — always visible cyan */}
       <ZoneBox
-        position={[TWIN_LAYOUT.startX, 0.2, 0]}
-        size={[0.9, 0.4, 0.9]}
+        position={[TWIN_LAYOUT.startX, 0.22, 0]}
+        size={[1.0, 0.44, 1.0]}
         color="#38bdf8"
-        active={!active}
+        active={active === undefined}
       />
 
-      {/* Zone B main sorter — straight */}
+      {/* Zone B main sorter — green, straight */}
       <ZoneBox
-        position={[TWIN_LAYOUT.zoneBX, 0.25, 0]}
-        size={[1.1, 0.5, 1.1]}
+        position={[TWIN_LAYOUT.zoneBX, 0.28, 0]}
+        size={[1.2, 0.56, 1.2]}
         color={ROUTE_COLORS.B}
         active={active === 'B'}
       />
 
-      {/* Roll-cage C 1200×800×800 mm */}
+      {/* Roll-cage C 1200×800×800 mm — orange */}
       <ZoneBox
         position={[TWIN_LAYOUT.gateX + 0.4, cage.y / 2, TWIN_LAYOUT.zoneCZ]}
         size={[cage.x, cage.y, cage.z]}
@@ -61,7 +61,7 @@ export default function SortingZones3D({ activeCategory, activeRoute }: Props) {
         active={active === 'C'}
       />
 
-      {/* Roll-cage D 1200×800×800 mm */}
+      {/* Roll-cage D 1200×800×800 mm — purple */}
       <ZoneBox
         position={[TWIN_LAYOUT.gateX + 0.4, cage.y / 2, TWIN_LAYOUT.zoneDZ]}
         size={[cage.x, cage.y, cage.z]}

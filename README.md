@@ -130,6 +130,7 @@ curl -I https://www.arhipovdan.ru/
 - `normal_flow` — обычный поток B/C/D.
 - `oversized_item` — max dimensions нарушены, маршрут C.
 - `round_object` — габариты проходят, roundness >= 0.8, маршрут D.
+- `c_priority` — негабарит + круглый → только C (приоритет габаритов).
 - `boundary_dimensions` — проверка min/max границ.
 - `close_items` — предупреждение spacing/queue, последовательная обработка.
 - `low_confidence` — низкий CV confidence, rule-based fallback.

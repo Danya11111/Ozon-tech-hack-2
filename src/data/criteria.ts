@@ -14,7 +14,7 @@ export const OZON_CRITERIA: OzonCriterion[] = [
     title: 'Classification rules: dimensions, roundness, priority',
     status: 'covered',
     evidence: 'ClassificationPanel shows thresholds, actual values, PASS/FAIL and C priority.',
-    relatedScenarioIds: ['oversized_item', 'round_object', 'boundary_dimensions'],
+    relatedScenarioIds: ['oversized_item', 'round_object', 'c_priority', 'boundary_dimensions'],
     relatedDoc: 'docs/ARCHITECTURE.md',
   },
   {

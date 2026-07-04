@@ -216,6 +216,9 @@ function completeCurrentItem(state: SimulationState): SimulationState {
   return transitionTo(next, 'RETURN_HOME');
 }
 
+/** OZON Track 3 nominal conveyor speed (m/s). */
+export const NOMINAL_CONVEYOR_SPEED_MPS = 1;
+
 function targetSpeedFor(state: SimulationState): number {
   if (state.machineState === 'FAULT' || state.machineState === 'EMERGENCY_STOP') {
     return 0;
@@ -223,7 +226,7 @@ function targetSpeedFor(state: SimulationState): number {
   if (!state.running) {
     return 0;
   }
-  return state.scenario.id === 'close_items' ? 0.75 : 1;
+  return state.scenario.id === 'close_items' ? 0.75 : NOMINAL_CONVEYOR_SPEED_MPS;
 }
 
 function deriveSensorsAndActuators(state: SimulationState): SimulationState {

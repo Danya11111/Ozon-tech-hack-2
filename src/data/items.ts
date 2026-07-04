@@ -91,6 +91,15 @@ export const ITEMS: Item[] = [
     shape: 'boundary box',
     expectedCategory: 'B',
   },
+  {
+    id: 'SKU-011',
+    name: 'Oversized round 500x300x300',
+    dimensionsMm: { width: 500, depth: 300, height: 300 },
+    roundness: 0.93,
+    confidence: 0.88,
+    shape: 'oversized round cylinder',
+    expectedCategory: 'C',
+  },
 ];
 
 export function getItem(id: string): Item {

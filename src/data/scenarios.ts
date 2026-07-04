@@ -30,6 +30,15 @@ export const SCENARIOS: Scenario[] = [
     items: ['SKU-006', 'SKU-007', 'SKU-008'].map(getItem),
   },
   {
+    id: 'c_priority',
+    name: 'C priority (oversized + round)',
+    description: 'Товар одновременно негабаритный и круглый — приоритет габаритов, маршрут только в C.',
+    goal: 'Доказать, что dimensions check идёт раньше roundness: категория C, не D.',
+    expectedCategorySummary: 'C only (D not activated)',
+    demonstrates: 'C-priority: oversized + round → ROUTE_TO_C, route D остаётся неактивным.',
+    items: ['SKU-011'].map(getItem),
+  },
+  {
     id: 'boundary_dimensions',
     name: 'Boundary dimensions',
     description: 'Товары около min/max границ показывают устойчивость правил.',

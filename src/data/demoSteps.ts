@@ -50,9 +50,22 @@ export const DEMO_STEPS: DemoStep[] = [
     presenterPhrase: 'The dimensions fit, but roundness is high, so the system sends it to D for do-upakovka.',
   },
   {
+    id: 'c-priority-oversized-round',
+    title: 'C priority oversized + round',
+    scenarioId: 'c_priority',
+    preferredAction: 'step',
+    focusArea: 'classification',
+    explanation: 'Item is both oversized and round; dimensions are checked first so category is C, not D.',
+    whatToWatch: 'DIM FAIL, K high, category C, ROUTE_TO_C active, route D inactive.',
+    juryValue: 'Proves C-priority rule for Track 3.',
+    relatedCriteria: ['classification-rules', 'boundary-cases', 'physical-routing'],
+    presenterPhrase: 'Even though the item is round, dimensions fail first, so we route only to C.',
+  },
+  {
     id: 'boundary-dimensions',
     title: 'Boundary dimensions',
     scenarioId: 'boundary_dimensions',
+
     preferredAction: 'step',
     focusArea: 'classification',
     explanation: 'Items at the edge of the allowed envelope prove the rule implementation is stable.',

@@ -129,16 +129,26 @@ export default function ProductDemoSection({
               <strong>{item?.item.name ?? 'Ожидание'}</strong>
             </div>
             <div className="summary-item">
-              <span>Категория</span>
+              <span>Dimensions</span>
+              <strong className={item?.classification.dimensionsPass === false ? 'fail-text' : 'pass-text'}>
+                {item ? (item.classification.dimensionsPass ? 'PASS' : 'FAIL') : '—'}
+              </strong>
+            </div>
+            <div className="summary-item">
+              <span>Roundness K</span>
+              <strong>{item ? item.item.roundness.toFixed(2) : '—'}</strong>
+            </div>
+            <div className="summary-item">
+              <span>Category</span>
               <strong className={category ? `category-${category}` : ''}>{category ?? '—'}</strong>
             </div>
             <div className="summary-item">
-              <span>Команда</span>
+              <span>Command</span>
               <strong>{command}</strong>
             </div>
             <div className="summary-item">
-              <span>Зона</span>
-              <strong>{category ? `Зона ${category}` : '—'}</strong>
+              <span>Target zone</span>
+              <strong>{category ? `Zone ${category}` : '—'}</strong>
             </div>
           </div>
 

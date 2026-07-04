@@ -1,3 +1,5 @@
+import { DIMENSION_LIMITS } from '../domain/classifier';
+import { NOMINAL_CONVEYOR_SPEED_MPS } from '../domain/simulation';
 import type { SimulationState } from '../domain/types';
 
 export default function CurrentProofCard({ simulation }: { simulation: SimulationState }) {
@@ -12,6 +14,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
     : result
       ? `ROUTE_TO_${result.category}`
       : 'WAITING';
+  const isCPriority = Boolean(result && !result.dimensionsPass && !result.roundnessPass);
 
   if (!current) {
     return (
@@ -20,6 +23,11 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
           <p className="eyebrow">Ожидание цикла</p>
           <h3>Готово к демонстрации</h3>
           <p>Нажмите Start demo — товар пройдёт Detection → Classification → Command → Routing.</p>
+          <p className="proof-limits">
+            Limits: min {DIMENSION_LIMITS.min.width}×{DIMENSION_LIMITS.min.depth}×{DIMENSION_LIMITS.min.height} mm ·
+            max {DIMENSION_LIMITS.max.width}×{DIMENSION_LIMITS.max.depth}×{DIMENSION_LIMITS.max.height} mm ·
+            conveyor {NOMINAL_CONVEYOR_SPEED_MPS.toFixed(2)} m/s
+          </p>
         </div>
       </div>
     );
@@ -34,38 +42,57 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
 
       <div className="proof-grid">
         <div className="proof-item">
-          <span className="proof-label">Категория</span>
+          <span className="proof-label">Dimensions</span>
+          <strong className={result?.dimensionsPass === false ? 'fail-text' : 'pass-text'}>
+            {result?.dimensionsPass ? 'PASS' : 'FAIL'}
+          </strong>
+          <em>
+            {dimensions?.width}×{dimensions?.depth}×{dimensions?.height} мм
+          </em>
+        </div>
+        <div className="proof-item">
+          <span className="proof-label">Roundness K</span>
+          <strong className={result?.roundnessPass === false && result?.dimensionsPass ? 'fail-text' : 'pass-text'}>
+            {item?.roundness.toFixed(2)}
+          </strong>
+          <em>{result?.roundnessPass ? 'PASS' : 'DETECTED (≥0.8)'}</em>
+        </div>
+        <div className="proof-item">
+          <span className="proof-label">Category</span>
           <strong className={`category-${result?.category ?? 'default'}`}>{result?.category ?? '—'}</strong>
         </div>
         <div className="proof-item">
-          <span className="proof-label">Зона</span>
-          <strong>{result?.category ? `Зона ${result.category}` : '—'}</strong>
+          <span className="proof-label">Target zone</span>
+          <strong>{result?.category ? `Zone ${result.category}` : '—'}</strong>
         </div>
         <div className="proof-item proof-item-wide">
-          <span className="proof-label">Команда</span>
+          <span className="proof-label">Command</span>
           <strong>{command}</strong>
         </div>
       </div>
 
       <div className="proof-details">
         <div className="detail-row">
-          <span>Габариты</span>
-          <strong className={result?.dimensionsPass === false ? 'fail-text' : ''}>
-            {dimensions?.width} × {dimensions?.depth} × {dimensions?.height} мм
+          <span>Min limits</span>
+          <strong>
+            {DIMENSION_LIMITS.min.width}×{DIMENSION_LIMITS.min.depth}×{DIMENSION_LIMITS.min.height} мм
           </strong>
         </div>
         <div className="detail-row">
-          <span>Roundness</span>
-          <strong className={result?.roundnessPass === false && result?.dimensionsPass ? 'fail-text' : ''}>
-            {item?.roundness.toFixed(2)}
-          </strong>
+          <span>Conveyor target</span>
+          <strong>{NOMINAL_CONVEYOR_SPEED_MPS.toFixed(2)} m/s</strong>
         </div>
       </div>
 
       <div className="proof-reason">
         <strong>Причина решения</strong>
         <p>{result?.reason}</p>
-        {lowConfidence ? <p className="warning-note">Низкая уверенность CV — rule-based fallback</p> : null}
+        {isCPriority ? (
+          <p className="warning-note">C-priority: негабарит + круглый → только C (габариты важнее формы)</p>
+        ) : null}
+        {lowConfidence ? (
+          <p className="warning-note">Низкая уверенность CV — rule-based fallback, класс только B/C/D</p>
+        ) : null}
         {simulation.machineState === 'FAULT' ? <p className="error-note">FAULT: конвейер остановлен</p> : null}
         {simulation.machineState === 'EMERGENCY_STOP' ? (
           <p className="error-note">EMERGENCY_STOP: аварийная остановка</p>
