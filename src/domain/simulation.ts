@@ -223,7 +223,7 @@ function targetSpeedFor(state: SimulationState): number {
   if (!state.running) {
     return 0;
   }
-  return state.scenario.id === 'close_items' ? 0.32 : 0.42;
+  return state.scenario.id === 'close_items' ? 0.75 : 1;
 }
 
 function deriveSensorsAndActuators(state: SimulationState): SimulationState {

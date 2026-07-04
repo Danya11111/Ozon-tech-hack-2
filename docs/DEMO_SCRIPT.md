@@ -6,22 +6,23 @@ Open https://arhipovdan.ru/ (или http://127.0.0.1:3100/).
 
 ## 30-Second Pitch
 
-«Мы сделали инженерную симуляцию сортировочной ячейки OZON. Полный цикл: detection → classification → command → routing. Показываем happy path B/C/D, fault handling и timing. Главный экран — product demo, инженерные панели ниже.»
+«Мы сделали инженерную симуляцию сортировочной ячейки OZON с 3D digital twin. Полный цикл: detection → classification → command → routing. Товар физически уходит в B/C/D. Physics engine не используем — motion по state machine, демо предсказуемо.»
 
 ## 3-Minute Demo
 
 1. На первом экране укажите Hero: что это за система и цепочку Detection → Classification → Command → Routing.
 2. Нажмите **Запустить демо**.
-3. В блоке **Главное демо** покажите упрощённую сцену и карточку результата:
-   - товар;
+3. В блоке **Главное демо** покажите **3D Digital Twin** и карточку результата:
+   - товар на конвейере;
+   - накопитель и stop-gate;
    - категория B/C/D;
-   - причина решения;
    - команда `ROUTE_TO_*`;
-   - целевая зона.
-4. Нажимайте **Next step**, следите за **Этапами цикла**.
-5. В **Сценариях** нажмите **Показать** на «Негабарит» — приоритет C.
-6. Затем «Круглый объект» — зона D.
-7. Затем «Застревание» или «Аварийная остановка» — FAULT / EMERGENCY_STOP, Reset.
+   - подсветка маршрута в зону.
+4. Нажимайте **Next step**, следите за **Этапами цикла** и движением в 3D.
+5. В **Сценариях** нажмите **Показать** на «Негабарит» — оранжевый route C, roll-cage C.
+6. Затем «Круглый объект» — фиолетовый route D.
+7. Затем «Застревание» или «Аварийная остановка» — красная подсветка, FAULT / EMERGENCY_STOP, Reset.
+8. При необходимости переключите **2D fallback** — логика та же.
 
 ## 5-Minute Demo
 
@@ -86,12 +87,19 @@ docker compose -p owl -f /opt/arhipovdan/app/docker-compose.server.yml ps
 document.documentElement.scrollWidth <= document.documentElement.clientWidth
 ```
 
+## 3D / WebGL
+
+- Desktop: по умолчанию 3D Digital Twin (если WebGL есть).
+- Mobile: по умолчанию 2D; 3D можно включить вручную.
+- Capability check: Engineering Details → блок **3D capability check** (WebGL, FPS).
+- Physics engine: **не подключён** (state-machine animation).
+
 ## What Each Block Proves
 
 - Hero — смысл проекта за 10 секунд.
-- Product Demo scene — физический маршрут и команда.
+- 3D digital twin — физическая маршрутизация A → CV → gate → B/C/D.
 - Proof card — почему выбрана категория B/C/D.
 - Storyline — текущий этап цикла.
 - Scenario cards — jury test cases без узкого скролл-списка.
 - Criteria cards — покрытие критериев OZON.
-- Engineering Details — timeline, PID, event log, sensors.
+- Engineering Details — timeline, PID, event log, sensors, 3D capability check.

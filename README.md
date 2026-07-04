@@ -11,9 +11,31 @@
 UI — **Product Demo Landing Page**:
 - без горизонтального скролла на desktop / laptop / mobile;
 - mobile-first адаптив (одна колонка < 640px);
+- **3D digital twin** (React Three Fiber) + 2D SVG fallback;
 - storyline Detection → Classification → Decision → Command → Routing;
 - карточки сценариев и критериев OZON;
 - Engineering Details свёрнуты по умолчанию.
+
+## 3D Digital Twin
+
+Главная сцена — цифровая модель программно-аппаратного комплекса:
+
+A → подающий конвейер → накопитель → CV/laser/ultrasonic → stop-gate → actuator → B/C/D.
+
+- Стек: `three` + `@react-three/fiber` + `@react-three/drei`.
+- **Physics engine не используется** — motion по state machine / keyframe (предсказуемое демо).
+- Архитектура (`itemMotion.ts`) готова к подключению physics позже.
+- Переключатель: **3D Digital Twin** / **2D fallback**.
+- На mobile (<640px) по умолчанию 2D; 3D можно включить вручную.
+- Если WebGL недоступен — автоматический 2D fallback.
+
+Что доказывает 3D:
+- classification → `ROUTE_TO_*` → actuator motion → physical route;
+- B зелёный прямой маршрут, C оранжевый roll-cage, D фиолетовый roll-cage;
+- C priority при негабарите (даже если объект круглый);
+- fault / emergency stop красной подсветкой и остановкой конвейера.
+
+Проверка WebGL: Engineering Details → **3D capability check** (FPS, WebGL status).
 
 ## Стек
 
@@ -38,7 +60,7 @@ http://127.0.0.1:3100/
 ## Как устроен новый UI
 
 1. **Hero** — что это за система, CTA «Запустить демо», цепочка Detection → Routing.
-2. **Product Demo** — упрощённая сцена (`SorterScene variant="simple"`) + карточка результата + Start / Next / Reset.
+2. **Product Demo** — 3D digital twin (или 2D fallback) + карточка результата + Start / Next / Reset.
 3. **Storyline Stepper** — текущий этап цикла.
 4. **Scenario Cards** — jury-кейсы карточками (кнопка «Показать»).
 5. **Criteria Cards** — покрытие критериев OZON со ссылкой на сценарий.
@@ -127,9 +149,10 @@ curl -I https://www.arhipovdan.ru/
 
 Границы MVP:
 
-- min: width >= 10 мм, depth >= 10 мм, height >= 2 мм;
+- min: width >= 10 мм, depth >= 10 мм, height >= 10 мм;
 - max: width <= 450 мм, depth <= 320 мм, height <= 320 мм;
-- roundness threshold: 0.8.
+- roundness threshold: 0.8 (K = r_in / r_out);
+- conveyor target speed: 1.00 м/с (close_items: 0.75 м/с).
 
 ## Исполнительная часть
 

@@ -2,7 +2,7 @@ import type { PidState } from './types';
 
 const PID_HISTORY_LIMIT = 40;
 
-export function createPidState(targetSpeedMps = 0.42): PidState {
+export function createPidState(targetSpeedMps = 1): PidState {
   return {
     targetSpeedMps,
     actualSpeedMps: 0,

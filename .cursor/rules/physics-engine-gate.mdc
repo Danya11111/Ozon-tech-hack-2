@@ -1,0 +1,12 @@
+---
+description: Physics engine only after feasibility; prefer predictable demo
+alwaysApply: true
+---
+
+# Physics Engine Gate Rules
+
+- Physics engine подключать только после feasibility check.
+- Если physics увеличивает bundle/лаги/нестабильность — использовать keyframe/state-machine animation.
+- Physics не должна ломать управляемость демо.
+- Для хакатона важнее предсказуемое демо, чем реалистичная физика.
+- Fault/jam можно моделировать логикой, а не реальными столкновениями.

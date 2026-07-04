@@ -16,7 +16,7 @@ export const CATEGORY_DEFINITIONS: Record<Category, CategoryDefinition> = {
 };
 
 export const DIMENSION_LIMITS = {
-  min: { width: 10, depth: 10, height: 2 },
+  min: { width: 10, depth: 10, height: 10 },
   max: { width: 450, depth: 320, height: 320 },
   roundnessThreshold: 0.8,
 };

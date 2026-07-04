@@ -24,9 +24,9 @@ Open scenario **Аварийная остановка**. The system enters `EMER
 
 Low confidence is logged as a warning. The system still applies deterministic dimensions/roundness rules as a fallback and shows this on the proof card.
 
-## 7. Why 2D, Not 3D?
+## 7. Why 3D Digital Twin Without Physics Engine?
 
-2D is enough for MVP validation: it shows geometry, timing, sensor positions, routes and state transitions without heavy rendering.
+The main demo uses a lightweight React Three Fiber digital twin driven by the state machine (keyframe motion). A physics engine would add wasm weight and unpredictable collisions, which is worse for a live jury pitch. 2D SVG remains as fallback when WebGL is unavailable or on narrow mobile screens.
 
 ## 8. What Is Needed For A Physical Prototype?
 
@@ -42,7 +42,7 @@ The proof card shows dimensions, roundness and reason. Tests cover key boundary 
 
 ## 11. How Are Dimensions And Circular Section Handled?
 
-Dimensions are checked first against min/max width, depth and height. If they pass, roundness is checked against threshold 0.8.
+Dimensions are checked first against min/max: 10×10×10 mm to 450×320×320 mm. If they pass, roundness K = r_in / r_out is checked against threshold 0.8. Conveyor target speed is 1.00 m/s.
 
 ## 12. Why Does C Have Priority Over D?
 
@@ -74,8 +74,20 @@ Scroll to **Engineering Details** or click **Инженерный режим**. 
 
 ## 19. How to check mobile and no horizontal scroll?
 
-Use widths 1920×1080, 1440×900 and 390×844. On mobile the layout is one column, buttons are large, the scene scales with `width: 100%`. In console:
+Use widths 1920×1080, 1440×900 and 390×844. On mobile the layout is one column, buttons are large, default view is 2D fallback. In console:
 
 ```js
 document.documentElement.scrollWidth <= document.documentElement.clientWidth
 ```
+
+## 20. How to show B / C / D / C-priority / fault in 3D?
+
+- Normal item → green route B.
+- Oversized → orange route C into roll-cage C.
+- Round object → purple route D into roll-cage D.
+- Oversized + round → still C (dimensions priority), D route stays inactive.
+- Jam / emergency → red overlay, conveyor stopped, Reset required.
+
+## 21. Where is the WebGL / FPS check?
+
+Open Engineering Details → **3D capability check**.

@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, lazy, Suspense, useImperativeHandle, useState } from 'react';
 import StateMachinePanel from './StateMachinePanel';
 import TimelinePanel from './TimelinePanel';
 import PidPanel from './PidPanel';
@@ -11,6 +11,8 @@ import SorterScene from './SorterScene';
 import { DEMO_STEPS } from '../data/demoSteps';
 import { SCENARIOS } from '../data/scenarios';
 import type { ScenarioId, SimulationState } from '../domain/types';
+
+const ThreeCapabilityCheck = lazy(() => import('./ThreeD/ThreeCapabilityCheck'));
 
 export interface EngineeringDetailsHandle {
   open: () => void;
@@ -61,6 +63,12 @@ const EngineeringDetails = forwardRef<EngineeringDetailsHandle, Props>(
           <div className="engineering-content" id="engineering-content">
             <div className="eng-panel eng-panel-wide">
               <SorterScene simulation={simulation} variant="full" />
+            </div>
+
+            <div className="eng-panel eng-panel-wide">
+              <Suspense fallback={<p className="three-loading">Loading 3D capability check…</p>}>
+                <ThreeCapabilityCheck />
+              </Suspense>
             </div>
 
             <div className="engineering-grid">

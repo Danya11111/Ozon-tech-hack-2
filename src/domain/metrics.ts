@@ -12,7 +12,7 @@ export function createMetrics(): Metrics {
     queueLength: 0,
     queueDelayMs: 0,
     conveyorSpeedMps: 0,
-    pidTargetSpeedMps: 0.42,
+    pidTargetSpeedMps: 1,
     pidActualSpeedMps: 0,
   };
 }

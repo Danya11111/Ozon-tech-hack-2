@@ -3,21 +3,21 @@ import { createPidState, updatePid } from './pid';
 
 describe('PID conveyor speed imitation', () => {
   it('moves actual speed toward target in normal mode', () => {
-    let pid = createPidState(0.42);
+    let pid = createPidState(1);
 
     for (let index = 0; index < 20; index += 1) {
-      pid = updatePid(pid, 0.42, 250);
+      pid = updatePid(pid, 1, 250);
     }
 
-    expect(pid.actualSpeedMps).toBeGreaterThan(0.3);
-    expect(Math.abs(pid.pidError)).toBeLessThan(0.15);
+    expect(pid.actualSpeedMps).toBeGreaterThan(0.7);
+    expect(Math.abs(pid.pidError)).toBeLessThan(0.35);
   });
 
   it('decays actual speed toward zero when target is stopped', () => {
-    let pid = createPidState(0.42);
+    let pid = createPidState(1);
 
     for (let index = 0; index < 20; index += 1) {
-      pid = updatePid(pid, 0.42, 250);
+      pid = updatePid(pid, 1, 250);
     }
     const runningSpeed = pid.actualSpeedMps;
 
@@ -26,6 +26,6 @@ describe('PID conveyor speed imitation', () => {
     }
 
     expect(pid.actualSpeedMps).toBeLessThan(runningSpeed);
-    expect(pid.actualSpeedMps).toBeLessThan(0.05);
+    expect(pid.actualSpeedMps).toBeLessThan(0.12);
   });
 });
