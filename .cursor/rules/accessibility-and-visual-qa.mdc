@@ -1,0 +1,22 @@
+---
+description: Accessibility and visual QA checklist for product demo
+alwaysApply: true
+---
+
+# Accessibility and Visual QA Rules
+
+- Контраст должен быть читаемым.
+- Фокус-состояния для кнопок обязательны.
+- Кнопки должны иметь понятные labels.
+- Не использовать только цвет для передачи смысла.
+- Текст должен быть читаемым на проекторе.
+- Проверить визуально:
+  - 1920×1080
+  - 1440×900
+  - 390×844
+- Проверить:
+  - нет horizontal scroll;
+  - hero понятен;
+  - CTA виден;
+  - demo section понятен;
+  - mobile layout не развален.

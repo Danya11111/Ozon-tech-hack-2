@@ -1,65 +1,76 @@
-import type { SimulationState } from '../domain/types';
+import type { MachineState, SimulationState } from '../domain/types';
 
-export default function StorylineStepper({ simulation }: { simulation: SimulationState }) {
-  const state = simulation.machineState;
-  
-  const isDetection = state === 'MOVING_TO_CAMERA' || state === 'DETECTING';
-  const isClassification = state === 'MOVING_TO_GATE' || state === 'WAITING_AT_GATE' || state === 'CLASSIFYING';
-  const isCommand = state.startsWith('ROUTE_TO_');
-  const isRouting = state === 'RETURN_HOME';
-  
-  const item = simulation.currentItem;
-  
-  return (
-    <div className="storyline-stepper">
-      <Step 
-        label="1. Detection" 
-        desc="Распознавание габаритов" 
-        active={isDetection} 
-        done={Boolean(item) && !isDetection} 
-      />
-      <Step 
-        label="2. Classification" 
-        desc="Дерево решений" 
-        active={isClassification} 
-        done={Boolean(item?.classification) && !isClassification && !isDetection} 
-      />
-      <Step 
-        label="3. Decision" 
-        desc="Выбор категории" 
-        active={isClassification && state === 'CLASSIFYING'} 
-        done={Boolean(item?.classification)} 
-      />
-      <Step 
-        label="4. Command" 
-        desc="Сигнал механизмам" 
-        active={isCommand} 
-        done={isRouting} 
-      />
-      <Step 
-        label="5. Routing" 
-        desc="Движение в зону" 
-        active={isCommand || isRouting} 
-        done={isRouting} 
-      />
-    </div>
-  );
+type StepKey = 'detection' | 'classification' | 'decision' | 'command' | 'routing';
+type StepStatus = 'active' | 'completed' | 'pending';
+
+const STEPS: Array<{ key: StepKey; number: number; label: string; description: string }> = [
+  { key: 'detection', number: 1, label: 'Detection', description: 'Камера и датчики снимают габариты' },
+  { key: 'classification', number: 2, label: 'Classification', description: 'Правила проверяют размеры и форму' },
+  { key: 'decision', number: 3, label: 'Decision', description: 'Система выбирает категорию B/C/D' },
+  { key: 'command', number: 4, label: 'Command', description: 'Формируется команда ROUTE_TO_*' },
+  { key: 'routing', number: 5, label: 'Routing', description: 'Товар уходит в целевую зону' },
+];
+
+function activeStep(state: MachineState): StepKey | null {
+  if (state === 'IDLE') return null;
+  if (state === 'MOVING_TO_CAMERA' || state === 'DETECTING') return 'detection';
+  if (state === 'MOVING_TO_GATE' || state === 'WAITING_AT_GATE') return 'classification';
+  if (state === 'CLASSIFYING') return 'decision';
+  if (state.startsWith('ROUTE_TO_')) return 'command';
+  if (state === 'RETURN_HOME') return 'routing';
+  if (state === 'FAULT' || state === 'EMERGENCY_STOP') return 'routing';
+  return null;
 }
 
-function Step({ label, desc, active, done }: { label: string, desc: string, active: boolean, done: boolean }) {
-  let statusClass = 'step-pending';
-  if (active) statusClass = 'step-active';
-  else if (done) statusClass = 'step-done';
+function stepStatus(key: StepKey, current: StepKey | null, machineState: MachineState): StepStatus {
+  if (machineState === 'IDLE') return 'pending';
+
+  const order: StepKey[] = ['detection', 'classification', 'decision', 'command', 'routing'];
+  const currentIndex = current ? order.indexOf(current) : -1;
+  const keyIndex = order.indexOf(key);
+
+  if (machineState === 'RETURN_HOME') {
+    return keyIndex < order.length - 1 ? 'completed' : 'active';
+  }
+
+  if (machineState === 'FAULT' || machineState === 'EMERGENCY_STOP') {
+    return keyIndex <= currentIndex ? 'active' : 'pending';
+  }
+
+  if (keyIndex < currentIndex) return 'completed';
+  if (keyIndex === currentIndex) return 'active';
+  return 'pending';
+}
+
+export default function StorylineStepper({ simulation }: { simulation: SimulationState }) {
+  const current = activeStep(simulation.machineState);
 
   return (
-    <div className={`story-step ${statusClass}`}>
-      <div className="step-indicator">
-        <div className="step-dot"></div>
+    <section className="storyline-section" id="storyline" aria-labelledby="storyline-title">
+      <div className="section-header">
+        <h2 id="storyline-title">Этапы цикла</h2>
+        <p>Текущий этап системы в цепочке Detection → Classification → Decision → Command → Routing.</p>
       </div>
-      <div className="step-content">
-        <strong>{label}</strong>
-        <span>{desc}</span>
-      </div>
-    </div>
+
+      <ol className="storyline-stepper">
+        {STEPS.map((step) => {
+          const status = stepStatus(step.key, current, simulation.machineState);
+          return (
+            <li key={step.key} className={`story-step step-${status}`}>
+              <div className="step-indicator" aria-hidden="true">
+                <span className="step-number">{step.number}</span>
+              </div>
+              <div className="step-content">
+                <strong>{step.label}</strong>
+                <span>{step.description}</span>
+                <span className="step-status-label">
+                  {status === 'active' ? 'Сейчас' : status === 'completed' ? 'Готово' : 'Ожидание'}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

@@ -1,79 +1,97 @@
 # Demo Script
 
-Open https://arhipovdan.ru/ and switch Header to `Guided Demo`.
+Open https://arhipovdan.ru/ (или http://127.0.0.1:3100/).
+
+Страница — product demo: Hero → Demo → Storyline → Scenarios → Criteria → Engineering Details.
 
 ## 30-Second Pitch
 
-"We built an engineering simulation of the OZON sorting cell. It models the full loop: detection -> classification -> command -> routing. We cover happy paths to B/C/D, fault handling, and timing. The Guided Demo view shows the live proof."
+«Мы сделали инженерную симуляцию сортировочной ячейки OZON. Полный цикл: detection → classification → command → routing. Показываем happy path B/C/D, fault handling и timing. Главный экран — product demo, инженерные панели ниже.»
 
-## 3-Minute Guided Demo
+## 3-Minute Demo
 
-1. Open **Guided Demo**.
-2. Click **Start Guided Demo**.
-3. Point to the **Current Proof Card** and the **Scene**.
-   - "Watch how detection leads to classification and routing."
-4. Click **Next** to show `Oversized item to C`.
-   - "Dimensions fail first, priority C."
-5. Click **Next** to show `Round object to D`.
-   - "Dimensions pass, but roundness triggers D."
-6. Click **Next** through `Boundary`, `Low confidence`, `Jam`, `Emergency stop`.
-   - On faults: click "Apply fault scenario" to confirm.
-   - "The line stops safely on emergency."
+1. На первом экране укажите Hero: что это за система и цепочку Detection → Classification → Command → Routing.
+2. Нажмите **Запустить демо**.
+3. В блоке **Главное демо** покажите упрощённую сцену и карточку результата:
+   - товар;
+   - категория B/C/D;
+   - причина решения;
+   - команда `ROUTE_TO_*`;
+   - целевая зона.
+4. Нажимайте **Next step**, следите за **Этапами цикла**.
+5. В **Сценариях** нажмите **Показать** на «Негабарит» — приоритет C.
+6. Затем «Круглый объект» — зона D.
+7. Затем «Застревание» или «Аварийная остановка» — FAULT / EMERGENCY_STOP, Reset.
 
-## 5-Minute Guided Demo
+## 5-Minute Demo
 
-Use all 10 demo steps in Guided Demo View:
+Пройдите сценарии по карточкам:
 
-1. System overview.
-2. Normal item to B.
-3. Oversized item to C.
-4. Round object to D.
-5. Boundary dimensions.
-6. Low confidence fallback.
-7. Close items queue.
-8. Jam / fault handling.
-9. Emergency stop.
-10. Performance and synchronization.
+1. Обычный товар — B/C/D поток.
+2. Негабарит — C.
+3. Круглый объект — D.
+4. Пограничные размеры — строгие min/max.
+5. Низкая уверенность CV — fallback.
+6. Очередь товаров — queue/spacing.
+7. Застревание — FAULT.
+8. Аварийная остановка — EMERGENCY_STOP.
 
-For each step:
+Для каждого:
 
-1. Read the **Demo Narration Card**.
-2. Use **Next** or the **Primary Action Button**.
-3. Point to the highlighted values in the **Proof Card**.
-4. Read the **Presenter Phrase** from the screen.
+1. Нажмите **Показать**.
+2. **Start demo** / **Next step**.
+3. Укажите категорию, причину и маршрут на карточке результата.
+4. Покажите активный шаг в Storyline Stepper.
 
-## What to say on each step
+## Engineering Details
 
-Use the `presenterPhrase` text shown in the **Demo Narration Card**. It is specifically written to be short and clear for the jury.
+Если жюри просит PID, event log, sensors или полный layout:
 
-## What to do if demo gets stuck
+1. Нажмите **Инженерный режим** (header / hero / demo).
+2. Откроется секция **Engineering Details** с полными панелями.
+3. Полная сцена — `SorterScene variant="full"`.
 
-- Click **Reset Demo**.
-- If still stuck, switch back to **Engineering Mode** and use manual scenario selection.
-- Proceed manually.
+## Что делать, если демо зависло
 
-## Fallback If Domain Does Not Open
+1. **Reset** в header или в блоке демо.
+2. Выберите сценарий заново карточкой **Показать**.
+3. При необходимости откройте Engineering Details и смените сценарий там.
 
-1. SSH to server.
-2. Check local frontend:
+## Fallback, если домен не открывается
+
+1. SSH на сервер.
+2. Проверьте локальный frontend:
 
 ```bash
 curl -I http://127.0.0.1:3100/
 ```
 
-3. Check Docker project:
+3. Проверьте Docker:
 
 ```bash
 docker compose -p owl -f /opt/arhipovdan/app/docker-compose.server.yml ps
 ```
 
-4. If screenshots/video are prepared later, show them while explaining the same demo steps.
+## Mobile / no horizontal scroll
 
-## What Each Screen Proves
+Перед защитой проверьте:
 
-- SVG scene proves physical route and actuator command.
-- Classification panel proves why category B/C/D was selected.
-- Timeline proves synchronization and step-by-step behavior.
-- PID panel proves conveyor control-loop behavior.
-- Event Log proves traceability.
-- Criteria panel proves coverage of OZON evaluation points.
+- 1920×1080 — hero + demo читаемы, CTA видны;
+- 1440×900 — нет debug-dashboard на первом экране;
+- 390×844 — одна колонка, крупные кнопки, сцена не вылезает.
+
+В консоли:
+
+```js
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```
+
+## What Each Block Proves
+
+- Hero — смысл проекта за 10 секунд.
+- Product Demo scene — физический маршрут и команда.
+- Proof card — почему выбрана категория B/C/D.
+- Storyline — текущий этап цикла.
+- Scenario cards — jury test cases без узкого скролл-списка.
+- Criteria cards — покрытие критериев OZON.
+- Engineering Details — timeline, PID, event log, sensors.

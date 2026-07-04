@@ -8,16 +8,18 @@ Before final submission:
 - [ ] `https://arhipovdan.ru/` opens.
 - [ ] `https://www.arhipovdan.ru/` opens.
 - [ ] `https://ai-shorts.ru/` still works and was not affected.
-- [ ] Presentation Mode opens.
-- [ ] Demo steps checked.
-- [ ] Safe Demo confirmation checked for jam/emergency.
-- [ ] App is responsive on Desktop (1920x1080), Laptop (1440x900) and Mobile (390x844).
-- [ ] NO horizontal scroll on body/app container.
-- [ ] Product Demo layout shows step, scene, and result.
-- [ ] Scenarios are displayed as cards.
-- [ ] Engineering Details accordion works and shows all technical panels.
-- [ ] Engineering Mode still works.
+- [ ] Product Demo page opens (Hero first, not engineering dashboard).
+- [ ] Start demo / Next step / Reset work.
+- [ ] Storyline Stepper updates with machine state.
+- [ ] Scenario cards open cases with **Показать**.
+- [ ] Criteria cards show OZON coverage and linked scenarios.
+- [ ] Engineering Details is collapsed by default and opens from CTA.
+- [ ] Engineering Details shows full panels (state machine, sensors, PID, timeline, event log, criteria).
+- [ ] App is responsive on Desktop (1920×1080), Laptop (1440×900) and Mobile (390×844).
+- [ ] NO horizontal scroll on body / `#root` / product page.
+- [ ] Mobile: one column, buttons ≥ 44px, scene scales.
 - [ ] Scenarios checked: normal_flow, oversized_item, round_object, boundary_dimensions, close_items, low_confidence, jam, emergency_stop.
-- [ ] Docs present: README, ARCHITECTURE, DEMO_SCRIPT, SCENARIOS, JURY_QA, SUBMISSION_CHECKLIST.
-- [ ] Branch pushed to `origin/dan_branch`.
-- [ ] Nginx backup path from deploy is known if infrastructure rollback is needed.
+- [ ] Docs present: README, ARCHITECTURE, DEMO_SCRIPT, SCENARIOS, JURY_QA, UI_UX_REDESIGN_AUDIT, SUBMISSION_CHECKLIST.
+- [ ] Cursor rules present in `.cursor/rules/`.
+- [ ] Branch ready for manual push to `origin/dan_branch`.
+- [ ] Nginx / SSL / neighboring projects were not modified.

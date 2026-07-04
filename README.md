@@ -8,12 +8,12 @@
 - маршрутизация в зоны B/C/D;
 - отработка аварийных ситуаций (Jam, Emergency Stop).
 
-UI переработан под **Product Demo Landing Page**, который:
-- работает без горизонтального скролла на любых экранах;
-- адаптирован для Mobile, Tablet и Desktop;
-- включает Storyline (Detection → Classification → Command → Routing);
-- предлагает список Jury Scenarios и OZON Criteria;
-- прячет сложный Engineering Dashboard в сворачиваемый аккордеон.
+UI — **Product Demo Landing Page**:
+- без горизонтального скролла на desktop / laptop / mobile;
+- mobile-first адаптив (одна колонка < 640px);
+- storyline Detection → Classification → Decision → Command → Routing;
+- карточки сценариев и критериев OZON;
+- Engineering Details свёрнуты по умолчанию.
 
 ## Стек
 
@@ -35,13 +35,46 @@ https://www.arhipovdan.ru/
 http://127.0.0.1:3100/
 ```
 
-## Структура Demo-страницы
+## Как устроен новый UI
 
-1. **Hero Section:** краткая суть проекта и цепочки действий.
-2. **Product Demo Section:** живая сцена (`SorterScene`) и карточка текущего результата.
-3. **Scenarios Cards:** карточки для проверки нестандартных товаров (негабарит, шар, затор).
-4. **Criteria Cards:** чек-лист покрытия требований OZON.
-5. **Engineering Details:** подробные отладочные панели (Event Log, PID, метрики).
+1. **Hero** — что это за система, CTA «Запустить демо», цепочка Detection → Routing.
+2. **Product Demo** — упрощённая сцена (`SorterScene variant="simple"`) + карточка результата + Start / Next / Reset.
+3. **Storyline Stepper** — текущий этап цикла.
+4. **Scenario Cards** — jury-кейсы карточками (кнопка «Показать»).
+5. **Criteria Cards** — покрытие критериев OZON со ссылкой на сценарий.
+6. **Engineering Details** — полные техпанели (state machine, sensors, PID, timeline, event log, criteria).
+
+## Как запустить демо
+
+1. Откройте сайт.
+2. Нажмите **Запустить демо** в Hero или **Start demo** в блоке демо.
+3. Нажимайте **Next step**, чтобы пройти цикл товара.
+4. Выберите сценарий в карточках ниже (негабарит, круглый объект, jam и т.д.).
+5. Для экспертов откройте **Инженерный режим** / **Engineering Details**.
+
+## Где Engineering Details
+
+Внизу страницы, секция **Engineering Details**. По умолчанию свёрнута. Кнопки «Инженерный режим» в header / hero / demo раскрывают блок и скроллят к нему. Внутри — полная сцена (`variant="full"`) и все инженерные панели.
+
+## Как проверить mobile
+
+1. Откройте DevTools → device toolbar.
+2. Выберите `390×844` (или iPhone 12/13).
+3. Проверьте:
+   - одна колонка;
+   - кнопки ≥ 44px;
+   - сцена масштабируется (`width: 100%`);
+   - нет horizontal scroll.
+
+## Как проверить отсутствие horizontal scroll
+
+В консоли браузера:
+
+```js
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```
+
+Должно вернуть `true` на ширинах 1920, 1440 и 390.
 
 ## Запуск локально
 
@@ -116,7 +149,7 @@ State machine управляет циклом:
 
 ## Simplified PID
 
-PID-панель показывает упрощенную имитацию control loop: target speed, actual speed, error, correction и mini graph последних тиков скорости.
+PID-панель (в Engineering Details) показывает упрощенную имитацию control loop: target speed, actual speed, error, correction и mini graph последних тиков скорости.
 
 В normal flow actual speed приближается к target. В `jam` и `emergency_stop` target становится 0, actual speed визуально падает к 0.
 
@@ -131,10 +164,20 @@ npm run test
 ## Документация
 
 - `docs/ARCHITECTURE.md` — модули и поток данных.
-- `docs/DEMO_SCRIPT.md` — 3-5 минутный сценарий защиты.
+- `docs/DEMO_SCRIPT.md` — сценарий защиты.
 - `docs/SCENARIOS.md` — ожидаемые результаты сценариев.
-- `docs/JURY_QA.md` — короткие ответы на вопросы жюри.
+- `docs/JURY_QA.md` — ответы на вопросы жюри.
+- `docs/UI_UX_REDESIGN_AUDIT.md` — план редизайна UI.
 - `docs/SUBMISSION_CHECKLIST.md` — checklist перед сдачей.
+
+## Cursor rules
+
+Локальные UI/UX rules в `.cursor/rules/`:
+
+- `ui-ux-pro-max.mdc`
+- `responsive-product-demo.mdc`
+- `react-design-system.mdc`
+- `accessibility-and-visual-qa.mdc`
 
 ## Ограничения MVP
 

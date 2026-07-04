@@ -1,0 +1,24 @@
+---
+description: React design system and component boundaries for sorter demo
+globs: src/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# React Design System Rules
+
+- Не ломать domain logic.
+- UI-компоненты должны быть небольшими и понятными.
+- Переиспользовать данные scenarios / criteria / demoSteps.
+- Не добавлять тяжёлые UI-библиотеки.
+- Не добавлять 3D.
+- Не добавлять backend.
+- Компоненты:
+  - HeroSection
+  - ProductDemoSection
+  - StorylineStepper
+  - ScenarioCards
+  - CriteriaCards
+  - EngineeringDetails
+- Старые инженерные панели можно использовать внутри EngineeringDetails.
+- Стили централизовать в styles.css или небольших CSS-блоках.
+- Не делать хаотичный refactor всего проекта.

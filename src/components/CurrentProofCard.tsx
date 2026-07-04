@@ -1,4 +1,3 @@
-import { DIMENSION_LIMITS } from '../domain/classifier';
 import type { SimulationState } from '../domain/types';
 
 export default function CurrentProofCard({ simulation }: { simulation: SimulationState }) {
@@ -8,14 +7,19 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
   const dimensions = item?.dimensionsMm;
   const lowConfidence = Boolean(item && item.confidence < 0.65);
   const stopped = simulation.machineState === 'FAULT' || simulation.machineState === 'EMERGENCY_STOP';
+  const command = simulation.machineState.startsWith('ROUTE_TO_')
+    ? simulation.machineState
+    : result
+      ? `ROUTE_TO_${result.category}`
+      : 'WAITING';
 
   if (!current) {
     return (
       <div className="proof-card proof-card-empty">
         <div className="proof-card-inner">
-          <p className="eyebrow">Awaiting cycle</p>
-          <h3>Ready to demonstrate sorting cycle</h3>
-          <p>Нажмите «Запустить демо» для начала или переключите сценарий ниже.</p>
+          <p className="eyebrow">Ожидание цикла</p>
+          <h3>Готово к демонстрации</h3>
+          <p>Нажмите Start demo — товар пройдёт Detection → Classification → Command → Routing.</p>
         </div>
       </div>
     );
@@ -25,33 +29,33 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
     <div className={`proof-card ${stopped ? 'proof-card-stopped' : ''}`}>
       <div className="proof-card-header">
         <p className="eyebrow">Результат классификации</p>
-        <h3>{item?.name} (ID: {item?.id})</h3>
+        <h3>{item?.name}</h3>
       </div>
-      
+
       <div className="proof-grid">
         <div className="proof-item">
           <span className="proof-label">Категория</span>
-          <strong className={`category-${result?.category || 'default'}`}>{result?.category || '-'}</strong>
+          <strong className={`category-${result?.category ?? 'default'}`}>{result?.category ?? '—'}</strong>
         </div>
         <div className="proof-item">
-          <span className="proof-label">Маршрут</span>
-          <strong>{result?.category ? `Зона ${result.category}` : '-'}</strong>
+          <span className="proof-label">Зона</span>
+          <strong>{result?.category ? `Зона ${result.category}` : '—'}</strong>
         </div>
-        <div className="proof-item">
+        <div className="proof-item proof-item-wide">
           <span className="proof-label">Команда</span>
-          <strong>{simulation.machineState.startsWith('ROUTE_TO_') ? simulation.machineState : 'WAITING'}</strong>
+          <strong>{command}</strong>
         </div>
       </div>
 
       <div className="proof-details">
         <div className="detail-row">
-          <span>Габариты:</span>
+          <span>Габариты</span>
           <strong className={result?.dimensionsPass === false ? 'fail-text' : ''}>
-            {dimensions?.width} x {dimensions?.depth} x {dimensions?.height} мм
+            {dimensions?.width} × {dimensions?.depth} × {dimensions?.height} мм
           </strong>
         </div>
         <div className="detail-row">
-          <span>Roundness:</span>
+          <span>Roundness</span>
           <strong className={result?.roundnessPass === false && result?.dimensionsPass ? 'fail-text' : ''}>
             {item?.roundness.toFixed(2)}
           </strong>
@@ -59,11 +63,14 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
       </div>
 
       <div className="proof-reason">
-        <strong>Почему такое решение:</strong> {result?.reason}
-        {lowConfidence && <p className="warning-note">Низкая уверенность CV — использован rule-based fallback</p>}
-        {simulation.machineState === 'FAULT' && <p className="error-note">FAULT: Конвейер остановлен</p>}
-        {simulation.machineState === 'EMERGENCY_STOP' && <p className="error-note">EMERGENCY_STOP: Аварийная остановка</p>}
-        {simulation.metrics.queueLength > 1 && <p className="warning-note">Внимание: очередь товаров</p>}
+        <strong>Причина решения</strong>
+        <p>{result?.reason}</p>
+        {lowConfidence ? <p className="warning-note">Низкая уверенность CV — rule-based fallback</p> : null}
+        {simulation.machineState === 'FAULT' ? <p className="error-note">FAULT: конвейер остановлен</p> : null}
+        {simulation.machineState === 'EMERGENCY_STOP' ? (
+          <p className="error-note">EMERGENCY_STOP: аварийная остановка</p>
+        ) : null}
+        {simulation.metrics.queueLength > 1 ? <p className="warning-note">Очередь товаров</p> : null}
       </div>
     </div>
   );

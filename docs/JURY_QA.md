@@ -10,23 +10,23 @@ The animation is driven by a deterministic state machine, classifier, sensor sta
 
 ## 3. How Do You Prove The Route Was Correct?
 
-The decision tree shows thresholds and PASS/FAIL, the scene shows the selected command and route arrow, and Event Log records state, command/category and item id.
+The proof card shows category, reason and `ROUTE_TO_*`. The scene highlights the selected route arrow and zone B/C/D. Event Log in Engineering Details records state, command and item id.
 
 ## 4. Where Are OZON Rules Reflected?
 
-The rules are explicit in classification limits: min/max dimensions, roundness threshold and C priority. Criteria Coverage maps these rules to scenarios and docs.
+The rules are explicit in classification limits: min/max dimensions, roundness threshold and C priority. Criteria Cards map these rules to scenarios. Full checklist is in Engineering Details.
 
 ## 5. How Does The Operator Safely Stop The System?
 
-The `emergency_stop` scenario enters `EMERGENCY_STOP`, stops conveyor target speed and requires Reset. In Presentation Mode, Safe Demo requires confirmation before fault scenarios.
+Open scenario **Аварийная остановка**. The system enters `EMERGENCY_STOP`, stops conveyor target speed and requires Reset.
 
 ## 6. What Happens On Sensor Failure Or Low Confidence?
 
-Low confidence is logged as a warning. The system still applies deterministic dimensions/roundness rules as a fallback and shows this in the panel.
+Low confidence is logged as a warning. The system still applies deterministic dimensions/roundness rules as a fallback and shows this on the proof card.
 
 ## 7. Why 2D, Not 3D?
 
-2D is enough for MVP validation: it shows geometry, timing, sensor positions, routes and state transitions without spending effort on heavy rendering.
+2D is enough for MVP validation: it shows geometry, timing, sensor positions, routes and state transitions without heavy rendering.
 
 ## 8. What Is Needed For A Physical Prototype?
 
@@ -38,7 +38,7 @@ The MVP uses pseudo-CV: bbox, dimensions, confidence and latency are derived fro
 
 ## 10. How Is Classification Correctness Proven?
 
-The decision tree shows PASS/FAIL for dimensions and roundness, actual values, thresholds and final category. Tests cover key boundary cases.
+The proof card shows dimensions, roundness and reason. Tests cover key boundary cases. Engineering Details has the full decision evidence and criteria checklist.
 
 ## 11. How Are Dimensions And Circular Section Handled?
 
@@ -50,7 +50,7 @@ Oversized or undersized items are operationally unsafe for the main line and mus
 
 ## 13. How Is Synchronization Shown?
 
-Cycle timeline shows state order, simulated timestamps, durations and status: done, active, pending or skipped.
+Storyline Stepper shows the active stage. In Engineering Details, Cycle Timeline shows state order, timestamps, durations and status: done, active, pending or skipped.
 
 ## 14. How Does The Actuator Part Work?
 
@@ -58,16 +58,24 @@ The stop-gate fixes the item. B opens the gate, C extends pusher C, D extends pu
 
 ## 15. What Happens On Jam?
 
-The system enters FAULT, conveyor target speed becomes 0, actual speed decays toward 0, and Reset is required.
+Open scenario **Застревание**. The system enters FAULT, conveyor target speed becomes 0, actual speed decays toward 0, and Reset is required.
 
 ## 16. Why is the interface a Product Demo Page now?
 
-To avoid cognitive overload during the pitch. The jury needs to understand the decision and see the route clearly without distraction from raw JSON logs or PID graphs, especially on laptop projectors or mobile devices.
+To avoid cognitive overload during the pitch. The jury needs to understand the decision and see the route clearly without distraction from raw logs or PID graphs on the first screen.
 
 ## 17. How does the Demo prove engineering realism?
 
-Even in the Product Demo Section, the scene and proof card are driven by the real underlying state machine, classifier, and metric engine—not a pre-rendered video.
+Even in the Product Demo Section, the scene and proof card are driven by the real state machine, classifier and metrics — not a pre-rendered video.
 
 ## 18. Where to see the full event log and PID?
 
-Scroll down and open the "Engineering Details (Engineering Mode)" accordion.
+Scroll to **Engineering Details** or click **Инженерный режим**. Open the section to see state machine, sensors, PID, timeline, event log and full criteria checklist.
+
+## 19. How to check mobile and no horizontal scroll?
+
+Use widths 1920×1080, 1440×900 and 390×844. On mobile the layout is one column, buttons are large, the scene scales with `width: 100%`. In console:
+
+```js
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```

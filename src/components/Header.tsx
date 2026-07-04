@@ -2,30 +2,49 @@ import type { SimulationState } from '../domain/types';
 
 interface HeaderProps {
   simulation: SimulationState;
+  onReset: () => void;
+  onOpenDemo: () => void;
+  onOpenScenarios: () => void;
+  onOpenEngineering: () => void;
 }
 
-export default function Header({ simulation }: HeaderProps) {
+export default function Header({
+  simulation,
+  onReset,
+  onOpenDemo,
+  onOpenScenarios,
+  onOpenEngineering,
+}: HeaderProps) {
   return (
     <header className="site-header">
       <div className="header-logo">
-        <span className="logo-icon">O</span>
+        <span className="logo-icon" aria-hidden="true">
+          O
+        </span>
         <div className="logo-text">
-          <span className="logo-title">OZON Tech</span>
-          <span className="logo-subtitle">Sorter Simulation</span>
+          <span className="logo-title">OZON Tech Sorter</span>
+          <span className="logo-subtitle">Product Demo</span>
         </div>
       </div>
-      
-      <div className="header-nav">
-        <a href="#demo" className="nav-link">Демо</a>
-        <a href="#scenarios" className="nav-link">Сценарии</a>
-        <a href="#criteria" className="nav-link">Критерии</a>
-        <a href="#engineering" className="nav-link">Инженерный режим</a>
-      </div>
-      
-      <div className="header-status-compact">
-        <div className={`status-dot ${simulation.systemStatus.toLowerCase()}`}></div>
+
+      <nav className="header-nav" aria-label="Основная навигация">
+        <button type="button" className="nav-link" onClick={onOpenDemo}>
+          Демо
+        </button>
+        <button type="button" className="nav-link" onClick={onOpenScenarios}>
+          Сценарии
+        </button>
+        <button type="button" className="nav-link" onClick={onOpenEngineering}>
+          Инженерный режим
+        </button>
+        <button type="button" className="nav-link nav-reset" onClick={onReset}>
+          Reset
+        </button>
+      </nav>
+
+      <div className="header-status-compact" aria-live="polite">
+        <span className={`status-dot ${simulation.systemStatus.toLowerCase()}`} aria-hidden="true" />
         <span>{simulation.systemStatus}</span>
-        <span className="sim-time">t+{(simulation.simTimeMs / 1000).toFixed(1)}s</span>
       </div>
     </header>
   );
