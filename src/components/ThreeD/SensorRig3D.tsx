@@ -18,17 +18,30 @@ function SensorPole({
   height?: number;
 }) {
   return (
-    <group position={[x, 0, -0.55]}>
+    <group position={[x, 0, -0.6]}>
+      {/* Pole - brighter */}
       <mesh position={[0, height / 2, 0]}>
-        <boxGeometry args={[0.08, height, 0.08]} />
-        <meshStandardMaterial color="#475569" />
+        <boxGeometry args={[0.1, height, 0.1]} />
+        <meshStandardMaterial color="#6b7a8f" metalness={0.3} roughness={0.7} />
       </mesh>
-      <mesh position={[0, height, 0.2]}>
-        <boxGeometry args={[0.28, 0.16, 0.22]} />
+      {/* Sensor head - larger and brighter */}
+      <mesh position={[0, height, 0.22]}>
+        <boxGeometry args={[0.32, 0.2, 0.26]} />
         <meshStandardMaterial
-          color={active ? labelColor : '#1e293b'}
+          color={active ? labelColor : '#3d4a5c'}
           emissive={active ? labelColor : '#000000'}
-          emissiveIntensity={active ? 0.55 : 0}
+          emissiveIntensity={active ? 0.7 : 0}
+          metalness={0.2}
+          roughness={0.6}
+        />
+      </mesh>
+      {/* Lens indicator */}
+      <mesh position={[0, height, 0.36]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.02, 16]} />
+        <meshStandardMaterial
+          color={active ? '#ffffff' : '#2a3444'}
+          emissive={active ? labelColor : '#000000'}
+          emissiveIntensity={active ? 0.9 : 0}
         />
       </mesh>
     </group>
@@ -44,11 +57,20 @@ export default function SensorRig3D({ sensors, machineState }: Props) {
       <SensorPole x={TWIN_LAYOUT.laserX} active={sensors.laser.active} labelColor="#22d3ee" />
       <SensorPole x={TWIN_LAYOUT.ultrasonicX} active={sensors.ultrasound.active} labelColor="#67e8f9" height={0.75} />
 
+      {/* Detection beam - more visible */}
       {detecting ? (
-        <mesh position={[TWIN_LAYOUT.cameraX, TWIN_LAYOUT.beltY + 0.35, 0]}>
-          <boxGeometry args={[0.7, 0.02, 0.55]} />
-          <meshStandardMaterial color="#38bdf8" transparent opacity={0.35} emissive="#38bdf8" emissiveIntensity={0.4} />
-        </mesh>
+        <group>
+          {/* Main detection plane */}
+          <mesh position={[TWIN_LAYOUT.cameraX, TWIN_LAYOUT.beltY + 0.4, 0]}>
+            <boxGeometry args={[0.8, 0.03, 0.6]} />
+            <meshStandardMaterial color="#38bdf8" transparent opacity={0.5} emissive="#38bdf8" emissiveIntensity={0.7} />
+          </mesh>
+          {/* Scan line effect */}
+          <mesh position={[TWIN_LAYOUT.cameraX, TWIN_LAYOUT.beltY + 0.2, 0]}>
+            <boxGeometry args={[0.02, 0.4, 0.6]} />
+            <meshStandardMaterial color="#67e8f9" transparent opacity={0.6} emissive="#67e8f9" emissiveIntensity={0.9} />
+          </mesh>
+        </group>
       ) : null}
     </group>
   );

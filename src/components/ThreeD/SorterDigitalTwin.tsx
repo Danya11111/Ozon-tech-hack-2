@@ -67,27 +67,32 @@ function TwinScene({
 
   return (
     <>
-      <color attach="background" args={['#050910']} />
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[5, 8, 4]} intensity={0.9} />
-      <directionalLight position={[-4, 4, -2]} intensity={0.25} />
+      {/* Darker blue-gray background for industrial feel */}
+      <color attach="background" args={['#0a1520']} />
+      
+      {/* Improved lighting for better visibility */}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[5, 8, 4]} intensity={1.1} />
+      <directionalLight position={[-4, 4, -2]} intensity={0.4} />
+      <hemisphereLight args={['#b8d4e8', '#1a2836', 0.3]} />
 
       <Grid
         args={[16, 16]}
         cellSize={0.5}
-        cellThickness={0.6}
-        cellColor="#1e3a54"
+        cellThickness={0.7}
+        cellColor="#2a4a6a"
         sectionSize={2}
-        sectionThickness={1}
-        sectionColor="#284762"
-        fadeDistance={18}
+        sectionThickness={1.2}
+        sectionColor="#3a6080"
+        fadeDistance={16}
         infiniteGrid={false}
         position={[0, 0.001, 0]}
       />
 
+      {/* Floor with better contrast */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[14, 10]} />
-        <meshStandardMaterial color="#07111d" />
+        <meshStandardMaterial color="#0f1a2a" />
       </mesh>
 
       <Conveyor3D stopped={stopped} />
@@ -120,9 +125,9 @@ function TwinScene({
         enablePan={!simplified}
         enableZoom
         maxPolarAngle={Math.PI / 2.1}
-        minDistance={4}
-        maxDistance={14}
-        target={[0.4, 0.3, 0]}
+        minDistance={2.5}
+        maxDistance={10}
+        target={[0.6, 0.4, 0]}
       />
       <FpsMeter onFps={onFps} />
     </>
@@ -164,7 +169,7 @@ export default function SorterDigitalTwin({
 
       <div className="digital-twin-canvas">
         <Canvas
-          camera={{ position: simplified ? [5.5, 4.2, 5.5] : [6.2, 4.8, 6.2], fov: 42 }}
+          camera={{ position: simplified ? [3.8, 2.6, 3.8] : [4.0, 3.0, 4.0], fov: 45 }}
           dpr={simplified ? [1, 1.25] : [1, 1.75]}
           gl={{ antialias: !simplified, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {

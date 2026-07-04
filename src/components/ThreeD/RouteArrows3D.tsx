@@ -27,17 +27,38 @@ function RouteBeam({
   const length = Math.sqrt(dx * dx + dz * dz) || 0.1;
   const angle = Math.atan2(dz, dx);
 
+  // Much thicker and brighter active route
+  const thickness = active ? 0.12 : 0.04;
+  const width = active ? 0.22 : 0.08;
+
   return (
-    <mesh position={mid} rotation={[0, -angle, 0]}>
-      <boxGeometry args={[length, active ? 0.06 : 0.04, active ? 0.14 : 0.08]} />
-      <meshStandardMaterial
-        color={color}
-        transparent
-        opacity={active ? 1 : 0.45}
-        emissive={color}
-        emissiveIntensity={active ? 0.55 : 0.18}
-      />
-    </mesh>
+    <group>
+      {/* Main route beam */}
+      <mesh position={mid} rotation={[0, -angle, 0]}>
+        <boxGeometry args={[length, thickness, width]} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={active ? 1 : 0.3}
+          emissive={color}
+          emissiveIntensity={active ? 0.8 : 0.12}
+        />
+      </mesh>
+      
+      {/* Glow layer for active route */}
+      {active && (
+        <mesh position={[mid[0], mid[1] - 0.02, mid[2]]} rotation={[0, -angle, 0]}>
+          <boxGeometry args={[length, 0.02, width + 0.1]} />
+          <meshStandardMaterial
+            color={color}
+            transparent
+            opacity={0.5}
+            emissive={color}
+            emissiveIntensity={1.0}
+          />
+        </mesh>
+      )}
+    </group>
   );
 }
 
