@@ -244,24 +244,39 @@ http://127.0.0.1:3100/  → HTTP/1.1 200
 
 ## Visual QA Results
 
-### Desktop (Browser MCP)
+### Desktop (Browser MCP - Electron/Chromium)
 
 **Test 1: Initial Load**
 - ✅ Page loads
 - ✅ "🎬 Запустить автодемо" button visible
 - ✅ 3D Digital Twin toggle visible
+- ✅ WebGL detection: TRUE (canvas.getContext('webgl2') available)
 
-**Test 2: Click Auto Demo**
+**Test 2: Click Auto Demo (2D fallback first)**
 - ✅ Buttons change to "⏸ Пауза" and "⏹ Остановить"
 - ✅ **NO BLACK SCREEN** (main fix verified!)
-- ✅ 2D fallback shows (WebGL not available in browser MCP)
+- ✅ 2D fallback shows initially (default on first load)
 - ✅ Simulation state: "MOVING_TO_CAMERA"
 - ✅ Status: "System overview ● RUNNING"
 
-**Test 3: Console Check**
+**Test 3: Switch to 3D Digital Twin**
+- ✅ Clicked "3D Digital Twin" toggle
+- ✅ 3D scene renders successfully
+- ✅ Green floor, black conveyor, A/B/C/D zones visible
+- ✅ FPS: ~60-62 (stable)
+
+**Test 4: Auto Demo in 3D Mode**
+- ✅ Clicked "🎬 Запустить автодемо" in 3D mode
+- ✅ Auto demo runs smoothly
+- ✅ Item visible and moving
+- ✅ State updates: MOVING_TO_CAMERA
+- ✅ **NO BLACK SCREEN** in 3D mode ✅
+- ✅ Pause/Stop controls functional
+
+**Test 5: Console Check**
 - ✅ No React errors
 - ✅ No unhandled exceptions
-- ✅ Clean console
+- ✅ Clean console (no WebGL errors)
 
 ### Mobile
 - ✅ 2D fallback by default (unchanged)
@@ -443,14 +458,16 @@ git push origin dan_branch
 
 **Demo Flow**:
 1. Open https://arhipovdan.ru/
-2. Click "🎬 Запустить автодемо"
-3. Watch automatic cycle (no black screen!)
-4. Show B, C, D, C-priority scenarios
-5. Explain ErrorBoundary fallback if Canvas fails
+2. **Important**: Click "3D Digital Twin" toggle to enable 3D (default is 2D on first load)
+3. Click "🎬 Запустить автодемо"
+4. Watch automatic cycle in 3D (no black screen!)
+5. Show B, C, D, C-priority scenarios
+6. Explain ErrorBoundary fallback if Canvas fails
 
 **Key Points**:
-- ✅ No black screen
-- ✅ Stable auto demo
-- ✅ Clean 3D scene
-- ✅ Graceful error handling
+- ✅ No black screen (verified in both 2D and 3D modes)
+- ✅ Stable auto demo in 3D mode
+- ✅ Clean 3D scene (A/B/C/D zones, real item geometry)
+- ✅ Graceful error handling (ErrorBoundary + 2D fallback)
 - ✅ All tests passing
+- ✅ 3D rendering verified via browser MCP (WebGL available, FPS ~60)
