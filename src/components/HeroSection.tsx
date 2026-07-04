@@ -14,19 +14,18 @@ export default function HeroSection({
       <div className="hero-content">
         <p className="hero-eyebrow">OZON Tech · Product Demo</p>
         <h1 id="hero-title" className="hero-title">
-          Интеллектуальная система сортировки товаров
+          Интеллектуальная система предварительной сортировки товаров
         </h1>
         <p className="hero-subtitle">
-          Симуляция показывает полный цикл: обнаружение товара, классификация по правилам,
-          управляющая команда и маршрутизация в зоны B/C/D.
+          3D-симуляция ПАК показывает полный цикл: товар поступает из A, определяется CV-модулем, классифицируется в B/C/D и физически маршрутизируется исполнительной частью.
         </p>
 
-        <div className="hero-badges" aria-label="Ключевые возможности">
-          <span className="hero-badge">Computer Vision</span>
-          <span className="hero-badge">Rule-based classification</span>
-          <span className="hero-badge">Actuator routing</span>
-          <span className="hero-badge">Cycle time</span>
-          <span className="hero-badge">Fault handling</span>
+        <div className="hero-badges" aria-label="Параметры системы">
+          <span className="hero-badge">Конвейер 1 м/с</span>
+          <span className="hero-badge">Min 10×10×2 мм</span>
+          <span className="hero-badge">Max 450×320×320 мм</span>
+          <span className="hero-badge">K ≥ 0.7 → D</span>
+          <span className="hero-badge">C priority</span>
         </div>
 
         <div className="hero-actions">
@@ -65,7 +64,7 @@ export default function HeroSection({
           </div>
         </div>
         <p className="hero-chain-caption">
-          Результат демо: категория B/C/D, команда ROUTE_TO_* и целевая зона
+          Detection → Classification → ROUTE_TO_* → Actuator → B/C/D
         </p>
       </div>
     </section>

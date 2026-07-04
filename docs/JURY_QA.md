@@ -42,7 +42,7 @@ The proof card shows dimensions, roundness and reason. Tests cover key boundary 
 
 ## 11. How Are Dimensions And Circular Section Handled?
 
-Dimensions are checked first against min/max: 10×10×10 mm to 450×320×320 mm. If they pass, roundness K = r_in / r_out is checked against threshold 0.8. Conveyor target speed is 1.00 m/s.
+Dimensions are checked first against min/max: 10×10×2 mm to 450×320×320 mm. If they pass, roundness K = r_in / r_out is checked against threshold 0.7. Conveyor target speed is 1.00 m/s.
 
 ## 12. Why Does C Have Priority Over D?
 
@@ -91,3 +91,7 @@ document.documentElement.scrollWidth <= document.documentElement.clientWidth
 ## 21. Where is the WebGL / FPS check?
 
 Open Engineering Details → **3D capability check**.
+
+## 22. Where Are The Test Object Models From input_info?
+
+The official test set includes 11 STEP/STL models from input_info: Cylinder, Helmet, Bottle, Bag, Plate, Box 400×400×300, Lunchbox, Box 300×200×200, Pouf, Pen, Detergent. These models can be used to validate classification correctness on realistic geometries. The demo uses mock items derived from these dimensions and shapes.

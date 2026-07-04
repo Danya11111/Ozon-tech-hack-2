@@ -18,7 +18,7 @@ Before final submission:
 - [ ] Jam / emergency stop show red fault state.
 - [ ] Physics engine is NOT required for the demo (state-machine motion).
 - [ ] Engineering Details includes 3D capability check (WebGL / FPS).
-- [ ] Min dimensions are 10×10×10 mm; conveyor target is 1.00 m/s.
+- [ ] Min dimensions are 10×10×2 mm; roundness threshold is 0.7; conveyor target is 1.00 m/s.
 - [ ] Storyline Stepper updates with machine state.
 - [ ] Scenario cards open cases with **Показать**.
 - [ ] Criteria cards show OZON coverage and linked scenarios.
@@ -27,7 +27,7 @@ Before final submission:
 - [ ] NO horizontal scroll on body / `#root` / product page.
 - [ ] Mobile: one column, buttons ≥ 44px, scene scales.
 - [ ] Scenarios checked: normal_flow, oversized_item, round_object, c_priority, boundary_dimensions, close_items, low_confidence, jam, emergency_stop.
-- [ ] Docs present: README, ARCHITECTURE, DEMO_SCRIPT, SCENARIOS, JURY_QA, UI_UX_REDESIGN_AUDIT, THREE_D_FEASIBILITY, SUBMISSION_CHECKLIST.
+- [ ] Docs present: README, ARCHITECTURE, DEMO_SCRIPT, SCENARIOS, JURY_QA, UI_UX_REDESIGN_AUDIT, THREE_D_FEASIBILITY, SUBMISSION_CHECKLIST, INPUT_INFO_ANALYSIS.
 - [ ] Cursor rules present in `.cursor/rules/` (including 3D / physics / WebGL rules).
 - [ ] Branch ready for manual push to `origin/dan_branch`.
 - [ ] Nginx / SSL / neighboring projects were not modified.

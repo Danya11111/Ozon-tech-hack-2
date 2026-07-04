@@ -4,6 +4,7 @@ import HeroSection from './components/HeroSection';
 import ProductDemoSection from './components/ProductDemoSection';
 import StorylineStepper from './components/StorylineStepper';
 import ScenarioCards from './components/ScenarioCards';
+import CPriorityExplanation from './components/CPriorityExplanation';
 import CriteriaCards from './components/CriteriaCards';
 import EngineeringDetails, { type EngineeringDetailsHandle } from './components/EngineeringDetails';
 import { DEMO_STEPS } from './data/demoSteps';
@@ -79,6 +80,10 @@ export default function App() {
     scrollToId('scenarios');
   };
 
+  const handleShowCPriority = () => {
+    handleScenarioChange('c_priority');
+  };
+
   return (
     <div className="product-page">
       <Header
@@ -112,6 +117,8 @@ export default function App() {
           activeScenarioId={activeScenarioId}
           onScenarioChange={handleScenarioChange}
         />
+
+        <CPriorityExplanation onShowCPriority={handleShowCPriority} />
 
         <CriteriaCards onLinkedScenario={handleScenarioChange} />
 

@@ -29,7 +29,7 @@ const PRODUCT_CRITERIA: CriteriaCard[] = [
   {
     id: 'round-section',
     title: 'Круг в сечении',
-    evidence: 'Roundness ≥ 0.8 направляет товар в зону D.',
+    evidence: 'Roundness ≥ 0.7 направляет товар в зону D.',
     status: 'covered',
     linkedScenario: 'round_object',
     linkedLabel: 'Круглый объект',

@@ -6,3 +6,4 @@ vite.config.d.ts
 .env
 .env.*
 npm-debug.log*
+input_info/extracted/

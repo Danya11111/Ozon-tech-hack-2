@@ -11,6 +11,7 @@ import RouteArrows3D from './RouteArrows3D';
 import SceneLabels3D from './SceneLabels3D';
 import { PHYSICS_ENGINE_ENABLED } from './itemMotion';
 import { NOMINAL_CONVEYOR_SPEED_MPS } from '../../domain/simulation';
+import { DIMENSION_LIMITS } from '../../domain/classifier';
 
 export interface SorterDigitalTwinProps {
   simulation: SimulationState;
@@ -142,7 +143,9 @@ export default function SorterDigitalTwin({
         {category ? <span className={`twin-chip category-${category}`}>Zone {category}</span> : null}
         <span className="twin-chip">{command}</span>
         <span className="twin-chip">Conveyor {NOMINAL_CONVEYOR_SPEED_MPS.toFixed(2)} m/s</span>
-        <span className="twin-chip">Min 10×10×10 mm</span>
+        <span className="twin-chip">
+          Min {DIMENSION_LIMITS.min.width}×{DIMENSION_LIMITS.min.depth}×{DIMENSION_LIMITS.min.height} mm
+        </span>
         {showFps ? <span className="twin-chip">FPS ~{fps}</span> : null}
         <span className="twin-chip muted-chip">
           Motion: {PHYSICS_ENGINE_ENABLED ? 'physics' : 'state-machine'}

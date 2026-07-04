@@ -23,7 +23,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'round_object',
     name: 'Round object',
-    description: 'Габариты проходят, но roundness >= 0.8, маршрут в D.',
+    description: 'Габариты проходят, но roundness >= 0.7, маршрут в D.',
     goal: 'Показать проверку круглого сечения после габаритов.',
     expectedCategorySummary: 'D for every item',
     demonstrates: 'Rule-based shape issue routing без реального ML на MVP-этапе.',

@@ -40,6 +40,33 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
         <h3>{item?.name}</h3>
       </div>
 
+      <div className="proof-summary">
+        <div className="summary-row">
+          <span className="summary-label">Category:</span>
+          <strong className={`category-${result?.category ?? 'default'}`}>{result?.category ?? '—'}</strong>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Command:</span>
+          <strong>{command}</strong>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Target:</span>
+          <strong>{result?.category ? `Zone ${result.category}` : '—'}</strong>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Why:</span>
+          <em>
+            {isCPriority
+              ? `dimensions failed, so C has priority even though K = ${item?.roundness.toFixed(2)}`
+              : result?.dimensionsPass === false
+                ? 'dimensions failed (oversized or undersized)'
+                : result?.roundnessPass === false
+                  ? `dimensions pass, but K = ${item?.roundness.toFixed(2)} ≥ 0.7`
+                  : 'dimensions pass and round section is not detected'}
+          </em>
+        </div>
+      </div>
+
       <div className="proof-grid">
         <div className="proof-item">
           <span className="proof-label">Dimensions</span>
@@ -55,7 +82,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
           <strong className={result?.roundnessPass === false && result?.dimensionsPass ? 'fail-text' : 'pass-text'}>
             {item?.roundness.toFixed(2)}
           </strong>
-          <em>{result?.roundnessPass ? 'PASS' : 'DETECTED (≥0.8)'}</em>
+          <em>{result?.roundnessPass ? 'PASS' : 'DETECTED (≥0.7)'}</em>
         </div>
         <div className="proof-item">
           <span className="proof-label">Category</span>

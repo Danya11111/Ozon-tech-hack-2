@@ -44,6 +44,29 @@ A → подающий конвейер → накопитель → CV/laser/ul
 - Vitest для доменных тестов
 - Docker + nginx (production static hosting)
 
+## input_info
+
+Проект разработан в соответствии с официальной постановкой задачи OZON Tech Track 3.
+
+**Использованные материалы:**
+- `Постановка_Задача_3_сжато_2.pdf` — полная постановка задачи (правила классификации, схема участка, критерии оценки)
+- `doc-1783009942.pdf` — схема рабочей зоны с размерами A/B/C/D
+- `doc-1783011400.pdf` — критерии оценки Track 3 (матрица баллов)
+- `doc-1782987706.zip` → STEP модели тестовых товаров (11 шт)
+- `doc-1782987733.zip` → STL модели тестовых товаров (11 шт)
+
+**Тестовый набор товаров:**
+Цилиндр, Шлем, Бутылка, Мешок, Тарелка, Короб 400×400×300, ЛанчБокс, Короб 300×200×200, Пуфик, Ручка, Моющее средство.
+
+**Параметры классификации (согласно постановке):**
+- Min dimensions: **10×10×2 мм**
+- Max dimensions: 450×320×320 мм
+- Roundness threshold: K ≥ **0.7**
+- Conveyor speed: 1.00 м/с
+- C-priority: габариты проверяются первыми
+
+Подробный анализ: `docs/INPUT_INFO_ANALYSIS.md`
+
 ## Как открыть демо
 
 Публично:
@@ -129,7 +152,7 @@ curl -I https://www.arhipovdan.ru/
 
 - `normal_flow` — обычный поток B/C/D.
 - `oversized_item` — max dimensions нарушены, маршрут C.
-- `round_object` — габариты проходят, roundness >= 0.8, маршрут D.
+- `round_object` — габариты проходят, roundness >= 0.7, маршрут D.
 - `c_priority` — негабарит + круглый → только C (приоритет габаритов).
 - `boundary_dimensions` — проверка min/max границ.
 - `close_items` — предупреждение spacing/queue, последовательная обработка.
@@ -150,9 +173,9 @@ curl -I https://www.arhipovdan.ru/
 
 Границы MVP:
 
-- min: width >= 10 мм, depth >= 10 мм, height >= 10 мм;
+- min: width >= 10 мм, depth >= 10 мм, height >= 2 мм;
 - max: width <= 450 мм, depth <= 320 мм, height <= 320 мм;
-- roundness threshold: 0.8 (K = r_in / r_out);
+- roundness threshold: 0.7 (K = r_in / r_out);
 - conveyor target speed: 1.00 м/с (close_items: 0.75 м/с).
 
 ## Исполнительная часть

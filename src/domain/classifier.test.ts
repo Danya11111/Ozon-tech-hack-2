@@ -6,10 +6,10 @@ import type { Category, Item } from './types';
 const VALID_CATEGORIES: Category[] = ['B', 'C', 'D'];
 
 describe('classifyItem', () => {
-  it('uses min dimensions 10×10×10 mm', () => {
-    expect(DIMENSION_LIMITS.min).toEqual({ width: 10, depth: 10, height: 10 });
+  it('uses min dimensions 10×10×2 mm', () => {
+    expect(DIMENSION_LIMITS.min).toEqual({ width: 10, depth: 10, height: 2 });
     expect(DIMENSION_LIMITS.max).toEqual({ width: 450, depth: 320, height: 320 });
-    expect(DIMENSION_LIMITS.roundnessThreshold).toBe(0.8);
+    expect(DIMENSION_LIMITS.roundnessThreshold).toBe(0.7);
   });
 
   it('routes normal box to B', () => {
@@ -40,11 +40,11 @@ describe('classifyItem', () => {
     expect(classifyItem(getItem('SKU-010')).category).toBe('B');
   });
 
-  it('rejects height below 10 mm as C', () => {
+  it('rejects height below 2 mm as C', () => {
     const item: Item = {
       ...getItem('SKU-001'),
       id: 'TEST-LOW-HEIGHT',
-      dimensionsMm: { width: 100, depth: 100, height: 9 },
+      dimensionsMm: { width: 100, depth: 100, height: 1 },
     };
     expect(classifyItem(item).category).toBe('C');
     expect(classifyItem(item).dimensionsPass).toBe(false);

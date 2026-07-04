@@ -690,6 +690,46 @@ button:disabled {
   font-size: 1.25rem;
 }
 
+.proof-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 2px solid var(--cyan);
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.summary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-label {
+  color: var(--cyan);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 88px;
+}
+
+.summary-row strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.summary-row em {
+  flex: 1;
+  min-width: 200px;
+  color: var(--muted);
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
 .proof-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -974,6 +1014,71 @@ button:disabled {
   color: var(--cyan);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* ---------- C-priority explanation ---------- */
+
+.c-priority-section {
+  margin: clamp(40px, 6vw, 72px) 0;
+}
+
+.c-priority-card {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: clamp(20px, 4vw, 32px);
+  border: 2px solid var(--orange);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%);
+}
+
+.c-priority-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--orange);
+  color: #041018;
+  font-size: 36px;
+  font-weight: 900;
+}
+
+.c-priority-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.c-priority-content h3 {
+  font-size: 1.5rem;
+  color: var(--text);
+}
+
+.c-priority-content p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.c-priority-content .btn-primary {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .c-priority-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .c-priority-content .btn-primary {
+    align-self: stretch;
+    width: 100%;
+  }
 }
 
 /* ---------- Engineering details ---------- */
