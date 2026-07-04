@@ -17,6 +17,8 @@ export interface SorterDigitalTwinProps {
   simulation: SimulationState;
   simplified?: boolean;
   showFps?: boolean;
+  technicalLabelsEnabled?: boolean;
+  cleanView?: boolean;
   onContextLost?: () => void;
 }
 
@@ -41,10 +43,14 @@ function FpsMeter({ onFps }: { onFps: (fps: number) => void }) {
 function TwinScene({
   simulation,
   simplified,
+  technicalLabelsEnabled,
+  cleanView,
   onFps,
 }: {
   simulation: SimulationState;
   simplified?: boolean;
+  technicalLabelsEnabled?: boolean;
+  cleanView?: boolean;
   onFps: (fps: number) => void;
 }) {
   const stopped =
@@ -99,6 +105,8 @@ function TwinScene({
         currentItem={simulation.currentItem}
         simplified={simplified}
         conveyorTargetMps={NOMINAL_CONVEYOR_SPEED_MPS}
+        technicalLabelsEnabled={technicalLabelsEnabled}
+        cleanView={cleanView}
       />
 
       {stopped ? (
@@ -125,6 +133,8 @@ export default function SorterDigitalTwin({
   simulation,
   simplified = false,
   showFps = true,
+  technicalLabelsEnabled = false,
+  cleanView = true,
   onContextLost,
 }: SorterDigitalTwinProps) {
   const [fps, setFps] = useState(0);
@@ -169,7 +179,13 @@ export default function SorterDigitalTwin({
           }}
         >
           <Suspense fallback={null}>
-            <TwinScene simulation={simulation} simplified={simplified} onFps={setFps} />
+            <TwinScene 
+              simulation={simulation} 
+              simplified={simplified} 
+              technicalLabelsEnabled={technicalLabelsEnabled}
+              cleanView={cleanView}
+              onFps={setFps} 
+            />
           </Suspense>
         </Canvas>
       </div>

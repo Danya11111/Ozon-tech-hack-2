@@ -8,6 +8,8 @@ interface Props {
   currentItem?: SimulatedItem;
   simplified?: boolean;
   conveyorTargetMps?: number;
+  technicalLabelsEnabled?: boolean;
+  cleanView?: boolean;
 }
 
 function Badge({
@@ -44,77 +46,32 @@ function Badge({
   );
 }
 
-function ItemProofPanel({
-  currentItem,
-  machineState,
-}: {
-  currentItem: SimulatedItem;
-  machineState: MachineState;
-}) {
-  const item = currentItem.item;
-  const result = currentItem.classification;
-  const category = result.category as Category;
-  const color = ROUTE_COLORS[category];
-  const command = machineState.startsWith('ROUTE_TO_')
-    ? machineState
-    : `ROUTE_TO_${category}`;
-  const dims = item.dimensionsMm;
-  const dimStatus = result.dimensionsPass ? 'PASS' : 'FAIL';
-  const roundStatus = result.roundnessPass ? 'PASS' : 'DETECTED';
-
-  return (
-    <Html position={[0, 2.05, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
-      <div
-        style={{
-          minWidth: 260,
-          padding: '12px 14px',
-          borderRadius: 14,
-          background: 'rgba(5, 9, 16, 0.94)',
-          border: `2px solid ${color}`,
-          color: '#e5f2ff',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          boxShadow: `0 0 24px ${color}44`,
-        }}
-      >
-        <div style={{ fontSize: 11, color: '#91a4b8', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Current item
-        </div>
-        <div style={{ fontSize: 16, fontWeight: 800, margin: '4px 0 10px' }}>{item.name}</div>
-        <div style={{ display: 'grid', gap: 6, fontSize: 14, fontWeight: 700 }}>
-          <div>
-            Dimensions: {dims.width}×{dims.depth}×{dims.height} mm{' '}
-            <span style={{ color: result.dimensionsPass ? '#4ade80' : '#fb3d4e' }}>{dimStatus}</span>
-          </div>
-          <div>
-            Roundness K = {item.roundness.toFixed(2)}{' '}
-            <span style={{ color: result.roundnessPass ? '#4ade80' : '#c084fc' }}>{roundStatus}</span>
-          </div>
-          <div style={{ color }}>
-            Category: {category}
-          </div>
-          <div style={{ color }}>
-            Command: {command}
-          </div>
-          <div style={{ color }}>
-            Target zone: {category}
-          </div>
-        </div>
-      </div>
-    </Html>
-  );
-}
+// ItemProofPanel removed — info now displayed in 2D proof card only
 
 export default function SceneLabels3D({
   machineState,
   currentItem,
   conveyorTargetMps = 1,
+  technicalLabelsEnabled = false,
+  cleanView = true,
 }: Props) {
   const category = currentItem?.classification.category as Category | undefined;
   const cage = TWIN_LAYOUT.rollCageSize;
+  const detecting = machineState === 'DETECTING';
+  const atGate = machineState === 'WAITING_AT_GATE' || machineState === 'CLASSIFYING';
+  const routing = machineState.startsWith('ROUTE_TO_');
+  const fault = machineState === 'FAULT' || machineState === 'EMERGENCY_STOP';
+  
+  // C-priority: dimensions failed + round detected → only C active, D not active
+  const isCPriority = Boolean(
+    category === 'C' && currentItem && !currentItem.classification.dimensionsPass && !currentItem.classification.roundnessPass
+  );
 
   return (
     <group>
-      {/* Zones A/B/C/D — always explicit */}
+      {/* === CLEAN VIEW (always visible) === */}
+      
+      {/* Zones A/B/C/D — always visible */}
       <Badge position={[TWIN_LAYOUT.startX, 0.85, 0]} text="A" color="#38bdf8" large />
       <Badge position={[TWIN_LAYOUT.zoneBX, 0.95, 0]} text="B" color={ROUTE_COLORS.B} large />
       <Badge
@@ -130,7 +87,7 @@ export default function SceneLabels3D({
         large
       />
 
-      {/* Accumulator at end of feed conveyor */}
+      {/* Накопитель — always visible */}
       <Badge
         position={[TWIN_LAYOUT.accumulatorX, 0.95, 0.65]}
         text="Накопитель"
@@ -138,51 +95,109 @@ export default function SceneLabels3D({
         large
       />
 
-      {/* Sensors & actuators — always visible */}
-      <Badge position={[TWIN_LAYOUT.cameraX, 1.2, -0.55]} text="Camera / CV" color="#38bdf8" />
-      <Badge position={[TWIN_LAYOUT.laserX, 1.2, -0.55]} text="Laser" color="#22d3ee" />
-      <Badge position={[TWIN_LAYOUT.ultrasonicX, 1.05, -0.55]} text="Ultrasonic" color="#67e8f9" />
-      <Badge position={[TWIN_LAYOUT.gateX, 1.15, 0]} text="Stop-gate" color="#fda4af" />
-      <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, 0.75]} text="Pusher C" color={ROUTE_COLORS.C} />
-      <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, -0.75]} text="Pusher D" color={ROUTE_COLORS.D} />
+      {/* === STEP-BASED LABELS (shown only when active) === */}
+      
+      {/* Detection: Camera/CV + Laser */}
+      {detecting && (
+        <>
+          <Badge position={[TWIN_LAYOUT.cameraX, 1.2, -0.55]} text="Camera CV" color="#38bdf8" />
+          <Badge position={[TWIN_LAYOUT.laserX, 1.2, -0.55]} text="Laser" color="#22d3ee" />
+        </>
+      )}
 
-      {/* Route labels */}
-      <Badge position={[(TWIN_LAYOUT.gateX + TWIN_LAYOUT.zoneBX) / 2, 0.55, 0]} text="Route B" color={ROUTE_COLORS.B} />
-      <Badge
-        position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneCZ / 2]}
-        text="Route C"
-        color={ROUTE_COLORS.C}
-      />
-      <Badge
-        position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneDZ / 2]}
-        text="Route D"
-        color={ROUTE_COLORS.D}
-      />
+      {/* At gate: Stop-gate + Ultrasonic */}
+      {atGate && (
+        <>
+          <Badge position={[TWIN_LAYOUT.gateX, 1.15, 0]} text="Stop-gate" color="#fda4af" />
+        </>
+      )}
 
-      <Badge
-        position={[-3.2, 1.55, 1.4]}
-        text={`Conveyor ${conveyorTargetMps.toFixed(2)} m/s · min ${DIMENSION_LIMITS.min.width}×${DIMENSION_LIMITS.min.depth}×${DIMENSION_LIMITS.min.height} mm`}
-        color="#91a4b8"
-      />
+      {/* Routing: active pusher only */}
+      {routing && category === 'C' && (
+        <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, 0.75]} text="Pusher C" color={ROUTE_COLORS.C} />
+      )}
+      {routing && category === 'D' && (
+        <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, -0.75]} text="Pusher D" color={ROUTE_COLORS.D} />
+      )}
 
-      {currentItem ? <ItemProofPanel currentItem={currentItem} machineState={machineState} /> : null}
+      {/* Active route only (not all three routes) */}
+      {routing && category === 'B' && (
+        <Badge position={[(TWIN_LAYOUT.gateX + TWIN_LAYOUT.zoneBX) / 2, 0.55, 0]} text="→ B" color={ROUTE_COLORS.B} />
+      )}
+      {routing && category === 'C' && (
+        <Badge
+          position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneCZ / 2]}
+          text="→ C"
+          color={ROUTE_COLORS.C}
+        />
+      )}
+      {routing && category === 'D' && (
+        <Badge
+          position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneDZ / 2]}
+          text="→ D"
+          color={ROUTE_COLORS.D}
+        />
+      )}
 
-      {category === 'C' && currentItem && !currentItem.classification.roundnessPass ? (
+      {/* C-priority badge (only when applicable) */}
+      {isCPriority && (
         <Badge
           position={[TWIN_LAYOUT.gateX + 0.4, cage.y + 0.7, TWIN_LAYOUT.zoneCZ]}
-          text="C-priority (dims first)"
+          text="C-priority"
           color={ROUTE_COLORS.C}
           large
         />
-      ) : null}
+      )}
 
-      {machineState === 'DETECTING' ? (
-        <Badge position={[TWIN_LAYOUT.cameraX, 1.55, 0]} text="CV detection" color="#38bdf8" />
-      ) : null}
-
-      {machineState === 'FAULT' || machineState === 'EMERGENCY_STOP' ? (
+      {/* Fault / Emergency stop */}
+      {fault && (
         <Badge position={[0, 2.5, 0]} text={machineState} color="#fb3d4e" large />
-      ) : null}
+      )}
+
+      {/* === TECHNICAL LABELS (opt-in) === */}
+      {technicalLabelsEnabled && !cleanView && (
+        <>
+          {/* Always show all sensors when technical mode is on */}
+          {!detecting && <Badge position={[TWIN_LAYOUT.cameraX, 1.2, -0.55]} text="Camera CV" color="#38bdf8" />}
+          {!detecting && <Badge position={[TWIN_LAYOUT.laserX, 1.2, -0.55]} text="Laser" color="#22d3ee" />}
+          <Badge position={[TWIN_LAYOUT.ultrasonicX, 1.05, -0.55]} text="Ultrasonic" color="#67e8f9" />
+          
+          {/* Always show all actuators */}
+          {!atGate && <Badge position={[TWIN_LAYOUT.gateX, 1.15, 0]} text="Stop-gate" color="#fda4af" />}
+          {!(routing && category === 'C') && (
+            <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, 0.75]} text="Pusher C" color={ROUTE_COLORS.C} />
+          )}
+          {!(routing && category === 'D') && (
+            <Badge position={[TWIN_LAYOUT.gateX - 0.1, 0.75, -0.75]} text="Pusher D" color={ROUTE_COLORS.D} />
+          )}
+          
+          {/* All route beams */}
+          {!(routing && category === 'B') && (
+            <Badge position={[(TWIN_LAYOUT.gateX + TWIN_LAYOUT.zoneBX) / 2, 0.55, 0]} text="Route B" color={ROUTE_COLORS.B} />
+          )}
+          {!(routing && category === 'C') && (
+            <Badge
+              position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneCZ / 2]}
+              text="Route C"
+              color={ROUTE_COLORS.C}
+            />
+          )}
+          {!(routing && category === 'D') && (
+            <Badge
+              position={[TWIN_LAYOUT.gateX + 0.2, 0.55, TWIN_LAYOUT.zoneDZ / 2]}
+              text="Route D"
+              color={ROUTE_COLORS.D}
+            />
+          )}
+          
+          {/* Conveyor info */}
+          <Badge
+            position={[-3.2, 1.55, 1.4]}
+            text={`Conveyor ${conveyorTargetMps.toFixed(2)} m/s · min ${DIMENSION_LIMITS.min.width}×${DIMENSION_LIMITS.min.depth}×${DIMENSION_LIMITS.min.height} mm`}
+            color="#91a4b8"
+          />
+        </>
+      )}
     </group>
   );
 }
