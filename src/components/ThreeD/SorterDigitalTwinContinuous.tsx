@@ -1,6 +1,11 @@
 /**
  * SorterDigitalTwinContinuous — 3D scene for continuous playback on main page.
  * Light warehouse-style scene with white-blue palette.
+ * 
+ * Physical dimensions (1 unit = 1 meter):
+ * - Belt top surface: 0.7m from floor
+ * - Belt width: 0.5m
+ * - Items ride ON the belt surface
  */
 
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -9,11 +14,27 @@ import { Suspense, useRef, useMemo } from 'react';
 import type { Mesh, Group } from 'three';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
-import { getItemPosition, isItemVisible, getActiveRoute, getConveyorSpeedFactor, CONVEYOR_POSITIONS } from '../../domain/conveyorPath';
+import { getItemPosition, isItemVisible, getActiveRoute, getConveyorSpeedFactor } from '../../domain/conveyorPath';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
 import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
+import {
+  BELT_TOP_Y,
+  BELT_THICKNESS_M,
+  CONVEYOR_WIDTH_M,
+  ROLLER_RADIUS_M,
+  ROLLER_SPACING_M,
+  FRAME_HEIGHT_M,
+  SIDE_GUARD_HEIGHT_M,
+  LEG_WIDTH_M,
+  MOTOR_WIDTH_M,
+  MOTOR_HEIGHT_M,
+  MOTOR_DEPTH_M,
+  DRIVE_ROLLER_RADIUS_M,
+  ZONES,
+  CAMERA_RIG,
+} from '../../domain/physicalLayout';
 
 export interface SorterDigitalTwinContinuousProps {
   playback: ContinuousPlaybackState;
@@ -41,25 +62,35 @@ const COLORS = {
   routeD: '#8b5cf6',
 };
 
+// Physical layout constants
+const BELT_Y = BELT_TOP_Y;                    // 0.7m - top of belt where items ride
+const BELT_UNDERSIDE_Y = BELT_TOP_Y - BELT_THICKNESS_M; // 0.685m
+const ROLLER_Y = BELT_UNDERSIDE_Y - ROLLER_RADIUS_M;    // ~0.645m - roller center
+const FRAME_TOP_Y = ROLLER_Y - ROLLER_RADIUS_M - 0.02;  // Top of frame structure
+const CONVEYOR_START_X = -4.2;
+const CONVEYOR_END_X = 4.3;
+const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
+const CONVEYOR_CENTER_X = (CONVEYOR_START_X + CONVEYOR_END_X) / 2;
+
 /** Single animated roller that rotates around its own axis */
 function Roller({ position, speedFactor }: { position: [number, number, number]; speedFactor: number }) {
   const meshRef = useRef<Mesh>(null);
   
   useFrame((_, delta) => {
     if (meshRef.current && speedFactor > 0) {
-      meshRef.current.rotation.x += delta * speedFactor * 3;
+      meshRef.current.rotation.x += delta * speedFactor * 4;
     }
   });
 
   return (
     <mesh ref={meshRef} position={position} rotation={[0, 0, Math.PI / 2]}>
-      <cylinderGeometry args={[0.035, 0.035, 0.72, 12]} />
-      <meshStandardMaterial color={COLORS.rollers} metalness={0.3} roughness={0.6} />
+      <cylinderGeometry args={[ROLLER_RADIUS_M, ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 12]} />
+      <meshStandardMaterial color={COLORS.rollers} metalness={0.4} roughness={0.5} />
     </mesh>
   );
 }
 
-/** Moving stripe on conveyor belt */
+/** Moving stripe on conveyor belt - animates at belt surface */
 function BeltStripe({ offset, speedFactor }: { offset: number; speedFactor: number }) {
   const meshRef = useRef<Mesh>(null);
   const posRef = useRef(offset);
@@ -67,70 +98,161 @@ function BeltStripe({ offset, speedFactor }: { offset: number; speedFactor: numb
   useFrame((_, delta) => {
     if (meshRef.current && speedFactor > 0) {
       posRef.current += delta * speedFactor * 1.0;
-      if (posRef.current > 4.4) posRef.current = -4.4;
+      if (posRef.current > CONVEYOR_END_X) posRef.current = CONVEYOR_START_X;
       meshRef.current.position.x = posRef.current;
     }
   });
 
   return (
-    <mesh ref={meshRef} position={[offset, 0.36, 0]}>
-      <boxGeometry args={[0.15, 0.01, 0.65]} />
-      <meshStandardMaterial color={COLORS.beltStripe} transparent opacity={0.6} />
+    <mesh ref={meshRef} position={[offset, BELT_Y + 0.002, 0]}>
+      <boxGeometry args={[0.12, 0.004, CONVEYOR_WIDTH_M - 0.05]} />
+      <meshStandardMaterial color={COLORS.beltStripe} transparent opacity={0.5} />
     </mesh>
   );
 }
 
-/** Conveyor belt - light warehouse style */
+/** Stepper motor drive unit */
+function StepperMotor({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Motor body */}
+      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 + MOTOR_DEPTH_M / 2 + 0.02]}>
+        <boxGeometry args={[MOTOR_WIDTH_M, MOTOR_HEIGHT_M, MOTOR_DEPTH_M]} />
+        <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Motor shaft */}
+      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 + 0.01]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.03, 8]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.2} />
+      </mesh>
+      {/* Drive pulley */}
+      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 - 0.02]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.025, 12]} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+      </mesh>
+      {/* Belt to drive roller (simplified) */}
+      <mesh position={[0, DRIVE_ROLLER_RADIUS_M / 2, CONVEYOR_WIDTH_M / 2 - 0.02]}>
+        <boxGeometry args={[0.01, DRIVE_ROLLER_RADIUS_M + 0.02, 0.015]} />
+        <meshStandardMaterial color="#1e293b" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Support leg from floor to frame */
+function SupportLeg({ x }: { x: number }) {
+  const legHeight = FRAME_TOP_Y;
+  return (
+    <group position={[x, 0, 0]}>
+      {/* Main vertical leg - front */}
+      <mesh position={[0, legHeight / 2, CONVEYOR_WIDTH_M / 2 + 0.03]}>
+        <boxGeometry args={[LEG_WIDTH_M, legHeight, LEG_WIDTH_M]} />
+        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
+      </mesh>
+      {/* Main vertical leg - back */}
+      <mesh position={[0, legHeight / 2, -CONVEYOR_WIDTH_M / 2 - 0.03]}>
+        <boxGeometry args={[LEG_WIDTH_M, legHeight, LEG_WIDTH_M]} />
+        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
+      </mesh>
+      {/* Cross brace */}
+      <mesh position={[0, legHeight * 0.3, 0]}>
+        <boxGeometry args={[LEG_WIDTH_M * 0.8, LEG_WIDTH_M * 0.8, CONVEYOR_WIDTH_M + 0.1]} />
+        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+/** 
+ * Conveyor belt - realistic roller conveyor
+ * Belt top surface at 0.7m (BELT_TOP_Y)
+ */
 function ConveyorBelt({ speedFactor }: { speedFactor: number }) {
+  const rollerCount = Math.floor(CONVEYOR_LENGTH / ROLLER_SPACING_M);
+  
   const rollerPositions = useMemo(() => {
     const positions: [number, number, number][] = [];
-    for (let i = 0; i < 18; i++) {
-      positions.push([-4 + i * 0.5, 0.28, 0]);
+    for (let i = 0; i < rollerCount; i++) {
+      positions.push([CONVEYOR_START_X + ROLLER_SPACING_M / 2 + i * ROLLER_SPACING_M, ROLLER_Y, 0]);
+    }
+    return positions;
+  }, [rollerCount]);
+
+  const legPositions = useMemo(() => {
+    const positions: number[] = [];
+    for (let x = CONVEYOR_START_X + 0.5; x < CONVEYOR_END_X - 0.3; x += 2.0) {
+      positions.push(x);
     }
     return positions;
   }, []);
 
   return (
     <group>
-      {/* Conveyor frame / base */}
-      <mesh position={[0, 0.2, 0]}>
-        <boxGeometry args={[9.0, 0.08, 0.95]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} />
-      </mesh>
-      
-      {/* Support legs */}
-      {[-3.5, -1, 1.5, 4].map((x, i) => (
-        <mesh key={i} position={[x, 0.1, 0]}>
-          <boxGeometry args={[0.12, 0.2, 0.8]} />
-          <meshStandardMaterial color={COLORS.supports} />
-        </mesh>
-      ))}
-      
-      {/* Main belt surface */}
-      <mesh position={[0, 0.32, 0]}>
-        <boxGeometry args={[8.8, 0.06, 0.7]} />
+      {/* Main belt surface - top working surface at 0.7m */}
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]}>
+        <boxGeometry args={[CONVEYOR_LENGTH, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
         <meshStandardMaterial color={COLORS.belt} />
       </mesh>
       
-      {/* Belt stripes (animated) */}
-      {[-4, -2, 0, 2, 4].map((offset, i) => (
+      {/* Belt stripes (animated) - moving on belt surface */}
+      {[-4, -2.5, -1, 0.5, 2, 3.5].map((offset, i) => (
         <BeltStripe key={i} offset={offset} speedFactor={speedFactor} />
       ))}
       
-      {/* Side guards */}
-      <mesh position={[0, 0.38, 0.42]}>
-        <boxGeometry args={[8.8, 0.1, 0.06]} />
-        <meshStandardMaterial color={COLORS.sideGuards} />
+      {/* Side guards - above belt level */}
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]}>
+        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.03]} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.2} roughness={0.7} />
       </mesh>
-      <mesh position={[0, 0.38, -0.42]}>
-        <boxGeometry args={[8.8, 0.1, 0.06]} />
-        <meshStandardMaterial color={COLORS.sideGuards} />
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]}>
+        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.03]} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.2} roughness={0.7} />
       </mesh>
       
-      {/* Rollers - each rotates independently */}
+      {/* Frame rails under the belt */}
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]}>
+        <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.3} roughness={0.5} />
+      </mesh>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]}>
+        <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.3} roughness={0.5} />
+      </mesh>
+      
+      {/* Rollers - rotating under the belt */}
       {rollerPositions.map((pos, i) => (
         <Roller key={i} position={pos} speedFactor={speedFactor} />
       ))}
+      
+      {/* Drive roller at end (larger) */}
+      <mesh position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M, DRIVE_ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 16]} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+      </mesh>
+      
+      {/* Tension roller at start (larger) */}
+      <mesh position={[CONVEYOR_START_X + 0.1, ROLLER_Y, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M * 0.9, DRIVE_ROLLER_RADIUS_M * 0.9, CONVEYOR_WIDTH_M - 0.02, 16]} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+      </mesh>
+      
+      {/* Support legs from floor */}
+      {legPositions.map((x, i) => (
+        <SupportLeg key={i} x={x} />
+      ))}
+      
+      {/* Stepper motor at drive end */}
+      <StepperMotor position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} />
+      
+      {/* End caps / guards */}
+      <mesh position={[CONVEYOR_START_X, BELT_Y - 0.05, 0]}>
+        <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} />
+      </mesh>
+      <mesh position={[CONVEYOR_END_X, BELT_Y - 0.05, 0]}>
+        <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} />
+      </mesh>
     </group>
   );
 }
@@ -167,36 +289,33 @@ function ZoneMarker({ position, label, color, active }: {
   );
 }
 
-/** Camera rig with overhead structure */
+/** Camera rig with overhead structure - positioned above belt at 0.7m */
 function CameraRig({ active }: { active: boolean }) {
+  const cameraX = ZONES.CAMERA.x;
+  const poleSpacing = CAMERA_RIG.poleSpacing;
+  const rigHeight = CAMERA_RIG.height;
+  const cameraY = CAMERA_RIG.cameraY;
+  const poleHeight = rigHeight;
+  
   return (
-    <group position={[CONVEYOR_POSITIONS.cameraX, 0, 0]}>
-      {/* Overhead frame */}
-      <mesh position={[0, 1.1, 0.5]}>
-        <boxGeometry args={[0.06, 0.06, 1.2]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
+    <group position={[cameraX, 0, 0]}>
+      {/* Support poles from floor */}
+      <mesh position={[0, poleHeight / 2, poleSpacing]}>
+        <cylinderGeometry args={[0.03, 0.03, poleHeight, 8]} />
+        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[0, 1.1, -0.5]}>
-        <boxGeometry args={[0.06, 0.06, 1.2]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
+      <mesh position={[0, poleHeight / 2, -poleSpacing]}>
+        <cylinderGeometry args={[0.03, 0.03, poleHeight, 8]} />
+        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
       {/* Cross beam */}
-      <mesh position={[0, 1.1, 0]}>
-        <boxGeometry args={[0.06, 0.06, 1.1]} />
+      <mesh position={[0, rigHeight, 0]}>
+        <boxGeometry args={[0.05, 0.05, poleSpacing * 2 + 0.1]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* Support poles */}
-      <mesh position={[0, 0.55, 0.55]}>
-        <cylinderGeometry args={[0.035, 0.035, 1.1, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 0.55, -0.55]}>
-        <cylinderGeometry args={[0.035, 0.035, 1.1, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
       {/* Camera unit */}
-      <mesh position={[0, 1.0, 0]}>
-        <boxGeometry args={[0.2, 0.12, 0.15]} />
+      <mesh position={[0, cameraY, 0]}>
+        <boxGeometry args={[0.18, 0.1, 0.12]} />
         <meshStandardMaterial 
           color={active ? COLORS.sensorActive : '#1e3a5f'}
           emissive={active ? COLORS.sensorActive : '#000'}
@@ -204,21 +323,21 @@ function CameraRig({ active }: { active: boolean }) {
         />
       </mesh>
       {/* Camera lens */}
-      <mesh position={[0, 0.93, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.02, 16]} />
+      <mesh position={[0, cameraY - 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.02, 16]} />
         <meshStandardMaterial color="#0f172a" />
       </mesh>
-      {/* Laser emitters on sides */}
-      <mesh position={[0.15, 0.55, 0.45]}>
-        <boxGeometry args={[0.08, 0.08, 0.08]} />
+      {/* Laser emitters on support poles */}
+      <mesh position={[0, BELT_Y + 0.15, poleSpacing - 0.05]}>
+        <boxGeometry args={[0.06, 0.06, 0.06]} />
         <meshStandardMaterial 
           color={active ? '#22d3ee' : '#475569'}
           emissive={active ? '#22d3ee' : '#000'}
           emissiveIntensity={active ? 0.4 : 0}
         />
       </mesh>
-      <mesh position={[-0.15, 0.55, 0.45]}>
-        <boxGeometry args={[0.08, 0.08, 0.08]} />
+      <mesh position={[0, BELT_Y + 0.15, -poleSpacing + 0.05]}>
+        <boxGeometry args={[0.06, 0.06, 0.06]} />
         <meshStandardMaterial 
           color={active ? '#22d3ee' : '#475569'}
           emissive={active ? '#22d3ee' : '#000'}
@@ -229,13 +348,13 @@ function CameraRig({ active }: { active: boolean }) {
   );
 }
 
-/** Inspection zone on belt */
+/** Inspection zone on belt - at belt surface height */
 function InspectionZone({ active }: { active: boolean }) {
   return (
-    <group position={[CONVEYOR_POSITIONS.cameraX, 0.36, 0]}>
-      {/* Inspection area rectangle */}
+    <group position={[ZONES.CAMERA.x, BELT_Y + 0.005, 0]}>
+      {/* Inspection area rectangle on belt */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.9, 0.7]} />
+        <planeGeometry args={[0.7, CONVEYOR_WIDTH_M - 0.05]} />
         <meshStandardMaterial 
           color={active ? COLORS.sensorActive : '#94a3b8'}
           transparent 
@@ -243,9 +362,10 @@ function InspectionZone({ active }: { active: boolean }) {
         />
       </mesh>
       {/* Corner markers */}
-      {[[-0.4, 0.3], [0.4, 0.3], [-0.4, -0.3], [0.4, -0.3]].map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.01, z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.03, 0.05, 4]} />
+      {[[-0.3, (CONVEYOR_WIDTH_M - 0.1) / 2], [0.3, (CONVEYOR_WIDTH_M - 0.1) / 2], 
+        [-0.3, -(CONVEYOR_WIDTH_M - 0.1) / 2], [0.3, -(CONVEYOR_WIDTH_M - 0.1) / 2]].map(([x, z], i) => (
+        <mesh key={i} position={[x, 0.005, z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.025, 0.04, 4]} />
           <meshStandardMaterial 
             color={active ? COLORS.sensorActive : '#64748b'}
             transparent 
@@ -257,21 +377,22 @@ function InspectionZone({ active }: { active: boolean }) {
   );
 }
 
-/** Animated scan line */
+/** Animated scan line - sweeps across belt at surface height */
 function ScanLine({ active }: { active: boolean }) {
   const lineRef = useRef<Mesh>(null);
-  const posRef = useRef(0.35);
+  const halfWidth = (CONVEYOR_WIDTH_M - 0.08) / 2;
+  const posRef = useRef(halfWidth);
   const dirRef = useRef(-1);
   
   useFrame((_, delta) => {
     if (lineRef.current && active) {
-      posRef.current += dirRef.current * delta * 0.8;
-      if (posRef.current < -0.35) {
-        posRef.current = -0.35;
+      posRef.current += dirRef.current * delta * 0.6;
+      if (posRef.current < -halfWidth) {
+        posRef.current = -halfWidth;
         dirRef.current = 1;
       }
-      if (posRef.current > 0.35) {
-        posRef.current = 0.35;
+      if (posRef.current > halfWidth) {
+        posRef.current = halfWidth;
         dirRef.current = -1;
       }
       lineRef.current.position.z = posRef.current;
@@ -281,8 +402,8 @@ function ScanLine({ active }: { active: boolean }) {
   if (!active) return null;
 
   return (
-    <mesh ref={lineRef} position={[CONVEYOR_POSITIONS.cameraX, 0.37, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[0.85, 0.02]} />
+    <mesh ref={lineRef} position={[ZONES.CAMERA.x, BELT_Y + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[0.65, 0.015]} />
       <meshStandardMaterial 
         color="#22d3ee" 
         emissive="#22d3ee"
@@ -401,63 +522,78 @@ function ShapeOutline({ position, scale, visible, isRound, category }: {
   );
 }
 
-/** Gate/accumulator zone */
+/** Gate/accumulator zone - positioned at belt height */
 function GateZone({ category }: { category: Category | null }) {
   const gateColor = category === 'B' ? COLORS.routeB 
     : category === 'C' ? COLORS.routeC 
     : category === 'D' ? COLORS.routeD 
     : COLORS.gateFrame;
   
+  const gateX = ZONES.GATE.x;
+  const postSpacing = CONVEYOR_WIDTH_M / 2 + 0.08;
+  const postHeight = 0.4;
+  
   return (
-    <group position={[CONVEYOR_POSITIONS.gateX, 0.35, 0]}>
-      {/* Gate posts */}
-      <mesh position={[0, 0.25, 0.48]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.5, 8]} />
+    <group position={[gateX, 0, 0]}>
+      {/* Gate posts from floor */}
+      <mesh position={[0, BELT_Y + postHeight / 2, postSpacing]}>
+        <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[0, 0.25, -0.48]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.5, 8]} />
+      <mesh position={[0, BELT_Y + postHeight / 2, -postSpacing]}>
+        <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
       {/* Gate bar */}
-      <mesh position={[0, 0.45, 0]}>
-        <boxGeometry args={[0.06, 0.06, 0.88]} />
+      <mesh position={[0, BELT_Y + postHeight, 0]}>
+        <boxGeometry args={[0.05, 0.05, postSpacing * 2]} />
         <meshStandardMaterial color={gateColor} />
+      </mesh>
+      {/* Diverter indicator on belt */}
+      <mesh position={[0, BELT_Y + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.15, CONVEYOR_WIDTH_M - 0.05]} />
+        <meshStandardMaterial 
+          color={gateColor} 
+          transparent 
+          opacity={category ? 0.3 : 0.1}
+        />
       </mesh>
     </group>
   );
 }
 
-/** Route arrows showing active path */
+/** Route arrows showing active path - at belt height */
 function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
+  const gateX = ZONES.GATE.x;
   const routes = [
-    { category: 'B' as Category, color: COLORS.routeB, endPos: [CONVEYOR_POSITIONS.zoneBX, 0.35, 0] as [number, number, number] },
-    { category: 'C' as Category, color: COLORS.routeC, endPos: [CONVEYOR_POSITIONS.gateX + 0.6, 0.35, CONVEYOR_POSITIONS.zoneCZ] as [number, number, number] },
-    { category: 'D' as Category, color: COLORS.routeD, endPos: [CONVEYOR_POSITIONS.gateX + 0.6, 0.35, CONVEYOR_POSITIONS.zoneDZ] as [number, number, number] },
+    { category: 'B' as Category, color: COLORS.routeB, endX: ZONES.B.x, endZ: 0 },
+    { category: 'C' as Category, color: COLORS.routeC, endX: gateX + 0.5, endZ: ZONES.C.z },
+    { category: 'D' as Category, color: COLORS.routeD, endX: gateX + 0.5, endZ: ZONES.D.z },
   ];
 
   return (
     <group>
-      {routes.map(({ category, color, endPos }) => {
+      {routes.map(({ category, color, endX, endZ }) => {
         const isActive = activeRoute === category;
         if (!isActive) return null;
         
         return (
           <group key={category}>
             <mesh position={[
-              (CONVEYOR_POSITIONS.gateX + endPos[0]) / 2,
-              0.36,
-              endPos[2] / 2
-            ]}>
-              <boxGeometry args={[
-                category === 'B' ? Math.abs(endPos[0] - CONVEYOR_POSITIONS.gateX) : 0.4,
-                0.03,
-                category !== 'B' ? Math.abs(endPos[2]) : 0.03
+              (gateX + endX) / 2,
+              BELT_Y + 0.005,
+              endZ / 2
+            ]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[
+                category === 'B' ? Math.abs(endX - gateX) : 0.3,
+                category !== 'B' ? Math.abs(endZ) : CONVEYOR_WIDTH_M - 0.1
               ]} />
               <meshStandardMaterial 
                 color={color} 
                 emissive={color}
                 emissiveIntensity={0.3}
+                transparent
+                opacity={0.6}
               />
             </mesh>
           </group>
@@ -467,9 +603,11 @@ function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
   );
 }
 
-/** Animated item based on playback state */
+/** 
+ * Animated item based on playback state.
+ * Item sits ON the belt surface (bottom of item at BELT_TOP_Y).
+ */
 function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
-  const position = getItemPosition(playback);
   const visible = isItemVisible(playback);
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
@@ -487,8 +625,20 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
   const asset = getModelAsset(itemId);
   const isRound = itemData.roundness >= 0.7 || asset?.fallbackPrimitive === 'cylinder';
   
+  // Convert mm to meters for visual dimensions
   const dims = itemData.dimensionsMm;
-  const scale = Math.min(0.35, Math.max(0.12, Math.max(dims.width, dims.depth, dims.height) / 900));
+  const visualWidth = dims.width / 1000;    // W in meters
+  const visualDepth = dims.depth / 1000;    // D in meters  
+  const visualHeight = dims.height / 1000;  // H in meters
+  
+  // Scale factor for visibility (items are small, scale up for demo)
+  const scaleFactor = 2.0;
+  const w = visualWidth * scaleFactor;
+  const d = visualDepth * scaleFactor;
+  const h = visualHeight * scaleFactor;
+  
+  // Get position with correct height calculation
+  const position = getItemPosition(playback, h);
   
   const colors: Record<Category, string> = {
     B: COLORS.routeB,
@@ -504,13 +654,14 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
   if (!visible) return null;
 
   const pos: [number, number, number] = [position.x, position.y, position.z];
+  const scale = Math.max(w, d, h);
 
   return (
     <>
       <group position={pos}>
         {asset?.fallbackPrimitive === 'cylinder' || isRound ? (
           <mesh>
-            <cylinderGeometry args={[scale * 0.45, scale * 0.45, scale * 0.7, 16]} />
+            <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
             <meshStandardMaterial 
               color={color}
               emissive={color}
@@ -519,7 +670,7 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
           </mesh>
         ) : (
           <mesh>
-            <boxGeometry args={[scale * 0.9, scale * 0.6, scale * 0.9]} />
+            <boxGeometry args={[w, h, d]} />
             <meshStandardMaterial 
               color={color}
               emissive={color}
@@ -527,10 +678,10 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
             />
           </mesh>
         )}
-        {/* Shadow on belt */}
-        <mesh position={[0, -scale * 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[scale * 0.5, 16]} />
-          <meshStandardMaterial color="#475569" transparent opacity={0.15} />
+        {/* Shadow on belt - at belt surface */}
+        <mesh position={[0, -h / 2 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[Math.max(w, d) / 2 + 0.02, 16]} />
+          <meshStandardMaterial color="#475569" transparent opacity={0.12} />
         </mesh>
       </group>
       
@@ -554,10 +705,9 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
   );
 }
 
-/** Main continuous scene - light warehouse style */
+/** Main continuous scene - light warehouse style with correct physical dimensions */
 function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybackState; simplified: boolean }) {
   const speedFactor = getConveyorSpeedFactor(playback);
-  const detectionActive = isDetectionActive(playback);
   const activeRoute = getActiveRoute(playback);
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
@@ -596,51 +746,51 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
         <meshStandardMaterial color={COLORS.floor} />
       </mesh>
 
-      {/* Conveyor */}
+      {/* Conveyor - belt top at 0.7m */}
       <ConveyorBelt speedFactor={speedFactor} />
 
-      {/* Zones */}
+      {/* Zone markers on floor */}
       <ZoneMarker 
-        position={[CONVEYOR_POSITIONS.spawnX, 0.01, 0]} 
+        position={[ZONES.A.x, 0.01, ZONES.A.z]} 
         label="A" 
         color={COLORS.sensorAccent} 
         active={playback.currentPhase === 'spawn'}
       />
       <ZoneMarker 
-        position={[CONVEYOR_POSITIONS.zoneBX, 0.01, 0]} 
+        position={[ZONES.B.x, 0.01, ZONES.B.z]} 
         label="B" 
         color={COLORS.routeB} 
         active={activeRoute === 'B'}
       />
       <ZoneMarker 
-        position={[CONVEYOR_POSITIONS.gateX + 0.8, 0.01, CONVEYOR_POSITIONS.zoneCZ]} 
+        position={[ZONES.C.x, 0.01, ZONES.C.z]} 
         label="C" 
         color={COLORS.routeC} 
         active={activeRoute === 'C'}
       />
       <ZoneMarker 
-        position={[CONVEYOR_POSITIONS.gateX + 0.8, 0.01, CONVEYOR_POSITIONS.zoneDZ]} 
+        position={[ZONES.D.x, 0.01, ZONES.D.z]} 
         label="D" 
         color={COLORS.routeD} 
         active={activeRoute === 'D'}
       />
 
-      {/* Camera rig with overhead structure */}
+      {/* Camera rig - overhead above belt */}
       <CameraRig active={cameraHighlight} />
       
-      {/* Inspection zone on belt */}
+      {/* Inspection zone on belt surface */}
       <InspectionZone active={cameraHighlight} />
       
-      {/* Animated scan line */}
+      {/* Animated scan line on belt */}
       <ScanLine active={showScan} />
 
-      {/* Gate */}
+      {/* Gate/diverter */}
       <GateZone category={category} />
 
-      {/* Route arrows - only when active */}
+      {/* Route arrows on belt surface */}
       <RouteArrows activeRoute={activeRoute} />
 
-      {/* Item with bounding box and shape outline */}
+      {/* Item riding ON the belt */}
       <PlaybackItem playback={playback} />
 
       <OrbitControls
@@ -648,8 +798,8 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
         enableZoom
         maxPolarAngle={Math.PI / 2.1}
         minDistance={3}
-        maxDistance={12}
-        target={[0.5, 0.35, 0]}
+        maxDistance={14}
+        target={[0, BELT_Y, 0]}
         autoRotate={false}
       />
     </>
@@ -665,7 +815,7 @@ export default function SorterDigitalTwinContinuous({
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
-          camera={{ position: [5.5, 4.0, 5.5], fov: 42 }}
+          camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
           dpr={simplified ? [1, 1.25] : [1, 1.75]}
           gl={{ antialias: !simplified, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {

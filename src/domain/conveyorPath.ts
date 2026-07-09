@@ -1,39 +1,25 @@
 /**
  * Conveyor Path — calculates item position based on phase and progress.
  * Uses real-world scale: 1 unit = 1 meter, conveyor speed = 1 m/s.
+ * 
+ * Physical parameters sourced from physicalLayout.ts
  */
 
 import type { Category } from './types';
 import type { CasePhase, ContinuousPlaybackState } from './continuousPlayback';
-import { getPhaseProgress, getCaseProgress } from './continuousPlayback';
+import { getPhaseProgress } from './continuousPlayback';
+import {
+  CONVEYOR_POSITIONS,
+  BELT_TOP_Y,
+  CONVEYOR_SPEED_MPS,
+  getItemYOnBelt,
+} from './physicalLayout';
 
-/** Key positions along the conveyor in meters (3D scene coordinates). */
-export const CONVEYOR_POSITIONS = {
-  /** Zone A - item spawn point */
-  spawnX: -4.2,
-  /** Camera/CV detection zone */
-  cameraX: -1.2,
-  /** Laser measurement zone */
-  laserX: -0.2,
-  /** Accumulator/gate position */
-  gateX: 1.6,
-  /** Zone B exit (main sorter) */
-  zoneBX: 3.8,
-  /** Zone C position (negative Z) */
-  zoneCZ: 2.4,
-  /** Zone D position (positive Z) */
-  zoneDZ: -2.4,
-  /** Belt height */
-  beltY: 0.35,
-  /** Item center height offset */
-  itemOffsetY: 0.15,
-} as const;
+// Re-export for backwards compatibility
+export { CONVEYOR_POSITIONS, CONVEYOR_SPEED_MPS };
 
 /** Total conveyor length from A to gate in meters. */
 export const CONVEYOR_LENGTH = CONVEYOR_POSITIONS.gateX - CONVEYOR_POSITIONS.spawnX;
-
-/** Conveyor speed in m/s. */
-export const CONVEYOR_SPEED_MPS = 1.0;
 
 export interface ItemPosition3D {
   x: number;
@@ -47,40 +33,31 @@ function getItemXForPhase(phase: CasePhase, phaseProgress: number): number {
   
   switch (phase) {
     case 'spawn':
-      // Item appears at spawn point
       return spawnX;
     
     case 'move_to_detection':
-      // Move from spawn to camera
       return spawnX + (cameraX - spawnX) * phaseProgress;
     
     case 'detection':
-      // At camera position
       return cameraX;
     
     case 'measurement':
-      // Move from camera to laser
       return cameraX + (laserX - cameraX) * phaseProgress;
     
     case 'classification':
-      // Move from laser toward gate
       return laserX + (gateX - laserX) * 0.5 * phaseProgress;
     
     case 'command_sent':
-      // Continue toward gate
       const midPoint = laserX + (gateX - laserX) * 0.5;
       return midPoint + (gateX - midPoint) * phaseProgress;
     
     case 'routing':
-      // At gate, preparing to route
       return gateX;
     
     case 'exit':
-      // Moving toward exit zone (B moves forward, C/D stays at gate X for lateral movement)
       return gateX + (zoneBX - gateX) * phaseProgress * 0.5;
     
     case 'clear_gap':
-      // Clear the area
       return gateX + (zoneBX - gateX) * 0.5 + (zoneBX - gateX) * 0.5 * phaseProgress;
     
     default:
@@ -95,34 +72,34 @@ function getItemZForPhase(phase: CasePhase, phaseProgress: number, category: Cat
   const { zoneCZ, zoneDZ } = CONVEYOR_POSITIONS;
   
   if (phase === 'routing') {
-    // Start lateral movement
     const targetZ = category === 'C' ? zoneCZ : zoneDZ;
     return targetZ * phaseProgress;
   }
   
   if (phase === 'exit' || phase === 'clear_gap') {
-    // At target Z position
     return category === 'C' ? zoneCZ : zoneDZ;
   }
   
   return 0;
 }
 
-/** Get item 3D position from playback state. */
-export function getItemPosition(state: ContinuousPlaybackState): ItemPosition3D {
+/**
+ * Get item 3D position from playback state.
+ * Item is positioned ON the belt surface (not floating above).
+ */
+export function getItemPosition(state: ContinuousPlaybackState, itemVisualHeight: number = 0.15): ItemPosition3D {
   const phaseProgress = getPhaseProgress(state);
-  const { beltY, itemOffsetY } = CONVEYOR_POSITIONS;
   
   const x = getItemXForPhase(state.currentPhase, phaseProgress);
   const z = getItemZForPhase(state.currentPhase, phaseProgress, state.targetCategory);
-  const y = beltY + itemOffsetY;
+  // Item sits ON the belt: belt top + half item height
+  const y = getItemYOnBelt(itemVisualHeight);
   
   return { x, y, z };
 }
 
 /** Get item visibility based on phase. */
 export function isItemVisible(state: ContinuousPlaybackState): boolean {
-  // Item is visible from spawn until clear_gap starts
   return state.currentPhase !== 'clear_gap' || getPhaseProgress(state) < 0.5;
 }
 
@@ -143,12 +120,10 @@ export function getActiveRoute(state: ContinuousPlaybackState): Category | null 
 export function getConveyorSpeedFactor(state: ContinuousPlaybackState): number {
   if (state.status !== 'running') return 0;
   
-  // Conveyor slows during detection/classification
   if (state.currentPhase === 'detection' || state.currentPhase === 'classification') {
     return 0.3;
   }
   
-  // Normal speed during movement phases
   return 1.0;
 }
 
