@@ -2248,6 +2248,55 @@ button:disabled {
   transition: background 160ms ease, border-color 160ms ease;
 }
 
+/* Auto Camera Toggle */
+.auto-camera-toggle {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  background: rgba(5, 9, 16, 0.75);
+  backdrop-filter: blur(8px);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.auto-camera-toggle:hover {
+  background: rgba(5, 9, 16, 0.9);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--cyan);
+}
+
+.auto-camera-toggle .toggle-icon {
+  font-size: 14px;
+}
+
+.auto-camera-toggle .toggle-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 767px) {
+  .auto-camera-toggle {
+    bottom: 80px;
+    left: 10px;
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+  
+  .auto-camera-toggle .toggle-icon {
+    font-size: 12px;
+  }
+}
+
 .details-link:hover {
   background: rgba(56, 189, 248, 0.1);
   border-color: var(--cyan);

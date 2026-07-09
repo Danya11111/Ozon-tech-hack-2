@@ -8,10 +8,11 @@
  * - Items ride ON the belt surface
  */
 
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls, Html, Line } from '@react-three/drei';
-import { Suspense, useRef, useMemo, useState } from 'react';
+import { Suspense, useRef, useMemo, useState, useEffect } from 'react';
 import type { Mesh, Group, BufferGeometry } from 'three';
+import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
@@ -21,6 +22,13 @@ import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, should
 import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
+import {
+  getCameraConfig,
+  smoothCameraTransition,
+  getInitialCameraConfig,
+  type CameraConfig,
+  type ViewportType,
+} from '../../domain/cinematicCamera';
 import {
   BELT_TOP_Y,
   BELT_THICKNESS_M,
@@ -47,6 +55,8 @@ export interface SorterDigitalTwinContinuousProps {
   playback: ContinuousPlaybackState;
   simplified?: boolean;
   onContextLost?: () => void;
+  autoCameraEnabled?: boolean;
+  viewportType?: ViewportType;
 }
 
 /** Light color palette */
@@ -78,6 +88,93 @@ const CONVEYOR_START_X = -4.2;
 const CONVEYOR_END_X = 4.3;
 const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
 const CONVEYOR_CENTER_X = (CONVEYOR_START_X + CONVEYOR_END_X) / 2;
+
+/** Cinematic camera controller - smoothly transitions between camera angles */
+function CinematicCameraController({ 
+  playback, 
+  enabled, 
+  viewportType = 'desktop' 
+}: { 
+  playback: ContinuousPlaybackState; 
+  enabled: boolean;
+  viewportType: ViewportType;
+}) {
+  const { camera } = useThree();
+  const cameraStateRef = useRef<CameraConfig>(getInitialCameraConfig(viewportType));
+  const isRunning = playback.status === 'running';
+  
+  // Get item position for camera following
+  const itemPosition = useMemo(() => {
+    if (playback.status === 'idle') return null;
+    const pos = getItemPosition(playback);
+    return [pos.x, pos.y, pos.z] as [number, number, number];
+  }, [playback]);
+  
+  useFrame(() => {
+    if (!enabled || !isRunning) return;
+    
+    // Get target camera config for current phase
+    const targetConfig = getCameraConfig(
+      playback.currentPhase,
+      playback.targetCategory,
+      itemPosition,
+      viewportType
+    );
+    
+    // Smooth transition
+    cameraStateRef.current = smoothCameraTransition(
+      cameraStateRef.current,
+      targetConfig,
+      0.04 // Smooth factor - lower = smoother
+    );
+    
+    // Apply to camera
+    const state = cameraStateRef.current;
+    camera.position.set(state.position[0], state.position[1], state.position[2]);
+    camera.lookAt(state.target[0], state.target[1], state.target[2]);
+    
+    // Update FOV if perspective camera
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.fov = state.fov;
+      camera.updateProjectionMatrix();
+    }
+  });
+  
+  return null;
+}
+
+/** Subtle motion trail behind moving items */
+function MotionTrail({ 
+  position, 
+  visible, 
+  color,
+  direction 
+}: { 
+  position: [number, number, number]; 
+  visible: boolean;
+  color: string;
+  direction: 'x' | 'z';
+}) {
+  if (!visible) return null;
+  
+  const trailLength = 0.15;
+  const offset = direction === 'x' ? [-trailLength, 0, 0] : [0, 0, -trailLength * Math.sign(position[2] || 1)];
+  
+  return (
+    <mesh position={[position[0] + offset[0], position[1], position[2] + offset[2]]}>
+      <boxGeometry args={[
+        direction === 'x' ? trailLength : 0.08,
+        0.02,
+        direction === 'z' ? trailLength : 0.08
+      ]} />
+      <meshBasicMaterial 
+        color={color} 
+        transparent 
+        opacity={0.3}
+      />
+    </mesh>
+  );
+}
 
 /** Single animated roller that rotates around its own axis */
 function Roller({ position, speedFactor }: { position: [number, number, number]; speedFactor: number }) {
@@ -1137,7 +1234,17 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
 }
 
 /** Main continuous scene - light warehouse style with correct physical dimensions */
-function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybackState; simplified: boolean }) {
+function ContinuousScene({ 
+  playback, 
+  simplified,
+  autoCameraEnabled,
+  viewportType 
+}: { 
+  playback: ContinuousPlaybackState; 
+  simplified: boolean;
+  autoCameraEnabled: boolean;
+  viewportType: ViewportType;
+}) {
   const speedFactor = getConveyorSpeedFactor(playback);
   const activeRoute = getActiveRoute(playback);
   const category = playback.targetCategory;
@@ -1164,6 +1271,17 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
   const isRound = itemData.roundness >= 0.7;
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
   const itemScale = Math.max(dims.width, dims.depth, dims.height);
+  
+  // Motion trail visibility - show during movement phases
+  const showMotionTrail = ['move_to_detection', 'routing', 'exit'].includes(phase) && 
+                          playback.status === 'running';
+  const trailDirection = phase === 'routing' || phase === 'exit' 
+    ? (activeRoute === 'C' || activeRoute === 'D' ? 'z' : 'x') 
+    : 'x';
+  const itemColor = category ? COLORS[`route${category}` as keyof typeof COLORS] : COLORS.sensorAccent;
+  
+  // Cinematic camera active only when running and enabled
+  const cinematicActive = autoCameraEnabled && playback.status === 'running';
 
   return (
     <>
@@ -1279,10 +1397,27 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
 
       {/* Item riding ON the belt */}
       <PlaybackItem playback={playback} />
+      
+      {/* Motion trail for visual movement feedback */}
+      <MotionTrail 
+        position={itemPos} 
+        visible={showMotionTrail} 
+        color={itemColor}
+        direction={trailDirection as 'x' | 'z'}
+      />
 
+      {/* Cinematic camera controller */}
+      <CinematicCameraController 
+        playback={playback} 
+        enabled={cinematicActive}
+        viewportType={viewportType}
+      />
+
+      {/* OrbitControls - enabled when not in cinematic mode */}
       <OrbitControls
-        enablePan={!simplified}
-        enableZoom
+        enablePan={!simplified && !cinematicActive}
+        enableZoom={!cinematicActive}
+        enableRotate={!cinematicActive}
         maxPolarAngle={Math.PI / 2.1}
         minDistance={3}
         maxDistance={14}
@@ -1297,6 +1432,8 @@ export default function SorterDigitalTwinContinuous({
   playback,
   simplified = false,
   onContextLost,
+  autoCameraEnabled = true,
+  viewportType = 'desktop',
 }: SorterDigitalTwinContinuousProps) {
   return (
     <div className="digital-twin-wrap continuous-twin">
@@ -1316,7 +1453,12 @@ export default function SorterDigitalTwinContinuous({
           }}
         >
           <Suspense fallback={null}>
-            <ContinuousScene playback={playback} simplified={simplified} />
+            <ContinuousScene 
+              playback={playback} 
+              simplified={simplified}
+              autoCameraEnabled={autoCameraEnabled}
+              viewportType={viewportType}
+            />
           </Suspense>
         </Canvas>
       </div>

@@ -7,6 +7,7 @@ import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../domain/demoPlaylist';
 import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
 import { getCaseProgress, getCurrentPhaseConfig } from '../domain/continuousPlayback';
 import { getMeasurementData, shouldShowMeasurement } from '../domain/measurementSystem';
+import { getViewportType, type ViewportType } from '../domain/cinematicCamera';
 import CVInspectionOverlay from '../components/CVInspectionOverlay';
 
 const SorterDigitalTwinContinuous = lazy(() => import('../components/ThreeD/SorterDigitalTwinContinuous'));
@@ -27,6 +28,7 @@ export default function MainPage({
   const webgl = useWebGLSupport();
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth));
   const [contextLost, setContextLost] = useState(false);
+  const [autoCameraEnabled, setAutoCameraEnabled] = useState(true);
 
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
@@ -36,6 +38,7 @@ export default function MainPage({
 
   const show3D = prefer3DByDefault(width, webgl && !contextLost);
   const simplified = width < 900;
+  const viewportType: ViewportType = getViewportType(width);
 
   const isRunning = playback.status === 'running';
   const isPaused = playback.status === 'paused';
@@ -74,6 +77,8 @@ export default function MainPage({
                 playback={playback}
                 simplified={simplified}
                 onContextLost={() => setContextLost(true)}
+                autoCameraEnabled={autoCameraEnabled}
+                viewportType={viewportType}
               />
             </Suspense>
           </ThreeErrorBoundary>
@@ -186,6 +191,19 @@ export default function MainPage({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Auto Camera Toggle - bottom left */}
+      {show3D && (
+        <button 
+          type="button"
+          className="auto-camera-toggle"
+          onClick={() => setAutoCameraEnabled(!autoCameraEnabled)}
+          title={autoCameraEnabled ? 'Disable auto camera to control manually' : 'Enable cinematic auto camera'}
+        >
+          <span className="toggle-icon">{autoCameraEnabled ? '🎬' : '🎥'}</span>
+          <span className="toggle-label">Auto Cam: {autoCameraEnabled ? 'ON' : 'OFF'}</span>
+        </button>
       )}
 
       {/* Details link - bottom right */}
