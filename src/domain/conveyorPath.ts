@@ -28,7 +28,7 @@ export interface ItemPosition3D {
 }
 
 /** Calculate item X position based on phase and progress. */
-function getItemXForPhase(phase: CasePhase, phaseProgress: number): number {
+function getItemXForPhase(phase: CasePhase, phaseProgress: number, category: Category | null): number {
   const { spawnX, cameraX, laserX, gateX, zoneBX } = CONVEYOR_POSITIONS;
   
   switch (phase) {
@@ -52,13 +52,16 @@ function getItemXForPhase(phase: CasePhase, phaseProgress: number): number {
       return midPoint + (gateX - midPoint) * phaseProgress;
     
     case 'routing':
+      if (category === 'B') {
+        return gateX + (zoneBX - gateX) * phaseProgress;
+      }
       return gateX;
     
     case 'exit':
-      return gateX + (zoneBX - gateX) * phaseProgress * 0.5;
+      return category === 'B' ? zoneBX : gateX;
     
     case 'clear_gap':
-      return gateX + (zoneBX - gateX) * 0.5 + (zoneBX - gateX) * 0.5 * phaseProgress;
+      return category === 'B' ? zoneBX : gateX;
     
     default:
       return gateX;
@@ -90,7 +93,7 @@ function getItemZForPhase(phase: CasePhase, phaseProgress: number, category: Cat
 export function getItemPosition(state: ContinuousPlaybackState, itemVisualHeight: number = 0.15): ItemPosition3D {
   const phaseProgress = getPhaseProgress(state);
   
-  const x = getItemXForPhase(state.currentPhase, phaseProgress);
+  const x = getItemXForPhase(state.currentPhase, phaseProgress, state.targetCategory);
   const z = getItemZForPhase(state.currentPhase, phaseProgress, state.targetCategory);
   // Item sits ON the belt: belt top + half item height
   const y = getItemYOnBelt(itemVisualHeight);
@@ -120,11 +123,15 @@ export function getActiveRoute(state: ContinuousPlaybackState): Category | null 
 export function getConveyorSpeedFactor(state: ContinuousPlaybackState): number {
   if (state.status !== 'running') return 0;
   
-  if (state.currentPhase === 'detection' || state.currentPhase === 'classification') {
-    return 0.3;
-  }
-  
-  return 1.0;
+  const movingPhases: CasePhase[] = [
+    'move_to_detection',
+    'measurement',
+    'classification',
+    'command_sent',
+    'routing',
+  ];
+
+  return movingPhases.includes(state.currentPhase) ? 1.0 : 0;
 }
 
 /** Calculate distance traveled in meters from elapsed time. */

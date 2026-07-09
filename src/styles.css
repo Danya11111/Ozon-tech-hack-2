@@ -2495,11 +2495,11 @@ button:disabled {
 
 .cv-overlay {
   position: absolute;
-  bottom: 120px;
-  right: 16px;
+  top: 96px;
+  left: 16px;
   z-index: 15;
   width: 220px;
-  max-height: calc(100vh - 320px);
+  max-height: calc(100vh - 220px);
   overflow-y: auto;
   border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 10px;

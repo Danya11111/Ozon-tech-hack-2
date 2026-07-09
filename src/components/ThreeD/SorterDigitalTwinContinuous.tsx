@@ -16,12 +16,16 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
-import { getItemPosition, isItemVisible, getActiveRoute, getConveyorSpeedFactor } from '../../domain/conveyorPath';
+import { getConveyorSpeedFactor } from '../../domain/conveyorPath';
+import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
 import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud, shouldShowActuator } from '../../domain/measurementSystem';
 import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
+import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
+import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
+import { CASE_DURATION_MS } from '../../domain/continuousPlayback';
 import {
   getCameraConfig,
   smoothCameraTransition,
@@ -86,6 +90,19 @@ const COLORS = {
   itemShadow: '#3a4a5a',        // Contact shadow
 };
 
+const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalness?: number }> = {
+  'SKU-001': { color: '#b68b58', roughness: 0.82 }, // cardboard box
+  'SKU-002': { color: '#e8eef6', roughness: 0.5 },  // lunchbox plastic
+  'SKU-004': { color: '#c49a6c', roughness: 0.82 }, // oversized cardboard
+  'SKU-006': { color: '#f8fafc', roughness: 0.42 }, // ceramic plate
+  'SKU-007': { color: '#7dd3fc', roughness: 0.28 }, // bottle plastic
+  'SKU-008': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 }, // cylinder
+};
+
+function getItemMaterial(itemId: string) {
+  return ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
+}
+
 // Physical layout constants
 const BELT_Y = BELT_TOP_Y;                    // 0.7m - top of belt where items ride
 const BELT_UNDERSIDE_Y = BELT_TOP_Y - BELT_THICKNESS_M; // 0.685m
@@ -113,8 +130,15 @@ function CinematicCameraController({
   // Get item position for camera following
   const itemPosition = useMemo(() => {
     if (playback.status === 'idle') return null;
-    const pos = getItemPosition(playback);
-    return [pos.x, pos.y, pos.z] as [number, number, number];
+    const currentItemElapsed = playback.totalElapsedMs - (playback.currentCaseIndex * CASE_DURATION_MS);
+    const pose = getPhysicalItemPose({
+      caseId: playback.currentCase.id,
+      dimensionsMm: { width: 300, depth: 200, height: 200 }, // rough approx for camera target
+      targetCategory: playback.targetCategory,
+      elapsedMs: currentItemElapsed,
+      slotIndex: playback.currentCaseIndex
+    });
+    return pose.position;
   }, [playback]);
   
   useFrame(() => {
@@ -1076,12 +1100,18 @@ function STLGeometry({
   path, 
   scale, 
   color, 
+  accentColor,
   emissiveIntensity,
+  roughness,
+  metalness,
 }: { 
   path: string; 
   scale: [number, number, number]; 
   color: string;
+  accentColor: string;
   emissiveIntensity: number;
+  roughness: number;
+  metalness: number;
 }) {
   const geometry = useLoader(STLLoader, path);
   
@@ -1094,15 +1124,20 @@ function STLGeometry({
   }, [geometry]);
   
   return (
-    <mesh geometry={geometry} scale={scale} castShadow>
-      <meshStandardMaterial 
-        color={color}
-        emissive={color}
-        emissiveIntensity={emissiveIntensity * 0.5}
-        roughness={0.5}
-        metalness={0.1}
-      />
-    </mesh>
+    <group scale={scale}>
+      <mesh geometry={geometry} castShadow>
+        <meshStandardMaterial 
+          color={color}
+          emissive={accentColor}
+          emissiveIntensity={emissiveIntensity}
+          roughness={roughness}
+          metalness={metalness}
+        />
+      </mesh>
+      <lineSegments geometry={new THREE.EdgesGeometry(geometry, 35)}>
+        <lineBasicMaterial color={accentColor} transparent opacity={0.28} />
+      </lineSegments>
+    </group>
   );
 }
 
@@ -1110,12 +1145,18 @@ function STLGeometry({
 function FallbackPrimitive({ 
   type, 
   color, 
+  accentColor,
   emissiveIntensity,
+  roughness,
+  metalness,
   w, h, d, 
 }: { 
   type: 'box' | 'cylinder' | 'sphere';
   color: string;
+  accentColor: string;
   emissiveIntensity: number;
+  roughness: number;
+  metalness: number;
   w: number; h: number; d: number;
 }) {
   if (type === 'cylinder' || type === 'sphere') {
@@ -1124,141 +1165,32 @@ function FallbackPrimitive({
         <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
         <meshStandardMaterial 
           color={color} 
-          emissive={color} 
-          emissiveIntensity={emissiveIntensity * 0.5}
-          roughness={0.5}
-          metalness={0.1}
+          emissive={accentColor} 
+          emissiveIntensity={emissiveIntensity}
+          roughness={roughness}
+          metalness={metalness}
         />
       </mesh>
     );
   }
   
   return (
-    <mesh castShadow>
-      <boxGeometry args={[w, h, d]} />
-      <meshStandardMaterial 
-        color={color} 
-        emissive={color} 
-        emissiveIntensity={emissiveIntensity * 0.5}
-        roughness={0.5}
-        metalness={0.1}
-      />
-    </mesh>
-  );
-}
-
-/** 
- * Animated item based on playback state.
- * Uses real STL models with true physical scale (1 unit = 1 meter).
- * Item sits ON the belt surface (bottom of item at BELT_TOP_Y).
- */
-function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
-  const visible = isItemVisible(playback);
-  const category = playback.targetCategory;
-  const phase = playback.currentPhase;
-  
-  const currentCase = playback.currentCase;
-  const itemId = currentCase.itemId.replace('-LC', '');
-  const itemData = useMemo(() => {
-    try {
-      return ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
-    } catch {
-      return ITEMS[0];
-    }
-  }, [itemId]);
-  
-  const asset = getModelAsset(itemId);
-  const isRound = itemData.roundness >= 0.7 || asset?.fallbackPrimitive === 'cylinder';
-  
-  // Get rendered dimensions in meters (true physical scale)
-  const dims = getRenderedItemDimensions(itemData.dimensionsMm);
-  const w = dims.width;
-  const d = dims.depth;
-  const h = dims.height;
-  
-  // Calculate Y position so item sits ON belt
-  const itemCenterY = getItemYOnBelt(h);
-  
-  // Get XZ position from playback
-  const basePosition = getItemPosition(playback, h);
-  const pos: [number, number, number] = [basePosition.x, itemCenterY, basePosition.z];
-  
-  const colors: Record<Category, string> = {
-    B: COLORS.routeB,
-    C: COLORS.routeC,
-    D: COLORS.routeD,
-  };
-  const color = category ? colors[category] : COLORS.sensorAccent;
-  const isRouting = isRoutingActive(playback);
-  const emissiveIntensity = isRouting ? 0.3 : 0.1;
-  
-  const showBBox = shouldShowBoundingBox(phase);
-  const showShape = shouldShowShapeOutline(phase);
-  
-  if (!visible) return null;
-
-  // Determine if we should use STL
-  const useSTL = asset?.loaderType === 'stl' && asset?.frontendAssetPath;
-  const stlPath = asset?.frontendAssetPath ?? '';
-  const fallbackPrimitive = asset?.fallbackPrimitive ?? 'box';
-  
-  // Scale for STL models (STL files are in mm, need to convert to meters)
-  const stlScale: [number, number, number] = [0.001, 0.001, 0.001];
-  
-  const visualScale = Math.max(w, d, h);
-
-  return (
-    <>
-      <group position={pos}>
-        {useSTL ? (
-          <Suspense fallback={
-            <FallbackPrimitive 
-              type={fallbackPrimitive} 
-              color={color} 
-              emissiveIntensity={emissiveIntensity}
-              w={w} h={h} d={d}
-            />
-          }>
-            <STLGeometry 
-              path={stlPath}
-              scale={stlScale}
-              color={color}
-              emissiveIntensity={emissiveIntensity}
-            />
-          </Suspense>
-        ) : (
-          <FallbackPrimitive 
-            type={isRound ? 'cylinder' : fallbackPrimitive} 
-            color={color} 
-            emissiveIntensity={emissiveIntensity}
-            w={w} h={h} d={d}
-          />
-        )}
-        
-        {/* Shadow on belt */}
-        <mesh position={[0, -h / 2 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[Math.max(w, d) / 2 + 0.01, 16]} />
-          <meshStandardMaterial color="#475569" transparent opacity={0.1} />
-        </mesh>
-      </group>
-      
-      {/* Bounding box during measurement */}
-      <BoundingBoxVisual 
-        position={pos} 
-        scale={visualScale} 
-        visible={showBBox} 
-        isRound={isRound}
-      />
-      
-      {/* Shape outline during classification */}
-      <ShapeOutline 
-        position={pos} 
-        scale={visualScale} 
-        visible={showShape} 
-        isRound={isRound}
-        category={category}
-      />
-    </>
+    <group>
+      <mesh castShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial 
+          color={color} 
+          emissive={accentColor} 
+          emissiveIntensity={emissiveIntensity}
+          roughness={roughness}
+          metalness={metalness}
+        />
+      </mesh>
+      <lineSegments>
+        <edgesGeometry args={[new THREE.BoxGeometry(w, h, d), 35]} />
+        <lineBasicMaterial color={accentColor} transparent opacity={0.35} />
+      </lineSegments>
+    </group>
   );
 }
 
@@ -1275,7 +1207,6 @@ function ContinuousScene({
   viewportType: ViewportType;
 }) {
   const speedFactor = getConveyorSpeedFactor(playback);
-  const activeRoute = getActiveRoute(playback);
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
   
@@ -1289,17 +1220,45 @@ function ContinuousScene({
   const showCloud = shouldShowPointCloud(phase);
   const showActuator = shouldShowActuator(phase);
   
-  // Get item position for measurement visualization
-  const itemPosition = getItemPosition(playback);
-  const itemPos: [number, number, number] = [itemPosition.x, itemPosition.y, itemPosition.z];
-  
-  // Get item data for point cloud (use true physical scale)
-  const currentCase = playback.currentCase;
+  // Compute all physical items based on elapsed time to keep them in roll-cages
+  const { totalElapsedMs, currentCase, currentCaseIndex } = playback;
+  const casesSpawned = Math.floor(totalElapsedMs / CASE_DURATION_MS) + 1;
+  const startIndex = Math.max(0, casesSpawned - 20); // Keep last 20 items
+
+  const sceneItems = useMemo(() => {
+    const items = [];
+    for (let i = startIndex; i < casesSpawned; i++) {
+      const playlistIndex = i % PLAYLIST_LENGTH;
+      const caseData = DEMO_PLAYLIST[playlistIndex];
+      const elapsedMs = totalElapsedMs - (i * CASE_DURATION_MS);
+      items.push({
+        id: `item-${i}-${caseData.id}`,
+        slotIndex: i,
+        caseData,
+        elapsedMs,
+      });
+    }
+    return items;
+  }, [totalElapsedMs, casesSpawned, startIndex]);
+
+  // Get item data for the current case
   const itemId = currentCase.itemId.replace('-LC', '');
   const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
   const isRound = itemData.roundness >= 0.7;
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
   const itemScale = Math.max(dims.width, dims.depth, dims.height);
+  
+  // Get item position for measurement visualization using physical model
+  const currentItemElapsed = totalElapsedMs - (currentCaseIndex * CASE_DURATION_MS);
+  const currentPose = getPhysicalItemPose({
+    caseId: currentCase.id,
+    dimensionsMm: itemData.dimensionsMm,
+    targetCategory: category,
+    elapsedMs: currentItemElapsed,
+    slotIndex: currentCaseIndex
+  });
+  const itemPos = currentPose.position;
+  const activeRoute = currentPose.activeRoute;
   
   // Motion trail visibility - show during movement phases
   const showMotionTrail = ['move_to_detection', 'routing', 'exit'].includes(phase) && 
@@ -1413,7 +1372,7 @@ function ContinuousScene({
       <StereoCameraLenses active={cameraHighlight} itemPosition={itemPos} />
       
       {/* Laser beam for height measurement */}
-      <LaserBeam active={showLaser} itemY={itemPosition.y} />
+      <LaserBeam active={showLaser} itemY={itemPos[1]} />
       
       {/* Point cloud for stereo analysis */}
       <PointCloud 
@@ -1438,8 +1397,30 @@ function ContinuousScene({
       {/* Route arrows on belt surface */}
       <RouteArrows activeRoute={activeRoute} />
 
-      {/* Item riding ON the belt */}
-      <PlaybackItem playback={playback} />
+      {/* Physically simulated items */}
+      {sceneItems.map(item => (
+        <PhysicalPlaybackItem 
+          key={item.id}
+          caseData={item.caseData}
+          elapsedMs={item.elapsedMs}
+          slotIndex={item.slotIndex}
+        />
+      ))}
+      
+      {/* Outline/BBox for the CURRENT item only */}
+      <BoundingBoxVisual 
+        position={itemPos} 
+        scale={itemScale} 
+        visible={shouldShowBoundingBox(phase)} 
+        isRound={isRound}
+      />
+      <ShapeOutline 
+        position={itemPos} 
+        scale={itemScale} 
+        visible={shouldShowShapeOutline(phase)} 
+        isRound={isRound}
+        category={category}
+      />
       
       {/* Motion trail for visual movement feedback */}
       <MotionTrail 

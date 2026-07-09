@@ -33,14 +33,14 @@ export interface PhaseConfig {
  * Distances are in meters, speed is 1 m/s, so duration = distance * 1000 ms.
  */
 export const CASE_PHASES: PhaseConfig[] = [
-  { phase: 'spawn', durationMs: 500, label: 'Spawn at A' },
-  { phase: 'move_to_detection', durationMs: 1200, label: 'Moving to camera' },  // ~1.2m at 1m/s
+  { phase: 'spawn', durationMs: 300, label: 'Spawn at A' },
+  { phase: 'move_to_detection', durationMs: 2500, label: 'Moving to camera' },  // 2.5m at 1m/s
   { phase: 'detection', durationMs: 600, label: 'CV Detection' },
-  { phase: 'measurement', durationMs: 400, label: 'Laser measurement' },
-  { phase: 'classification', durationMs: 500, label: 'Classification' },
-  { phase: 'command_sent', durationMs: 300, label: 'Command sent' },
-  { phase: 'routing', durationMs: 1500, label: 'Routing to zone' },  // ~1.5m to B/C/D
-  { phase: 'exit', durationMs: 800, label: 'Exit to zone' },
+  { phase: 'measurement', durationMs: 1000, label: 'Laser measurement' }, // 1.0m at 1m/s
+  { phase: 'classification', durationMs: 1000, label: 'Classification' }, // 1.0m at 1m/s
+  { phase: 'command_sent', durationMs: 1000, label: 'Command sent' }, // 1.0m at 1m/s
+  { phase: 'routing', durationMs: 2500, label: 'Routing to zone' },  // 2.5m B-route at 1m/s
+  { phase: 'exit', durationMs: 400, label: 'Exit to zone' },
   { phase: 'clear_gap', durationMs: 500, label: 'Clear gap' },
 ];
 
