@@ -12,7 +12,9 @@ const ALL: SurfaceName[] = [
   'main_belt',
   'inspection_station',
   'routing_junction',
-  'b_receiver',
+  'b_transfer',
+  'chute_b',
+  'b_bin_floor',
   'chute_c',
   'chute_d',
   'c_cage_floor',
@@ -56,9 +58,15 @@ describe('conveyorNetwork', () => {
   });
 
   it('provides an ordered path per category', () => {
-    expect(pathForCategory('B')).toEqual(['main_belt', 'inspection_station', 'routing_junction', 'b_receiver']);
+    expect(pathForCategory('B')).toEqual(['main_belt', 'inspection_station', 'routing_junction', 'b_transfer', 'chute_b', 'b_bin_floor']);
     expect(pathForCategory('C')).toEqual(['main_belt', 'inspection_station', 'routing_junction', 'chute_c', 'c_cage_floor']);
     expect(pathForCategory('D')).toEqual(['main_belt', 'inspection_station', 'routing_junction', 'chute_d', 'd_cage_floor']);
+  });
+
+  it('B bin floor and cages are on the ground (not floating)', () => {
+    expect(SURFACES.b_bin_floor.surfaceY).toBeLessThan(0.2);
+    expect(SURFACES.c_cage_floor.surfaceY).toBeLessThan(0.2);
+    expect(SURFACES.d_cage_floor.surfaceY).toBeLessThan(0.2);
   });
 
   it('bounds check works', () => {
@@ -67,6 +75,14 @@ describe('conveyorNetwork', () => {
     const cz = (c.minZ + c.maxZ) / 2;
     expect(isWithinBounds('c_cage_floor', cx, cz)).toBe(true);
     expect(isWithinBounds('c_cage_floor', c.maxX + 1, cz)).toBe(false);
+  });
+
+  it('every surface has a kind', () => {
+    for (const name of ALL) {
+      expect(SURFACES[name].kind).toBeTruthy();
+    }
+    expect(SURFACES.b_bin_floor.kind).toBe('bin_floor');
+    expect(SURFACES.b_transfer.kind).toBe('conveyor');
   });
 
   it('chutes have real length (item slides, does not teleport)', () => {

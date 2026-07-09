@@ -1,0 +1,39 @@
+{
+  "logs": [
+    {
+      "type": "warning",
+      "text": "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x22440015da00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x22440015da00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x22440015da00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x22440015da00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    },
+    {
+      "type": "log",
+      "text": "THREE.WebGLRenderer: Context Lost."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    }
+  ],
+  "errors": 0,
+  "warnings": 7,
+  "log_spam": 1
+}

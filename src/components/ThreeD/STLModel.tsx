@@ -57,7 +57,9 @@ export default function STLModel({
     // Load STL geometry
     geometry = useLoader(STLLoader, path);
   } catch (error) {
-    console.warn(`Failed to load STL model: ${path}`, error);
+    if (import.meta.env.DEV) {
+      console.warn(`Failed to load STL model: ${path}`, error);
+    }
     return fallback ? <>{fallback}</> : null;
   }
   

@@ -144,17 +144,19 @@ export const CHUTE_SLOPE_START_Y = BELT_TOP_Y;      // 0.7m at junction
 export const CHUTE_END_Y = CAGE_FLOOR_Y + 0.05;     // safe entry height into cage
 
 // =========================================================
-// B receiving zone (short downstream receiving tray after sorter)
-// Physical tray at belt height with low side walls and an end stop,
-// so B items visibly land and remain instead of vanishing.
+// B receiving bin — отдельный промышленный контейнер на полу.
+// НЕ продолжение конвейера: короткий transfer spur → drop chute → bin floor.
+// Размер ~1.2×0.8×0.5 m (как C/D по footprint).
 // =========================================================
 export const B_RECEIVER = {
-  startX: ZONES.GATE.x + 0.7,   // 2.2m — begins after routing junction
-  endX: ZONES.B.x + 0.4,        // 4.4m — end stop
-  y: BELT_TOP_Y,                // 0.7m top surface
-  width: CONVEYOR_WIDTH_M,      // 0.5m
-  wallHeight: 0.12,             // 120mm side/end walls
-  restX: ZONES.B.x,             // 4.0m — where the item comes to rest
+  centerX: 3.35,                  // отдельно после конца ленты
+  centerZ: 0,
+  width: 1.2,                     // 1200 mm
+  depth: 0.8,                     // 800 mm
+  wallHeight: 0.5,                // 500 mm walls
+  floorY: CAGE_FLOOR_Y,           // 0.08 m interior floor
+  transferStartX: ZONES.GATE.x,   // 1.5 m — spur starts at junction
+  transferEndX: 2.15,             // 0.65 m short spur, NOT a long belt extension
 };
 
 // =========================================================

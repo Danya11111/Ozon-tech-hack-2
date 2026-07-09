@@ -8,19 +8,16 @@
  * - Items ride ON the belt surface
  */
 
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls, Html, Line } from '@react-three/drei';
 import { Suspense, useRef, useMemo, useState, useEffect } from 'react';
-import type { Mesh, Group, BufferGeometry } from 'three';
+import type { Mesh, Group } from 'three';
 import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
-import { getConveyorSpeedFactor } from '../../domain/conveyorPath';
 import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
 import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud, shouldShowActuator } from '../../domain/measurementSystem';
-import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
 import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
@@ -52,7 +49,6 @@ import {
   STEREO_CAMERA,
   ROLL_CAGE,
   getRenderedItemDimensions,
-  getItemYOnBelt,
   B_RECEIVER,
   CAGE_FLOOR_Y,
   CONVEYOR_SPEED_MPS,
@@ -112,7 +108,11 @@ const BELT_UNDERSIDE_Y = BELT_TOP_Y - BELT_THICKNESS_M; // 0.685m
 const ROLLER_Y = BELT_UNDERSIDE_Y - ROLLER_RADIUS_M;    // ~0.645m - roller center
 const FRAME_TOP_Y = ROLLER_Y - ROLLER_RADIUS_M - 0.02;  // Top of frame structure
 const CONVEYOR_START_X = -4.2;
-const CONVEYOR_END_X = 4.3;
+const CONVEYOR_END_X = B_RECEIVER.transferEndX + 0.15; // main belt ends at short B spur tip
+/** Max items rendered simultaneously (perf cap). */
+const MAX_VISIBLE_ITEMS = 6;
+/** Heavy animated overlays off by default for smooth demo. */
+const ENABLE_DEMO_EFFECTS = false;
 const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
 const CONVEYOR_CENTER_X = (CONVEYOR_START_X + CONVEYOR_END_X) / 2;
 
@@ -210,19 +210,11 @@ function MotionTrail({
   );
 }
 
-/** Single animated roller that rotates around its own axis */
-function Roller({ position, speedFactor }: { position: [number, number, number]; speedFactor: number }) {
-  const meshRef = useRef<Mesh>(null);
-  
-  useFrame((_, delta) => {
-    if (meshRef.current && speedFactor > 0) {
-      meshRef.current.rotation.x += delta * speedFactor * 4;
-    }
-  });
-
+/** Static roller cylinder — no per-frame rotation (belt stripes show movement). */
+function StaticRoller({ position }: { position: [number, number, number] }) {
   return (
-    <mesh ref={meshRef} position={position} rotation={[0, 0, Math.PI / 2]}>
-      <cylinderGeometry args={[ROLLER_RADIUS_M, ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 12]} />
+    <mesh position={position} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[ROLLER_RADIUS_M, ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 8]} />
       <meshStandardMaterial color={COLORS.rollers} metalness={0.4} roughness={0.5} />
     </mesh>
   );
@@ -304,28 +296,18 @@ function StepperMotor({ position, pulseActive }: { position: [number, number, nu
   );
 }
 
-/** Laser beam from rangefinder to item */
+/** Laser beam from rangefinder to item — static opacity, no useFrame. */
 function LaserBeam({ active, itemY }: { active: boolean; itemY: number }) {
-  const beamRef = useRef<Mesh>(null);
-  const opacityRef = useRef(0.6);
-  
-  useFrame((_, delta) => {
-    if (beamRef.current && active) {
-      opacityRef.current = 0.4 + Math.sin(Date.now() / 100) * 0.3;
-    }
-  });
-  
   if (!active) return null;
-  
+
   const beamLength = LASER_HEIGHT_M - itemY;
   const beamCenterY = itemY + beamLength / 2;
-  
+
   return (
     <group position={[ZONES.CAMERA.x, 0, 0]}>
-      {/* Main laser beam */}
-      <mesh ref={beamRef} position={[0, beamCenterY, 0]}>
+      <mesh position={[0, beamCenterY, 0]}>
         <cylinderGeometry args={[0.003, 0.003, beamLength, 8]} />
-        <meshStandardMaterial 
+        <meshStandardMaterial
           color="#22d3ee"
           emissive="#22d3ee"
           emissiveIntensity={0.6}
@@ -517,16 +499,18 @@ function SupportLeg({ x }: { x: number }) {
  * Conveyor belt - realistic roller conveyor
  * Belt top surface at 0.7m (BELT_TOP_Y)
  */
-function ConveyorBelt({ speedFactor, pulseActive, elapsedMs }: { speedFactor: number; pulseActive: boolean; elapsedMs: number }) {
-  const rollerCount = Math.floor(CONVEYOR_LENGTH / ROLLER_SPACING_M);
+function ConveyorBelt({ pulseActive, elapsedMs, simplified }: { pulseActive: boolean; elapsedMs: number; simplified: boolean }) {
+  const spacing = simplified ? ROLLER_SPACING_M * 2 : ROLLER_SPACING_M;
+  const rollerCount = Math.floor(CONVEYOR_LENGTH / spacing);
+  const stripeOffsets = simplified ? [-2, 0, 2] : [-3, -1, 0.5, 2];
   
   const rollerPositions = useMemo(() => {
     const positions: [number, number, number][] = [];
     for (let i = 0; i < rollerCount; i++) {
-      positions.push([CONVEYOR_START_X + ROLLER_SPACING_M / 2 + i * ROLLER_SPACING_M, ROLLER_Y, 0]);
+      positions.push([CONVEYOR_START_X + spacing / 2 + i * spacing, ROLLER_Y, 0]);
     }
     return positions;
-  }, [rollerCount]);
+  }, [rollerCount, spacing]);
 
   const legPositions = useMemo(() => {
     const positions: number[] = [];
@@ -539,7 +523,7 @@ function ConveyorBelt({ speedFactor, pulseActive, elapsedMs }: { speedFactor: nu
   return (
     <group>
       {/* Main belt surface - matte PVC/tarpaulin look at 0.7m */}
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]} castShadow receiveShadow>
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]}>
         <boxGeometry args={[CONVEYOR_LENGTH, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
         <meshStandardMaterial 
           color={COLORS.belt} 
@@ -549,33 +533,33 @@ function ConveyorBelt({ speedFactor, pulseActive, elapsedMs }: { speedFactor: nu
       </mesh>
       
       {/* Belt stripes — deterministic movement synced to item (offset = time * 1 m/s) */}
-      {[-4, -2.5, -1, 0.5, 2, 3.5].map((offset, i) => (
+      {stripeOffsets.map((offset, i) => (
         <BeltStripe key={i} baseOffset={offset} elapsedMs={elapsedMs} />
       ))}
       
       {/* Side guards - brushed metal above belt */}
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]} castShadow>
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]}>
         <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.025]} />
         <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]} castShadow>
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]}>
         <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.025]} />
         <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
       </mesh>
       
       {/* Frame rails - industrial metal */}
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]} castShadow>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]}>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
         <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]} castShadow>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]}>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
         <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
       
-      {/* Rollers - rotating under the belt */}
+      {/* Rollers — static geometry (no per-frame rotation hooks) */}
       {rollerPositions.map((pos, i) => (
-        <Roller key={i} position={pos} speedFactor={speedFactor} />
+        <StaticRoller key={i} position={pos} />
       ))}
       
       {/* Drive roller at end (larger) */}
@@ -644,52 +628,91 @@ function ZoneMarker({ position, label, color, active }: {
 }
 
 /**
- * B receiving zone — physical downstream receiving tray after the sorter.
- * A short 0.5m-wide tray at belt height (0.7m) with low side walls and an end
- * stop, so B items visibly land and remain instead of vanishing into thin air.
+ * B receiving bin — отдельный промышленный контейнер на полу (не продолжение ленты).
+ * Короткий transfer spur + drop chute в открытый bin 1.2×0.8 m.
  */
-function BReceiver({ active }: { active: boolean }) {
-  const { startX, endX, y, width, wallHeight } = B_RECEIVER;
-  const len = endX - startX;
-  const centerX = (startX + endX) / 2;
-  const emissive = active ? 0.35 : 0.05;
-  const legY = y / 2;
+function BReceiverBin({ active }: { active: boolean }) {
+  const { centerX, centerZ, width, depth, wallHeight, floorY, transferEndX, transferStartX } = B_RECEIVER;
+  const emissive = active ? 0.3 : 0.04;
+  const hx = width / 2;
+  const hz = depth / 2;
+  const wall = 0.03;
+  const entryX = centerX - hx + 0.1;
+  const spurLen = transferEndX - transferStartX;
 
   return (
     <group>
-      {/* Tray floor at belt height */}
-      <mesh position={[centerX, y - 0.02, 0]} receiveShadow>
-        <boxGeometry args={[len, 0.04, width]} />
-        <meshStandardMaterial color="#334155" metalness={0.3} roughness={0.7} />
+      {/* Short B-only transfer spur (not a full belt extension) */}
+      <mesh position={[(transferStartX + transferEndX) / 2, BELT_Y - 0.02, 0]}>
+        <boxGeometry args={[spurLen, 0.04, CONVEYOR_WIDTH_M - 0.06]} />
+        <meshStandardMaterial color="#64748b" roughness={0.85} metalness={0.15} />
       </mesh>
-      {/* Side walls */}
+      {/* Spur side rails */}
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[centerX, y + wallHeight / 2, s * (width / 2)]}>
-          <boxGeometry args={[len, wallHeight, 0.02]} />
-          <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.55} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+        <mesh key={`spur${s}`} position={[(transferStartX + transferEndX) / 2, BELT_Y + 0.04, s * (CONVEYOR_WIDTH_M / 2 - 0.02)]}>
+          <boxGeometry args={[spurLen, 0.06, 0.02]} />
+          <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.55} />
         </mesh>
       ))}
-      {/* End stop wall */}
-      <mesh position={[endX, y + wallHeight / 2, 0]}>
-        <boxGeometry args={[0.03, wallHeight, width]} />
-        <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.6} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+
+      {/* Drop chute into bin */}
+      <mesh
+        position={[(transferEndX + entryX) / 2, (BELT_Y + floorY) / 2 + 0.02, centerZ]}
+        rotation={[0, 0, Math.atan2(BELT_Y - floorY, entryX - transferEndX)]}
+      >
+        <boxGeometry args={[Math.hypot(entryX - transferEndX, BELT_Y - floorY), 0.015, CONVEYOR_WIDTH_M - 0.08]} />
+        <meshStandardMaterial color="#4ade80" transparent opacity={0.5} emissive={COLORS.routeB} emissiveIntensity={emissive} side={THREE.DoubleSide} />
       </mesh>
-      {/* Support legs */}
-      {[startX + 0.2, endX - 0.2].map((lx) => (
-        [-1, 1].map((s) => (
-          <mesh key={`${lx}-${s}`} position={[lx, legY, s * (width / 2 - 0.05)]}>
-            <boxGeometry args={[0.04, y, 0.04]} />
-            <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
-          </mesh>
-        ))
+
+      {/* Floor pad under bin */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[centerX, 0.001, centerZ]}>
+        <planeGeometry args={[width + 0.25, depth + 0.25]} />
+        <meshStandardMaterial color={COLORS.routeB} transparent opacity={active ? 0.18 : 0.06} />
+      </mesh>
+
+      {/* Bin interior floor */}
+      <mesh position={[centerX, floorY - 0.01, centerZ]}>
+        <boxGeometry args={[width - 0.06, 0.025, depth - 0.06]} />
+        <meshStandardMaterial color="#334155" roughness={0.8} metalness={0.2} />
+      </mesh>
+
+      {/* Bin walls — 3 sides + low front lip */}
+      {[-1, 1].map((s) => (
+        <mesh key={`w${s}`} position={[centerX, floorY + wallHeight / 2, centerZ + s * hz]}>
+          <boxGeometry args={[width, wallHeight, wall]} />
+          <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+        </mesh>
       ))}
-      {/* Label */}
-      <Html position={[centerX, y + wallHeight + 0.18, 0]} center>
+      <mesh position={[centerX + hx, floorY + wallHeight / 2, centerZ]}>
+        <boxGeometry args={[wall, wallHeight, depth]} />
+        <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+      </mesh>
+      <mesh position={[entryX, floorY + wallHeight / 4, centerZ]}>
+        <boxGeometry args={[wall, wallHeight / 3, depth - 0.1]} />
+        <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} transparent opacity={0.85} />
+      </mesh>
+
+      {/* Corner posts */}
+      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+        <mesh key={`post${i}`} position={[centerX + sx * (hx - 0.04), floorY + wallHeight / 2, centerZ + sz * (hz - 0.04)]}>
+          <boxGeometry args={[0.04, wallHeight, 0.04]} />
+          <meshStandardMaterial color="#3f6f52" metalness={0.4} roughness={0.5} />
+        </mesh>
+      ))}
+
+      {/* Legs to floor */}
+      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+        <mesh key={`leg${i}`} position={[centerX + sx * (hx - 0.08), floorY / 2, centerZ + sz * (hz - 0.08)]}>
+          <boxGeometry args={[0.05, floorY, 0.05]} />
+          <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
+        </mesh>
+      ))}
+
+      <Html position={[centerX, floorY + wallHeight + 0.25, centerZ]} center>
         <div style={{
           color: active ? COLORS.routeB : '#64748b',
-          fontSize: '20px',
+          fontSize: '22px',
           fontWeight: 800,
-          textShadow: active ? `0 0 8px ${COLORS.routeB}` : 'none',
           userSelect: 'none',
         }}>
           B
@@ -719,7 +742,7 @@ function RollCage({ position, label, color, active }: {
       </mesh>
 
       {/* Solid interior floor where items rest */}
-      <mesh position={[0, CAGE_FLOOR_Y - 0.005, 0]} receiveShadow>
+      <mesh position={[0, CAGE_FLOOR_Y - 0.005, 0]}>
         <boxGeometry args={[width - frameThickness, 0.01, depth - frameThickness]} />
         <meshStandardMaterial color="#1e293b" metalness={0.3} roughness={0.7} />
       </mesh>
@@ -1159,105 +1182,6 @@ function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
   );
 }
 
-/** STL geometry loader - always loads the geometry */
-function STLGeometry({ 
-  path, 
-  scale, 
-  color, 
-  accentColor,
-  emissiveIntensity,
-  roughness,
-  metalness,
-}: { 
-  path: string; 
-  scale: [number, number, number]; 
-  color: string;
-  accentColor: string;
-  emissiveIntensity: number;
-  roughness: number;
-  metalness: number;
-}) {
-  const geometry = useLoader(STLLoader, path);
-  
-  // Center and compute normals on first render
-  useMemo(() => {
-    if (geometry) {
-      geometry.center();
-      geometry.computeVertexNormals();
-    }
-  }, [geometry]);
-  
-  return (
-    <group scale={scale}>
-      <mesh geometry={geometry} castShadow>
-        <meshStandardMaterial 
-          color={color}
-          emissive={accentColor}
-          emissiveIntensity={emissiveIntensity}
-          roughness={roughness}
-          metalness={metalness}
-        />
-      </mesh>
-      <lineSegments geometry={new THREE.EdgesGeometry(geometry, 35)}>
-        <lineBasicMaterial color={accentColor} transparent opacity={0.28} />
-      </lineSegments>
-    </group>
-  );
-}
-
-/** Fallback primitive when STL is not available */
-function FallbackPrimitive({ 
-  type, 
-  color, 
-  accentColor,
-  emissiveIntensity,
-  roughness,
-  metalness,
-  w, h, d, 
-}: { 
-  type: 'box' | 'cylinder' | 'sphere';
-  color: string;
-  accentColor: string;
-  emissiveIntensity: number;
-  roughness: number;
-  metalness: number;
-  w: number; h: number; d: number;
-}) {
-  if (type === 'cylinder' || type === 'sphere') {
-    return (
-      <mesh castShadow>
-        <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
-        <meshStandardMaterial 
-          color={color} 
-          emissive={accentColor} 
-          emissiveIntensity={emissiveIntensity}
-          roughness={roughness}
-          metalness={metalness}
-        />
-      </mesh>
-    );
-  }
-  
-  return (
-    <group>
-      <mesh castShadow>
-        <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial 
-          color={color} 
-          emissive={accentColor} 
-          emissiveIntensity={emissiveIntensity}
-          roughness={roughness}
-          metalness={metalness}
-        />
-      </mesh>
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(w, h, d), 35]} />
-        <lineBasicMaterial color={accentColor} transparent opacity={0.35} />
-      </lineSegments>
-    </group>
-  );
-}
-
 /** Main continuous scene - light warehouse style with correct physical dimensions */
 function ContinuousScene({ 
   playback, 
@@ -1270,9 +1194,10 @@ function ContinuousScene({
   autoCameraEnabled: boolean;
   viewportType: ViewportType;
 }) {
-  const speedFactor = getConveyorSpeedFactor(playback);
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
+  const liteScene = simplified || !ENABLE_DEMO_EFFECTS;
+  const effectsEnabled = ENABLE_DEMO_EFFECTS && !simplified;
   
   const cameraHighlight = shouldHighlightCamera(phase);
   const showScan = shouldShowScanEffect(phase);
@@ -1284,10 +1209,11 @@ function ContinuousScene({
   const showCloud = shouldShowPointCloud(phase);
   const showActuator = shouldShowActuator(phase);
   
-  // Compute all physical items based on elapsed time to keep them in roll-cages
+  // Compute physical items based on elapsed time. Cap the number of
+  // simultaneously rendered items to keep the scene lightweight.
   const { totalElapsedMs, currentCase, currentCaseIndex } = playback;
   const casesSpawned = Math.floor(totalElapsedMs / CASE_DURATION_MS) + 1;
-  const startIndex = Math.max(0, casesSpawned - 20); // Keep last 20 items
+  const startIndex = Math.max(0, casesSpawned - MAX_VISIBLE_ITEMS);
 
   const sceneItems = useMemo(() => {
     const items = [];
@@ -1332,32 +1258,18 @@ function ContinuousScene({
     : 'x';
   const itemColor = category ? COLORS[`route${category}` as keyof typeof COLORS] : COLORS.sensorAccent;
   
-  // Cinematic camera active only when running and enabled
-  const cinematicActive = autoCameraEnabled && playback.status === 'running';
+  // Cinematic camera active only when heavy effects enabled
+  const cinematicActive = effectsEnabled && autoCameraEnabled && playback.status === 'running';
 
   return (
     <>
       {/* Light background */}
       <color attach="background" args={[COLORS.background]} />
       
-      {/* Soft natural lighting - warehouse aesthetic */}
+      {/* Soft natural lighting — no shadow maps (Canvas shadows=false for perf) */}
       <ambientLight intensity={0.7} />
       <hemisphereLight args={['#f8fafc', '#d0dae8', 0.5]} />
-      {/* Main directional light with soft shadow */}
-      <directionalLight 
-        position={[8, 12, 6]} 
-        intensity={0.9}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-far={30}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
-        shadow-bias={-0.0001}
-      />
-      {/* Fill light from opposite side */}
+      <directionalLight position={[8, 12, 6]} intensity={0.9} />
       <directionalLight position={[-5, 8, -4]} intensity={0.35} />
 
       {/* Grid */}
@@ -1374,14 +1286,14 @@ function ContinuousScene({
         position={[0, 0.001, 0]}
       />
 
-      {/* Floor with shadow receiving */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[16, 12]} />
         <meshStandardMaterial color={COLORS.floor} roughness={0.9} metalness={0} />
       </mesh>
 
       {/* Conveyor - belt top at 0.7m */}
-      <ConveyorBelt speedFactor={speedFactor} pulseActive={showPulse} elapsedMs={totalElapsedMs} />
+      <ConveyorBelt pulseActive={showPulse} elapsedMs={totalElapsedMs} simplified={liteScene} />
 
       {/* Zone A - spawn point */}
       <ZoneMarker 
@@ -1391,8 +1303,8 @@ function ContinuousScene({
         active={playback.currentPhase === 'spawn'}
       />
       
-      {/* Zone B - physical receiving tray at end of sorter */}
-      <BReceiver active={activeRoute === 'B'} />
+      {/* Zone B - physical receiving bin at end of sorter */}
+      <BReceiverBin active={activeRoute === 'B'} />
       
       {/* Zone C - roll cage for oversized items */}
       <RollCage 
@@ -1433,19 +1345,21 @@ function ContinuousScene({
       {/* Laser beam for height measurement */}
       <LaserBeam active={showLaser} itemY={itemPos[1]} />
       
-      {/* Point cloud for stereo analysis */}
-      <PointCloud 
-        active={showCloud} 
-        itemPosition={itemPos} 
-        scale={itemScale}
-        isRound={isRound}
-      />
+      {/* Point cloud for stereo analysis — opt-in only */}
+      {effectsEnabled && (
+        <PointCloud
+          active={showCloud}
+          itemPosition={itemPos}
+          scale={itemScale}
+          isRound={isRound}
+        />
+      )}
       
       {/* Inspection zone on belt surface */}
       <InspectionZone active={cameraHighlight} />
       
-      {/* Animated scan line on belt */}
-      <ScanLine active={showScan} />
+      {/* Animated scan line on belt — opt-in only */}
+      {effectsEnabled && <ScanLine active={showScan} />}
 
       {/* Gate/diverter */}
       <GateZone category={category} />
@@ -1481,20 +1395,24 @@ function ContinuousScene({
         category={category}
       />
       
-      {/* Motion trail for visual movement feedback */}
-      <MotionTrail 
-        position={itemPos} 
-        visible={showMotionTrail} 
-        color={itemColor}
-        direction={trailDirection as 'x' | 'z'}
-      />
+      {/* Motion trail — opt-in only */}
+      {effectsEnabled && (
+        <MotionTrail
+          position={itemPos}
+          visible={showMotionTrail}
+          color={itemColor}
+          direction={trailDirection as 'x' | 'z'}
+        />
+      )}
 
-      {/* Cinematic camera controller */}
-      <CinematicCameraController 
-        playback={playback} 
-        enabled={cinematicActive}
-        viewportType={viewportType}
-      />
+      {/* Cinematic camera controller — opt-in only */}
+      {effectsEnabled && (
+        <CinematicCameraController
+          playback={playback}
+          enabled={cinematicActive}
+          viewportType={viewportType}
+        />
+      )}
 
       {/* OrbitControls - enabled when not in cinematic mode */}
       <OrbitControls
@@ -1523,8 +1441,8 @@ export default function SorterDigitalTwinContinuous({
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
           camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
-          dpr={simplified ? [1, 1.25] : [1, 1.75]}
-          shadows={!simplified}
+          dpr={simplified ? [1, 1.25] : [1, 1.5]}
+          shadows={false}
           gl={{ antialias: !simplified, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;

@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react';
+import { Suspense, memo, useEffect, useMemo } from 'react';
 import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
 import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
@@ -25,7 +25,21 @@ const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalne
   'SKU-011': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 },
 };
 
-function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, roughness, metalness }: any) {
+interface RenderProps {
+  color: string;
+  accentColor: string;
+  emissiveIntensity: number;
+  roughness: number;
+  metalness: number;
+}
+
+// STL geometry is cached globally by useLoader (one geometry per URL, shared
+// across items). We only render the solid mesh — no per-item wireframe overlay,
+// which keeps draw calls and allocations low.
+function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, roughness, metalness }: RenderProps & {
+  path: string;
+  scale: [number, number, number];
+}) {
   const geometry = useLoader(STLLoader, path) as THREE.BufferGeometry;
   useMemo(() => {
     if (geometry) {
@@ -35,94 +49,118 @@ function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, rough
   }, [geometry]);
   return (
     <group scale={scale}>
-      <mesh geometry={geometry} castShadow>
+      <mesh geometry={geometry}>
         <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
       </mesh>
-      <lineSegments geometry={new THREE.EdgesGeometry(geometry, 35)}>
-        <lineBasicMaterial color={accentColor} transparent opacity={0.28} />
-      </lineSegments>
     </group>
   );
 }
 
-function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughness, metalness, w, h, d }: any) {
-  if (type === 'cylinder' || type === 'sphere') {
-    return (
-      <group>
-        <mesh castShadow>
-          <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
-          <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
-        </mesh>
-      </group>
-    );
-  }
+function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughness, metalness, w, h, d }: RenderProps & {
+  type: 'box' | 'cylinder' | 'sphere';
+  w: number; h: number; d: number;
+}) {
+  // Memoize the geometry once per size so we don't allocate every render.
+  const geometry = useMemo<THREE.BufferGeometry>(() => {
+    if (type === 'cylinder' || type === 'sphere') {
+      const r = Math.max(w, d) / 2;
+      return new THREE.CylinderGeometry(r, r, h, 16);
+    }
+    return new THREE.BoxGeometry(w, h, d);
+  }, [type, w, h, d]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
   return (
-    <group>
-      <mesh castShadow>
-        <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
-      </mesh>
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(w, h, d), 35]} />
-        <lineBasicMaterial color={accentColor} transparent opacity={0.35} />
-      </lineSegments>
-    </group>
+    <mesh geometry={geometry}>
+      <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
+    </mesh>
   );
 }
 
-export function PhysicalPlaybackItem({ 
-  caseData, 
-  elapsedMs, 
-  slotIndex = 0 
-}: { 
-  caseData: PlaylistCase; 
+export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
+  caseData,
+  elapsedMs,
+  slotIndex = 0,
+}: {
+  caseData: PlaylistCase;
   elapsedMs: number;
   slotIndex?: number;
 }) {
   const itemId = caseData.itemId.replace('-LC', '');
   const itemData = useMemo(() => ITEMS.find(i => i.id === itemId) ?? ITEMS[0], [itemId]);
   const asset = getModelAsset(itemId);
-  
+
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
-  
+
   const pose = getPhysicalItemPose({
     caseId: caseData.id,
     slotIndex,
     dimensionsMm: itemData.dimensionsMm,
     targetCategory: caseData.expectedCategory,
-    elapsedMs
+    elapsedMs,
   });
 
-  const { position, rotation, isSettled, phase, surface } = pose;
+  const { position, rotation, phase, surface, isSettled } = pose;
   const isRouting = phase === 'routing';
-  // Item rests on a moving/transport surface (shadow makes sense there).
+  const useSimplifiedMesh = phase === 'settled' || isSettled;
+  // Contact shadow only while the item rides a flat transport surface.
   const onTransport = surface === 'main_belt'
     || surface === 'inspection_station'
     || surface === 'routing_junction'
-    || surface === 'b_receiver';
+    || surface === 'b_transfer';
 
-  // Before spawn, don't show
   if (elapsedMs < 0) return null;
 
-  const accentColor = COLORS[caseData.expectedCategory] ?? COLORS.sensorAccent;
+  const routeAccent = COLORS[caseData.expectedCategory] ?? COLORS.sensorAccent;
   const material = ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
-  const emissiveIntensity = isRouting ? 0.16 : 0.03;
-  
-  const useSTL = asset?.loaderType === 'stl' && asset?.frontendAssetPath;
+  const bodyColor = useSimplifiedMesh ? (material.color ?? '#b8b2a8') : material.color;
+  const accentColor = useSimplifiedMesh ? '#94a3b8' : routeAccent;
+  const emissiveIntensity = useSimplifiedMesh ? 0.01 : (isRouting ? 0.12 : 0.03);
+  const metalness = material.metalness ?? 0.05;
+
+  const useSTL = !useSimplifiedMesh && asset?.loaderType === 'stl' && asset?.frontendAssetPath;
   const stlPath = asset?.frontendAssetPath ?? '';
   const fallbackType = asset?.fallbackPrimitive ?? 'box';
+
+  const fallback = (
+    <FallbackPrimitive
+      type={fallbackType}
+      color={bodyColor}
+      accentColor={accentColor}
+      emissiveIntensity={emissiveIntensity}
+      roughness={material.roughness}
+      metalness={metalness}
+      w={dims.width}
+      h={dims.height}
+      d={dims.depth}
+    />
+  );
 
   return (
     <group position={position} rotation={rotation}>
       {useSTL ? (
-        <Suspense fallback={<FallbackPrimitive type={fallbackType} color={material.color} accentColor={accentColor} emissiveIntensity={emissiveIntensity} roughness={material.roughness} metalness={material.metalness ?? 0.05} w={dims.width} h={dims.height} d={dims.depth} />}>
-          <STLGeometry path={stlPath} scale={[0.001, 0.001, 0.001]} color={material.color} accentColor={accentColor} emissiveIntensity={emissiveIntensity} roughness={material.roughness} metalness={material.metalness ?? 0.05} />
+        <Suspense fallback={fallback}>
+          <STLGeometry
+            path={stlPath}
+            scale={[0.001, 0.001, 0.001]}
+            color={bodyColor}
+            accentColor={accentColor}
+            emissiveIntensity={emissiveIntensity}
+            roughness={material.roughness}
+            metalness={metalness}
+          />
         </Suspense>
       ) : (
-        <FallbackPrimitive type={fallbackType} color={material.color} accentColor={accentColor} emissiveIntensity={emissiveIntensity} roughness={material.roughness} metalness={material.metalness ?? 0.05} w={dims.width} h={dims.height} d={dims.depth} />
+        fallback
       )}
-      
-      {/* Contact shadow only while riding a transport surface */}
+
+      {useSimplifiedMesh && (
+        <mesh position={[0, -dims.height / 2 + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[Math.max(dims.width, dims.depth) * 0.35, Math.max(dims.width, dims.depth) * 0.42, 20]} />
+          <meshBasicMaterial color={routeAccent} transparent opacity={0.5} />
+        </mesh>
+      )}
+
       {onTransport && (
         <mesh position={[0, -dims.height / 2 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[Math.max(dims.width, dims.depth) / 2 + 0.01, 16]} />
@@ -131,4 +169,4 @@ export function PhysicalPlaybackItem({
       )}
     </group>
   );
-}
+});

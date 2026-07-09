@@ -41,15 +41,47 @@ describe('physicalItemMotion', () => {
     expect(a).toEqual(b);
   });
 
-  it('B final pose is inside the b_receiver bounds', () => {
+  it('B final pose is inside the b_receiver bin bounds', () => {
     const pose = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 20000 });
-    expect(pose.surface).toBe('b_receiver');
+    expect(pose.surface).toBe('b_bin_floor');
     expect(pose.isSettled).toBe(true);
-    const b = SURFACES.b_receiver.bounds;
+    const b = SURFACES.b_bin_floor.bounds;
     expect(pose.position[0]).toBeGreaterThanOrEqual(b.minX);
     expect(pose.position[0]).toBeLessThanOrEqual(b.maxX);
     expect(pose.position[2]).toBeGreaterThanOrEqual(b.minZ);
     expect(pose.position[2]).toBeLessThanOrEqual(b.maxZ);
+  });
+
+  it('settled B item is NOT on the active belt', () => {
+    const pose = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 20000 });
+    expect(['main_belt', 'b_transfer', 'inspection_station', 'routing_junction']).not.toContain(pose.surface);
+    expect(pose.surface).toBe('b_bin_floor');
+  });
+
+  it('settled B item sits on bin floor not belt height', () => {
+    const pose = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 9200 });
+    expect(pose.surface).toBe('b_bin_floor');
+    expect(pose.position[1]).toBeLessThan(0.35); // well below belt (0.7m)
+    expect(pose.position[0]).toBeGreaterThan(2.7); // inside B bin (center 3.35)
+  });
+
+  it('settled B item remains fixed as time increases', () => {
+    const t1 = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 11000 });
+    const t2 = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 40000 });
+    expect(t1.position).toEqual(t2.position);
+    expect(t1.isSettled).toBe(true);
+    expect(t2.isSettled).toBe(true);
+  });
+
+  it('B travels via belt transfer then drop chute before settling', () => {
+    const transfer = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 7200 });
+    expect(transfer.surface).toBe('b_transfer');
+    expect(transfer.phase).toBe('routing');
+    const chute = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 8200 });
+    expect(chute.surface).toBe('chute_b');
+    const settled = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 9000 });
+    expect(settled.surface).toBe('b_bin_floor');
+    expect(settled.phase).toBe('settled');
   });
 
   it('C final pose is inside the c_cage bounds', () => {
@@ -91,6 +123,26 @@ describe('physicalItemMotion', () => {
           expect(Number.isFinite(v)).toBe(true);
         }
       }
+    }
+  });
+
+  it('B final pose fixed after +1000 ms', () => {
+    const t0 = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 10000 });
+    const t1 = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 11000 });
+    expect(t0.surface).toBe('b_bin_floor');
+    expect(t0.position).toEqual(t1.position);
+  });
+
+  it('no teleport between adjacent sampled poses', () => {
+    let prev = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 0 });
+    for (let t = 100; t <= 10000; t += 100) {
+      const cur = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: t });
+      const dx = cur.position[0] - prev.position[0];
+      const dy = cur.position[1] - prev.position[1];
+      const dz = cur.position[2] - prev.position[2];
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      expect(dist).toBeLessThan(1.5); // max ~1m per 100ms at 1m/s
+      prev = cur;
     }
   });
 

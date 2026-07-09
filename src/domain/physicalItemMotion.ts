@@ -15,7 +15,6 @@ import {
   type SurfaceName,
   type Vec3,
 } from './conveyorNetwork';
-import { B_RECEIVER, CAGE_FLOOR_Y, ROLL_CAGE } from './physicalLayout';
 
 export type SurfaceType = SurfaceName;
 export type MotionPhase = 'feed' | 'inspection' | 'decision' | 'routing' | 'settled';
@@ -59,30 +58,24 @@ function poseOnSurface(name: SurfaceName, t: number, itemHeightM: number): { pos
   };
 }
 
-/** Deterministic slot position inside a cage (grid, stays within bounds). */
-function cageSlot(name: SurfaceName, slotIndex: number, itemHeightM: number): { pos: Vec3; rotY: number } {
-  const b = SURFACES[name].bounds;
+/**
+ * Deterministic settled slot inside any bin/cage floor surface.
+ * Uses the surface's own bounds so items always stay contained (grid 3×2).
+ */
+function settledSlot(name: SurfaceName, slotIndex: number, itemHeightM: number): { pos: Vec3; rotY: number } {
+  const s = SURFACES[name];
+  const b = s.bounds;
   const cx = (b.minX + b.maxX) / 2;
   const cz = (b.minZ + b.maxZ) / 2;
-  // 3 columns × 2 rows grid inside the cage footprint.
-  const col = slotIndex % 3;       // 0,1,2
+  const spanX = b.maxX - b.minX;
+  const spanZ = b.maxZ - b.minZ;
+  const col = slotIndex % 3;                 // 0,1,2
   const row = Math.floor(slotIndex / 3) % 2; // 0,1
-  const offsetX = (col - 1) * (ROLL_CAGE.width / 3.2); // ~±0.375
-  const offsetZ = (row - 0.5) * (ROLL_CAGE.depth / 2.4); // ~±0.17
+  const offsetX = (col - 1) * (spanX / 3.5); // stays well within bounds
+  const offsetZ = (row - 0.5) * (spanZ / 3.0);
   return {
-    pos: [cx + offsetX, CAGE_FLOOR_Y + itemHeightM / 2, cz + offsetZ],
-    rotY: (slotIndex % 4) * (Math.PI / 8), // small fixed yaw variety, deterministic
-  };
-}
-
-/** Deterministic rest position inside the B receiver tray (stacks backwards). */
-function bReceiverSlot(slotIndex: number, itemHeightM: number): { pos: Vec3; rotY: number } {
-  const spacing = 0.55;
-  let x = B_RECEIVER.restX - (slotIndex % 4) * spacing;
-  if (x < B_RECEIVER.startX + 0.3) x = B_RECEIVER.startX + 0.3;
-  return {
-    pos: [x, B_RECEIVER.y + itemHeightM / 2, 0],
-    rotY: 0,
+    pos: [cx + offsetX, s.surfaceY + itemHeightM / 2, cz + offsetZ],
+    rotY: (slotIndex % 4) * (Math.PI / 8),
   };
 }
 
@@ -123,15 +116,19 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
     const r = poseOnSurface('routing_junction', t, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'routing_junction'; phase = 'decision';
   } else if (category === 'B') {
-    // B: travel along the receiving tray, then rest inside it.
-    const travelSpan = clearStart - routingStart;
+    // B: short transfer spur → drop chute → settle inside floor bin.
+    const exitStart = starts['exit'];
+    const travelSpan = exitStart - routingStart;
     const t = (elapsedMs - routingStart) / travelSpan;
-    if (t < 1) {
-      const r = poseOnSurface('b_receiver', t, itemHeightM);
-      pos = r.pos; rotY = r.rotY; surface = 'b_receiver'; phase = 'routing';
+    if (t < 0.35) {
+      const r = poseOnSurface('b_transfer', t / 0.35, itemHeightM);
+      pos = r.pos; rotY = r.rotY; surface = 'b_transfer'; phase = 'routing';
+    } else if (t < 0.88) {
+      const r = poseOnSurface('chute_b', (t - 0.35) / 0.53, itemHeightM);
+      pos = r.pos; rotY = r.rotY; surface = 'chute_b'; phase = 'routing';
     } else {
-      const r = bReceiverSlot(slotIndex, itemHeightM);
-      pos = r.pos; rotY = r.rotY; surface = 'b_receiver'; phase = 'settled';
+      const r = settledSlot('b_bin_floor', slotIndex, itemHeightM);
+      pos = r.pos; rotY = r.rotY; surface = 'b_bin_floor'; phase = 'settled';
       isSettled = elapsedMs >= total;
     }
   } else {
@@ -144,7 +141,7 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
       const r = poseOnSurface(chuteName, t, itemHeightM);
       pos = r.pos; rotY = r.rotY; surface = chuteName; phase = 'routing';
     } else {
-      const r = cageSlot(cageName, slotIndex, itemHeightM);
+      const r = settledSlot(cageName, slotIndex, itemHeightM);
       pos = r.pos; rotY = r.rotY; surface = cageName; phase = 'settled';
       isSettled = elapsedMs >= total;
     }

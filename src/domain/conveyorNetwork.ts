@@ -27,11 +27,15 @@ export type SurfaceName =
   | 'main_belt'
   | 'inspection_station'
   | 'routing_junction'
-  | 'b_receiver'
+  | 'b_transfer'
+  | 'chute_b'
+  | 'b_bin_floor'
   | 'chute_c'
   | 'chute_d'
   | 'c_cage_floor'
   | 'd_cage_floor';
+
+export type SurfaceKind = 'conveyor' | 'station' | 'junction' | 'chute' | 'bin_floor' | 'cage_floor';
 
 export type Vec3 = [number, number, number];
 
@@ -44,6 +48,7 @@ export interface SurfaceBounds {
 
 export interface Surface {
   name: SurfaceName;
+  kind: SurfaceKind;
   /** Entry point of the surface (item enters here). */
   start: Vec3;
   /** Exit point of the surface (item leaves here). */
@@ -70,6 +75,13 @@ const D = ZONES.D;           // cage D center
 const CAGE_HALF_X = ROLL_CAGE.width / 2;   // 0.6
 const CAGE_HALF_Z = ROLL_CAGE.depth / 2;   // 0.4
 
+/** B bin geometry — separate floor-standing container. */
+const B_BIN_HALF_X = B_RECEIVER.width / 2;  // 0.6
+const B_BIN_HALF_Z = B_RECEIVER.depth / 2;  // 0.4
+const B_BIN_ENTRY_X = B_RECEIVER.centerX - B_BIN_HALF_X + 0.12;
+const CHUTE_B_ENTRY: Vec3 = [B_RECEIVER.transferEndX, BELT_TOP_Y, 0];
+const CHUTE_B_EXIT: Vec3 = [B_BIN_ENTRY_X, CHUTE_END_Y, B_RECEIVER.centerZ];
+
 /** Chute entry sits at the junction on the belt edge toward the cage. */
 const CHUTE_C_ENTRY: Vec3 = [GATE.x, BELT_TOP_Y, MAIN_BELT_WIDTH_M / 2];
 const CHUTE_C_EXIT: Vec3 = [C.x, CHUTE_END_Y, C.z - CAGE_HALF_Z]; // front edge of cage C
@@ -82,6 +94,7 @@ export const CHUTE_SPEED_MPS = 0.5;
 export const SURFACES: Record<SurfaceName, Surface> = {
   main_belt: {
     name: 'main_belt',
+    kind: 'conveyor',
     start: [A.x, BELT_TOP_Y, 0],
     end: [CAMERA.x, BELT_TOP_Y, 0],
     surfaceY: BELT_TOP_Y,
@@ -91,6 +104,7 @@ export const SURFACES: Record<SurfaceName, Surface> = {
   },
   inspection_station: {
     name: 'inspection_station',
+    kind: 'station',
     start: [CAMERA.x, BELT_TOP_Y, 0],
     end: [CAMERA.x, BELT_TOP_Y, 0],
     surfaceY: BELT_TOP_Y,
@@ -100,6 +114,7 @@ export const SURFACES: Record<SurfaceName, Surface> = {
   },
   routing_junction: {
     name: 'routing_junction',
+    kind: 'junction',
     start: [CAMERA.x, BELT_TOP_Y, 0],
     end: [GATE.x, BELT_TOP_Y, 0],
     surfaceY: BELT_TOP_Y,
@@ -107,23 +122,57 @@ export const SURFACES: Record<SurfaceName, Surface> = {
     speedMps: CONVEYOR_SPEED_MPS,
     bounds: { minX: CAMERA.x, maxX: GATE.x, minZ: -MAIN_BELT_WIDTH_M / 2, maxZ: MAIN_BELT_WIDTH_M / 2 },
   },
-  b_receiver: {
-    name: 'b_receiver',
+  b_transfer: {
+    name: 'b_transfer',
+    kind: 'conveyor',
     start: [GATE.x, BELT_TOP_Y, 0],
-    end: [B_RECEIVER.restX, BELT_TOP_Y, 0],
-    surfaceY: B_RECEIVER.y,
-    width: B_RECEIVER.width,
+    end: [B_RECEIVER.transferEndX, BELT_TOP_Y, 0],
+    surfaceY: BELT_TOP_Y,
+    width: MAIN_BELT_WIDTH_M,
     speedMps: CONVEYOR_SPEED_MPS,
     bounds: {
-      minX: B_RECEIVER.startX,
-      maxX: B_RECEIVER.endX,
-      minZ: -B_RECEIVER.width / 2,
-      maxZ: B_RECEIVER.width / 2,
+      minX: GATE.x,
+      maxX: B_RECEIVER.transferEndX,
+      minZ: -MAIN_BELT_WIDTH_M / 2,
+      maxZ: MAIN_BELT_WIDTH_M / 2,
+    },
+    targetCategory: 'B',
+  },
+  chute_b: {
+    name: 'chute_b',
+    kind: 'chute',
+    start: CHUTE_B_ENTRY,
+    end: CHUTE_B_EXIT,
+    surfaceY: BELT_TOP_Y,
+    width: MAIN_BELT_WIDTH_M,
+    speedMps: CHUTE_SPEED_MPS,
+    bounds: {
+      minX: Math.min(CHUTE_B_ENTRY[0], CHUTE_B_EXIT[0]) - 0.1,
+      maxX: Math.max(CHUTE_B_ENTRY[0], CHUTE_B_EXIT[0]) + 0.1,
+      minZ: -MAIN_BELT_WIDTH_M / 2,
+      maxZ: MAIN_BELT_WIDTH_M / 2,
+    },
+    targetCategory: 'B',
+  },
+  b_bin_floor: {
+    name: 'b_bin_floor',
+    kind: 'bin_floor',
+    start: [B_RECEIVER.centerX, B_RECEIVER.floorY, B_RECEIVER.centerZ],
+    end: [B_RECEIVER.centerX, B_RECEIVER.floorY, B_RECEIVER.centerZ],
+    surfaceY: B_RECEIVER.floorY,
+    width: B_RECEIVER.width,
+    speedMps: 0,
+    bounds: {
+      minX: B_RECEIVER.centerX - B_BIN_HALF_X,
+      maxX: B_RECEIVER.centerX + B_BIN_HALF_X,
+      minZ: B_RECEIVER.centerZ - B_BIN_HALF_Z,
+      maxZ: B_RECEIVER.centerZ + B_BIN_HALF_Z,
     },
     targetCategory: 'B',
   },
   chute_c: {
     name: 'chute_c',
+    kind: 'chute',
     start: CHUTE_C_ENTRY,
     end: CHUTE_C_EXIT,
     surfaceY: BELT_TOP_Y,
@@ -139,6 +188,7 @@ export const SURFACES: Record<SurfaceName, Surface> = {
   },
   chute_d: {
     name: 'chute_d',
+    kind: 'chute',
     start: CHUTE_D_ENTRY,
     end: CHUTE_D_EXIT,
     surfaceY: BELT_TOP_Y,
@@ -154,6 +204,7 @@ export const SURFACES: Record<SurfaceName, Surface> = {
   },
   c_cage_floor: {
     name: 'c_cage_floor',
+    kind: 'cage_floor',
     start: [C.x, CAGE_FLOOR_Y, C.z],
     end: [C.x, CAGE_FLOOR_Y, C.z],
     surfaceY: CAGE_FLOOR_Y,
@@ -169,6 +220,7 @@ export const SURFACES: Record<SurfaceName, Surface> = {
   },
   d_cage_floor: {
     name: 'd_cage_floor',
+    kind: 'cage_floor',
     start: [D.x, CAGE_FLOOR_Y, D.z],
     end: [D.x, CAGE_FLOOR_Y, D.z],
     surfaceY: CAGE_FLOOR_Y,
@@ -227,5 +279,5 @@ export function pathForCategory(category: Category): SurfaceName[] {
   if (category === 'D') {
     return ['main_belt', 'inspection_station', 'routing_junction', 'chute_d', 'd_cage_floor'];
   }
-  return ['main_belt', 'inspection_station', 'routing_junction', 'b_receiver'];
+  return ['main_belt', 'inspection_station', 'routing_junction', 'b_transfer', 'chute_b', 'b_bin_floor'];
 }
