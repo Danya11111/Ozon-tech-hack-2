@@ -82,19 +82,19 @@ export const DRIVE_ROLLER_CIRCUMFERENCE_M = Math.PI * DRIVE_ROLLER_RADIUS_M * 2;
 export const MM_PER_STEP = (DRIVE_ROLLER_CIRCUMFERENCE_M * 1000) / STEPS_PER_REV; // ~0.118mm/step
 
 // =========================================================
-// Laser rangefinder
+// Laser rangefinder (must be above max item)
 // =========================================================
-export const LASER_HEIGHT_M = 1.15;            // Laser mounted at 1.15m
+export const LASER_HEIGHT_M = 1.4;            // Laser at 1.4m (above max item)
 export const LASER_POSITION_X = ZONES.CAMERA.x; // Co-located with camera
 
 // =========================================================
-// Stereo camera
+// Stereo camera (must be above max item)
 // =========================================================
 export const STEREO_CAMERA = {
   baseline: 0.12,           // 120mm between lenses
   focalLength: 0.004,       // 4mm focal length
   fov: 60,                  // 60° field of view
-  mountY: 1.1,              // Mounted at 1.1m
+  mountY: 1.35,             // Mounted at 1.35m (above max item)
 };
 
 // =========================================================
@@ -107,26 +107,59 @@ export const MEASUREMENT_ZONE = {
 };
 
 // =========================================================
+// Item dimension limits (per spec)
+// =========================================================
+export const MAX_ITEM_WIDTH_M = 0.45;         // 450mm max width
+export const MAX_ITEM_DEPTH_M = 0.32;         // 320mm max depth
+export const MAX_ITEM_HEIGHT_M = 0.32;        // 320mm max height (normal items)
+export const OVERSIZE_DEMO_MAX_HEIGHT_M = 0.4; // 400mm for oversized demo items (C scenario)
+
+// =========================================================
+// Sensor rig clearance
+// =========================================================
+export const SENSOR_CLEARANCE_M = 0.25;       // 250mm clearance above tallest item
+export const SENSOR_RIG_HEIGHT_M = BELT_TOP_Y + OVERSIZE_DEMO_MAX_HEIGHT_M + SENSOR_CLEARANCE_M; // ~1.35m
+
+// =========================================================
 // Roll cages (C/D destination bins)
 // =========================================================
 export const ROLL_CAGE = {
   width: 1.2,   // 1200mm
   depth: 0.8,   // 800mm
   height: 0.8,  // 800mm
+  wheelRadius: 0.04,  // 40mm caster wheels
+  frameThickness: 0.03, // 30mm frame tube
 };
 
 // =========================================================
-// Item positioning
+// Item positioning and scaling
 // =========================================================
+
+/** Soft multiplier for visibility (max 1.15 for subtle enhancement) */
+export const ITEM_VISIBILITY_MULTIPLIER = 1.0; // Use 1.0 for true physical scale
+
+/**
+ * Get rendered item dimensions in meters from mm dimensions.
+ * Uses real physical scale (1 unit = 1 meter).
+ * @param dimensionsMm - Dimensions in millimeters
+ * @returns Dimensions in meters with optional visibility multiplier
+ */
+export function getRenderedItemDimensions(dimensionsMm: { width: number; depth: number; height: number }) {
+  return {
+    width: (dimensionsMm.width / 1000) * ITEM_VISIBILITY_MULTIPLIER,
+    depth: (dimensionsMm.depth / 1000) * ITEM_VISIBILITY_MULTIPLIER,
+    height: (dimensionsMm.height / 1000) * ITEM_VISIBILITY_MULTIPLIER,
+  };
+}
 
 /**
  * Calculate item Y position so it sits ON the belt surface.
- * @param itemVisualHeight - Visual height of item mesh in meters
+ * @param itemRenderedHeight - Rendered height of item in meters
  * @returns Y position for item center
  */
-export function getItemYOnBelt(itemVisualHeight: number): number {
+export function getItemYOnBelt(itemRenderedHeight: number): number {
   // Item center = belt top + half item height
-  return BELT_TOP_Y + itemVisualHeight / 2;
+  return BELT_TOP_Y + itemRenderedHeight / 2;
 }
 
 /**
@@ -138,13 +171,20 @@ export function getStandardItemY(): number {
   return getItemYOnBelt(averageItemHeight);
 }
 
+/**
+ * Check if item height is within normal limits.
+ */
+export function isItemHeightNormal(heightMm: number): boolean {
+  return heightMm <= MAX_ITEM_HEIGHT_M * 1000;
+}
+
 // =========================================================
-// Camera rig
+// Camera rig (must be above max item height)
 // =========================================================
 export const CAMERA_RIG = {
-  height: 1.2,           // 1.2m overhead frame
+  height: 1.5,           // 1.5m overhead frame (above max item)
   poleSpacing: 0.6,      // Poles 0.6m apart (outside belt)
-  cameraY: 1.1,          // Camera at 1.1m
+  cameraY: 1.35,         // Camera at 1.35m (above max item)
 };
 
 // =========================================================

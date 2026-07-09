@@ -2446,18 +2446,18 @@ button:disabled {
 
 .cv-overlay {
   position: absolute;
-  top: 50%;
+  bottom: 100px;
   right: 20px;
-  transform: translateY(-50%);
   z-index: 15;
-  width: 260px;
+  width: 240px;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
   border: 1px solid rgba(37, 99, 235, 0.3);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 24px rgba(37, 99, 235, 0.15);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  overflow: hidden;
 }
 
 .cv-header {
@@ -2718,26 +2718,67 @@ button:disabled {
   color: #c2410c;
 }
 
-/* Mobile: hide CV overlay */
+/* Mobile: compact bottom overlay */
 @media (max-width: 767px) {
   .cv-overlay {
-    display: none;
-  }
-}
-
-/* Tablet: smaller overlay */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .cv-overlay {
-    width: 220px;
-    right: 12px;
-    font-size: 10px;
+    position: fixed;
+    bottom: 80px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: 200px;
+    font-size: 9px;
+    border-radius: 8px;
   }
   
   .cv-header {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    font-size: 10px;
   }
   
   .cv-body {
-    padding: 10px 12px;
+    padding: 8px 10px;
+  }
+  
+  .cv-section-header {
+    font-size: 8px;
+    margin: 4px 0;
+  }
+  
+  .cv-row {
+    margin-bottom: 3px;
+  }
+}
+
+/* Tablet: smaller overlay, positioned below HUD */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .cv-overlay {
+    width: 200px;
+    right: 12px;
+    bottom: 100px;
+    max-height: calc(100vh - 300px);
+    font-size: 9px;
+  }
+  
+  .cv-header {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+  
+  .cv-body {
+    padding: 8px 10px;
+  }
+  
+  .cv-section-header {
+    font-size: 8px;
+  }
+}
+
+/* Large screens: ensure no overlap with HUD */
+@media (min-width: 1024px) {
+  .cv-overlay {
+    bottom: 100px;
+    right: 20px;
+    max-height: calc(100vh - 320px);
   }
 }

@@ -8,10 +8,11 @@
  * - Items ride ON the belt surface
  */
 
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { Grid, OrbitControls, Html, Line } from '@react-three/drei';
-import { Suspense, useRef, useMemo } from 'react';
-import type { Mesh, Group } from 'three';
+import { Suspense, useRef, useMemo, useState } from 'react';
+import type { Mesh, Group, BufferGeometry } from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
 import { getItemPosition, isItemVisible, getActiveRoute, getConveyorSpeedFactor } from '../../domain/conveyorPath';
@@ -37,6 +38,9 @@ import {
   CAMERA_RIG,
   LASER_HEIGHT_M,
   STEREO_CAMERA,
+  ROLL_CAGE,
+  getRenderedItemDimensions,
+  getItemYOnBelt,
 } from '../../domain/physicalLayout';
 
 export interface SorterDigitalTwinContinuousProps {
@@ -468,7 +472,7 @@ function ConveyorBelt({ speedFactor, pulseActive }: { speedFactor: number; pulse
   );
 }
 
-/** Zone markers with labels */
+/** Zone marker for A and B (simple floor marker) */
 function ZoneMarker({ position, label, color, active }: {
   position: [number, number, number];
   label: string;
@@ -478,17 +482,17 @@ function ZoneMarker({ position, label, color, active }: {
   return (
     <group position={position}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[1.2, 1.2]} />
+        <planeGeometry args={[1.0, 1.0]} />
         <meshStandardMaterial 
           color={color} 
           transparent 
           opacity={active ? 0.35 : 0.12}
         />
       </mesh>
-      <Html position={[0, 0.2, 0]} center>
+      <Html position={[0, 0.15, 0]} center>
         <div style={{
           color: active ? color : '#64748b',
-          fontSize: '22px',
+          fontSize: '20px',
           fontWeight: 800,
           textShadow: active ? `0 0 8px ${color}` : 'none',
           userSelect: 'none',
@@ -496,6 +500,146 @@ function ZoneMarker({ position, label, color, active }: {
           {label}
         </div>
       </Html>
+    </group>
+  );
+}
+
+/** Roll cage for C/D zones - realistic wireframe cage with wheels */
+function RollCage({ position, label, color, active }: {
+  position: [number, number, number];
+  label: 'C' | 'D';
+  color: string;
+  active: boolean;
+}) {
+  const { width, depth, height, wheelRadius, frameThickness } = ROLL_CAGE;
+  const ft = frameThickness;
+  const emissiveIntensity = active ? 0.4 : 0;
+  
+  return (
+    <group position={position}>
+      {/* Floor marker */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
+        <planeGeometry args={[width + 0.2, depth + 0.2]} />
+        <meshStandardMaterial color={color} transparent opacity={active ? 0.25 : 0.08} />
+      </mesh>
+      
+      {/* Cage frame - bottom rectangle */}
+      <mesh position={[0, wheelRadius * 2 + ft / 2, depth / 2 - ft / 2]}>
+        <boxGeometry args={[width, ft, ft]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[0, wheelRadius * 2 + ft / 2, -depth / 2 + ft / 2]}>
+        <boxGeometry args={[width, ft, ft]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[width / 2 - ft / 2, wheelRadius * 2 + ft / 2, 0]}>
+        <boxGeometry args={[ft, ft, depth - ft * 2]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[-width / 2 + ft / 2, wheelRadius * 2 + ft / 2, 0]}>
+        <boxGeometry args={[ft, ft, depth - ft * 2]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      
+      {/* Cage frame - top rectangle */}
+      <mesh position={[0, wheelRadius * 2 + height - ft / 2, depth / 2 - ft / 2]}>
+        <boxGeometry args={[width, ft, ft]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[0, wheelRadius * 2 + height - ft / 2, -depth / 2 + ft / 2]}>
+        <boxGeometry args={[width, ft, ft]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[width / 2 - ft / 2, wheelRadius * 2 + height - ft / 2, 0]}>
+        <boxGeometry args={[ft, ft, depth - ft * 2]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      <mesh position={[-width / 2 + ft / 2, wheelRadius * 2 + height - ft / 2, 0]}>
+        <boxGeometry args={[ft, ft, depth - ft * 2]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+      
+      {/* Vertical posts (corners) */}
+      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+        <mesh key={i} position={[sx * (width / 2 - ft / 2), wheelRadius * 2 + height / 2, sz * (depth / 2 - ft / 2)]}>
+          <boxGeometry args={[ft, height - ft, ft]} />
+          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      ))}
+      
+      {/* Caster wheels */}
+      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+        <mesh key={`wheel-${i}`} position={[sx * (width / 2 - 0.08), wheelRadius, sz * (depth / 2 - 0.08)]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[wheelRadius, wheelRadius, 0.03, 12]} />
+          <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
+      
+      {/* Wire mesh sides (simplified - just vertical lines) */}
+      {[-1, 1].map((sz) => (
+        <group key={`side-${sz}`}>
+          {[0.2, 0.4, 0.6, 0.8].map((t, i) => (
+            <mesh key={i} position={[-width / 2 + width * t, wheelRadius * 2 + height / 2, sz * (depth / 2 - 0.01)]}>
+              <boxGeometry args={[0.008, height - ft * 2, 0.008]} />
+              <meshStandardMaterial color={color} transparent opacity={0.6} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      
+      {/* Label */}
+      <Html position={[0, wheelRadius * 2 + height + 0.15, 0]} center>
+        <div style={{
+          color: active ? color : '#64748b',
+          fontSize: '18px',
+          fontWeight: 800,
+          textShadow: active ? `0 0 8px ${color}` : 'none',
+          userSelect: 'none',
+        }}>
+          {label}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Chute/deflector for routing items to C/D */
+function RouteChute({ gateX, targetZ, color, active }: {
+  gateX: number;
+  targetZ: number;
+  color: string;
+  active: boolean;
+}) {
+  const chuteLength = Math.abs(targetZ) - CONVEYOR_WIDTH_M / 2 - 0.1;
+  const chuteWidth = 0.4;
+  const direction = targetZ > 0 ? 1 : -1;
+  const midZ = (CONVEYOR_WIDTH_M / 2 + 0.1) * direction + (chuteLength / 2) * direction;
+  
+  return (
+    <group>
+      {/* Chute surface - angled slightly down */}
+      <mesh 
+        position={[gateX + 0.3, BELT_TOP_Y - 0.02, midZ]} 
+        rotation={[direction * -0.1, 0, 0]}
+      >
+        <boxGeometry args={[chuteWidth, 0.02, chuteLength]} />
+        <meshStandardMaterial 
+          color={color} 
+          transparent 
+          opacity={active ? 0.7 : 0.3}
+          emissive={color}
+          emissiveIntensity={active ? 0.2 : 0}
+        />
+      </mesh>
+      {/* Side rails */}
+      <mesh position={[gateX + 0.3 - chuteWidth / 2 - 0.015, BELT_TOP_Y + 0.02, midZ]}>
+        <boxGeometry args={[0.02, 0.06, chuteLength]} />
+        <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[gateX + 0.3 + chuteWidth / 2 + 0.015, BELT_TOP_Y + 0.02, midZ]}>
+        <boxGeometry args={[0.02, 0.06, chuteLength]} />
+        <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
+      </mesh>
     </group>
   );
 }
@@ -814,8 +958,72 @@ function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
   );
 }
 
+/** STL geometry loader - always loads the geometry */
+function STLGeometry({ 
+  path, 
+  scale, 
+  color, 
+  emissiveIntensity,
+}: { 
+  path: string; 
+  scale: [number, number, number]; 
+  color: string;
+  emissiveIntensity: number;
+}) {
+  const geometry = useLoader(STLLoader, path);
+  
+  // Center and compute normals on first render
+  useMemo(() => {
+    if (geometry) {
+      geometry.center();
+      geometry.computeVertexNormals();
+    }
+  }, [geometry]);
+  
+  return (
+    <mesh geometry={geometry} scale={scale}>
+      <meshStandardMaterial 
+        color={color}
+        emissive={color}
+        emissiveIntensity={emissiveIntensity}
+        roughness={0.4}
+      />
+    </mesh>
+  );
+}
+
+/** Fallback primitive when STL is not available */
+function FallbackPrimitive({ 
+  type, 
+  color, 
+  emissiveIntensity,
+  w, h, d, 
+}: { 
+  type: 'box' | 'cylinder' | 'sphere';
+  color: string;
+  emissiveIntensity: number;
+  w: number; h: number; d: number;
+}) {
+  if (type === 'cylinder' || type === 'sphere') {
+    return (
+      <mesh>
+        <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={emissiveIntensity} />
+      </mesh>
+    );
+  }
+  
+  return (
+    <mesh>
+      <boxGeometry args={[w, h, d]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={emissiveIntensity} />
+    </mesh>
+  );
+}
+
 /** 
  * Animated item based on playback state.
+ * Uses real STL models with true physical scale (1 unit = 1 meter).
  * Item sits ON the belt surface (bottom of item at BELT_TOP_Y).
  */
 function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
@@ -836,20 +1044,18 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
   const asset = getModelAsset(itemId);
   const isRound = itemData.roundness >= 0.7 || asset?.fallbackPrimitive === 'cylinder';
   
-  // Convert mm to meters for visual dimensions
-  const dims = itemData.dimensionsMm;
-  const visualWidth = dims.width / 1000;    // W in meters
-  const visualDepth = dims.depth / 1000;    // D in meters  
-  const visualHeight = dims.height / 1000;  // H in meters
+  // Get rendered dimensions in meters (true physical scale)
+  const dims = getRenderedItemDimensions(itemData.dimensionsMm);
+  const w = dims.width;
+  const d = dims.depth;
+  const h = dims.height;
   
-  // Scale factor for visibility (items are small, scale up for demo)
-  const scaleFactor = 2.0;
-  const w = visualWidth * scaleFactor;
-  const d = visualDepth * scaleFactor;
-  const h = visualHeight * scaleFactor;
+  // Calculate Y position so item sits ON belt
+  const itemCenterY = getItemYOnBelt(h);
   
-  // Get position with correct height calculation
-  const position = getItemPosition(playback, h);
+  // Get XZ position from playback
+  const basePosition = getItemPosition(playback, h);
+  const pos: [number, number, number] = [basePosition.x, itemCenterY, basePosition.z];
   
   const colors: Record<Category, string> = {
     B: COLORS.routeB,
@@ -858,48 +1064,62 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
   };
   const color = category ? colors[category] : COLORS.sensorAccent;
   const isRouting = isRoutingActive(playback);
+  const emissiveIntensity = isRouting ? 0.3 : 0.1;
   
   const showBBox = shouldShowBoundingBox(phase);
   const showShape = shouldShowShapeOutline(phase);
   
   if (!visible) return null;
 
-  const pos: [number, number, number] = [position.x, position.y, position.z];
-  const scale = Math.max(w, d, h);
+  // Determine if we should use STL
+  const useSTL = asset?.loaderType === 'stl' && asset?.frontendAssetPath;
+  const stlPath = asset?.frontendAssetPath ?? '';
+  const fallbackPrimitive = asset?.fallbackPrimitive ?? 'box';
+  
+  // Scale for STL models (STL files are in mm, need to convert to meters)
+  const stlScale: [number, number, number] = [0.001, 0.001, 0.001];
+  
+  const visualScale = Math.max(w, d, h);
 
   return (
     <>
       <group position={pos}>
-        {asset?.fallbackPrimitive === 'cylinder' || isRound ? (
-          <mesh>
-            <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
-            <meshStandardMaterial 
-              color={color}
-              emissive={color}
-              emissiveIntensity={isRouting ? 0.3 : 0.1}
+        {useSTL ? (
+          <Suspense fallback={
+            <FallbackPrimitive 
+              type={fallbackPrimitive} 
+              color={color} 
+              emissiveIntensity={emissiveIntensity}
+              w={w} h={h} d={d}
             />
-          </mesh>
+          }>
+            <STLGeometry 
+              path={stlPath}
+              scale={stlScale}
+              color={color}
+              emissiveIntensity={emissiveIntensity}
+            />
+          </Suspense>
         ) : (
-          <mesh>
-            <boxGeometry args={[w, h, d]} />
-            <meshStandardMaterial 
-              color={color}
-              emissive={color}
-              emissiveIntensity={isRouting ? 0.3 : 0.1}
-            />
-          </mesh>
+          <FallbackPrimitive 
+            type={isRound ? 'cylinder' : fallbackPrimitive} 
+            color={color} 
+            emissiveIntensity={emissiveIntensity}
+            w={w} h={h} d={d}
+          />
         )}
-        {/* Shadow on belt - at belt surface */}
+        
+        {/* Shadow on belt */}
         <mesh position={[0, -h / 2 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[Math.max(w, d) / 2 + 0.02, 16]} />
-          <meshStandardMaterial color="#475569" transparent opacity={0.12} />
+          <circleGeometry args={[Math.max(w, d) / 2 + 0.01, 16]} />
+          <meshStandardMaterial color="#475569" transparent opacity={0.1} />
         </mesh>
       </group>
       
       {/* Bounding box during measurement */}
       <BoundingBoxVisual 
         position={pos} 
-        scale={scale} 
+        scale={visualScale} 
         visible={showBBox} 
         isRound={isRound}
       />
@@ -907,7 +1127,7 @@ function PlaybackItem({ playback }: { playback: ContinuousPlaybackState }) {
       {/* Shape outline during classification */}
       <ShapeOutline 
         position={pos} 
-        scale={scale} 
+        scale={visualScale} 
         visible={showShape} 
         isRound={isRound}
         category={category}
@@ -937,13 +1157,13 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
   const itemPosition = getItemPosition(playback);
   const itemPos: [number, number, number] = [itemPosition.x, itemPosition.y, itemPosition.z];
   
-  // Get item data for point cloud
+  // Get item data for point cloud (use true physical scale)
   const currentCase = playback.currentCase;
   const itemId = currentCase.itemId.replace('-LC', '');
   const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
   const isRound = itemData.roundness >= 0.7;
-  const dims = itemData.dimensionsMm;
-  const itemScale = Math.max(dims.width, dims.depth, dims.height) / 1000 * 2;
+  const dims = getRenderedItemDimensions(itemData.dimensionsMm);
+  const itemScale = Math.max(dims.width, dims.depth, dims.height);
 
   return (
     <>
@@ -979,28 +1199,48 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
       {/* Conveyor - belt top at 0.7m */}
       <ConveyorBelt speedFactor={speedFactor} pulseActive={showPulse} />
 
-      {/* Zone markers on floor */}
+      {/* Zone A - spawn point */}
       <ZoneMarker 
         position={[ZONES.A.x, 0.01, ZONES.A.z]} 
         label="A" 
         color={COLORS.sensorAccent} 
         active={playback.currentPhase === 'spawn'}
       />
+      
+      {/* Zone B - main sorter exit */}
       <ZoneMarker 
         position={[ZONES.B.x, 0.01, ZONES.B.z]} 
         label="B" 
         color={COLORS.routeB} 
         active={activeRoute === 'B'}
       />
-      <ZoneMarker 
-        position={[ZONES.C.x, 0.01, ZONES.C.z]} 
+      
+      {/* Zone C - roll cage for oversized items */}
+      <RollCage 
+        position={[ZONES.C.x, 0, ZONES.C.z]} 
         label="C" 
         color={COLORS.routeC} 
         active={activeRoute === 'C'}
       />
-      <ZoneMarker 
-        position={[ZONES.D.x, 0.01, ZONES.D.z]} 
+      
+      {/* Zone D - roll cage for round items */}
+      <RollCage 
+        position={[ZONES.D.x, 0, ZONES.D.z]} 
         label="D" 
+        color={COLORS.routeD} 
+        active={activeRoute === 'D'}
+      />
+      
+      {/* Chutes for routing to C/D */}
+      <RouteChute 
+        gateX={ZONES.GATE.x} 
+        targetZ={ZONES.C.z} 
+        color={COLORS.routeC} 
+        active={activeRoute === 'C'}
+      />
+      <RouteChute 
+        gateX={ZONES.GATE.x} 
+        targetZ={ZONES.D.z} 
         color={COLORS.routeD} 
         active={activeRoute === 'D'}
       />
