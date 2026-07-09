@@ -53,6 +53,7 @@ export const DRIVE_ROLLER_RADIUS_M = 0.06;     // 60mm drive roller
 
 // =========================================================
 // Zone positions (X axis = along conveyor, Z axis = lateral)
+// Must be declared before other constants that reference it
 // =========================================================
 export const ZONES = {
   /** Zone A - item spawn point (start of conveyor) */
@@ -70,6 +71,40 @@ export const ZONES = {
   /** Zone D - round items (lateral opposite) */
   D: { x: 2.0, z: -2.0, label: 'D' },
 } as const;
+
+// =========================================================
+// Stepper motor parameters (for length measurement)
+// =========================================================
+export const STEPPER_STEP_ANGLE_DEG = 1.8;     // 1.8° per full step (200 steps/rev)
+export const MICROSTEP_DIVISOR = 16;           // 16x microstepping
+export const STEPS_PER_REV = 360 / STEPPER_STEP_ANGLE_DEG * MICROSTEP_DIVISOR; // 3200 steps/rev
+export const DRIVE_ROLLER_CIRCUMFERENCE_M = Math.PI * DRIVE_ROLLER_RADIUS_M * 2; // ~0.377m
+export const MM_PER_STEP = (DRIVE_ROLLER_CIRCUMFERENCE_M * 1000) / STEPS_PER_REV; // ~0.118mm/step
+
+// =========================================================
+// Laser rangefinder
+// =========================================================
+export const LASER_HEIGHT_M = 1.15;            // Laser mounted at 1.15m
+export const LASER_POSITION_X = ZONES.CAMERA.x; // Co-located with camera
+
+// =========================================================
+// Stereo camera
+// =========================================================
+export const STEREO_CAMERA = {
+  baseline: 0.12,           // 120mm between lenses
+  focalLength: 0.004,       // 4mm focal length
+  fov: 60,                  // 60° field of view
+  mountY: 1.1,              // Mounted at 1.1m
+};
+
+// =========================================================
+// Measurement zone
+// =========================================================
+export const MEASUREMENT_ZONE = {
+  startX: ZONES.CAMERA.x - 0.4,
+  endX: ZONES.CAMERA.x + 0.4,
+  length: 0.8,              // 800mm measurement zone
+};
 
 // =========================================================
 // Roll cages (C/D destination bins)

@@ -2624,6 +2624,100 @@ button:disabled {
   font-family: 'SF Mono', monospace;
 }
 
+/* Measurement section headers */
+.cv-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 8px 0 6px;
+}
+
+.cv-indicator {
+  font-size: 6px;
+  color: #94a3b8;
+  transition: color 0.2s;
+}
+
+.cv-indicator.active {
+  color: #22d3ee;
+}
+
+.cv-indicator.pulse {
+  animation: pulse-indicator 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse-indicator {
+  0%, 100% { color: #22d3ee; opacity: 1; }
+  50% { color: #0ea5e9; opacity: 0.6; }
+}
+
+/* Compact rows */
+.cv-row.cv-compact {
+  margin-bottom: 2px;
+  font-size: 10px;
+}
+
+.cv-row.cv-compact .cv-label {
+  font-size: 9px;
+}
+
+.cv-row.cv-compact .cv-value {
+  font-size: 10px;
+}
+
+/* Mono values */
+.cv-value.cv-mono {
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 10px;
+}
+
+/* Result values */
+.cv-value.cv-result {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+/* Dimension details */
+.cv-dims-detail {
+  font-size: 9px;
+  font-weight: 400;
+  color: #64748b;
+}
+
+/* Blink animation */
+.cv-blink {
+  animation: blink 0.3s ease-in-out infinite;
+  color: #22d3ee;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Status variants */
+.cv-status.active { background: #22d3ee; color: #0c4a6e; }
+.cv-status.idle { background: #94a3b8; color: #1e293b; }
+
+/* C-priority warning */
+.cv-warning.cv-cpriority {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.cv-warning.cv-cpriority .warning-icon {
+  color: #f97316;
+}
+
+.cv-warning.cv-cpriority .warning-text {
+  color: #c2410c;
+}
+
 /* Mobile: hide CV overlay */
 @media (max-width: 767px) {
   .cv-overlay {

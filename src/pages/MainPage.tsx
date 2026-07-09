@@ -6,7 +6,7 @@ import { prefer3DByDefault, useWebGLSupport } from '../components/ThreeD/useWebG
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../domain/demoPlaylist';
 import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
 import { getCaseProgress, getCurrentPhaseConfig } from '../domain/continuousPlayback';
-import { getInspectionData } from '../domain/inspectionViewModel';
+import { getMeasurementData, shouldShowMeasurement } from '../domain/measurementSystem';
 import CVInspectionOverlay from '../components/CVInspectionOverlay';
 
 const SorterDigitalTwinContinuous = lazy(() => import('../components/ThreeD/SorterDigitalTwinContinuous'));
@@ -47,8 +47,8 @@ export default function MainPage({
   const phaseConfig = getCurrentPhaseConfig(playback);
   const caseProgress = getCaseProgress(playback);
   
-  const inspectionData = useMemo(() => getInspectionData(playback), [playback]);
-  const showInspection = inspectionData.visible && (isRunning || isPaused) && !isFinished;
+  const measurementData = useMemo(() => getMeasurementData(playback), [playback]);
+  const showMeasurement = shouldShowMeasurement(playback.currentPhase) && (isRunning || isPaused) && !isFinished;
 
   const handlePlayPause = () => {
     if (isRunning) {
@@ -88,9 +88,9 @@ export default function MainPage({
         )}
       </div>
 
-      {/* CV Inspection Overlay - right center */}
-      {showInspection && width >= 768 && (
-        <CVInspectionOverlay data={inspectionData} />
+      {/* Measurement System Overlay - right center */}
+      {width >= 768 && (
+        <CVInspectionOverlay data={measurementData} visible={showMeasurement} />
       )}
 
       {/* Minimal HUD - top right */}

@@ -16,6 +16,7 @@ import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuous
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
 import { getItemPosition, isItemVisible, getActiveRoute, getConveyorSpeedFactor } from '../../domain/conveyorPath';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
+import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud, shouldShowActuator } from '../../domain/measurementSystem';
 import { getModelAsset } from '../../data/modelAssets';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
@@ -34,6 +35,8 @@ import {
   DRIVE_ROLLER_RADIUS_M,
   ZONES,
   CAMERA_RIG,
+  LASER_HEIGHT_M,
+  STEREO_CAMERA,
 } from '../../domain/physicalLayout';
 
 export interface SorterDigitalTwinContinuousProps {
@@ -111,8 +114,18 @@ function BeltStripe({ offset, speedFactor }: { offset: number; speedFactor: numb
   );
 }
 
-/** Stepper motor drive unit */
-function StepperMotor({ position }: { position: [number, number, number] }) {
+/** Stepper motor drive unit with pulse indicator */
+function StepperMotor({ position, pulseActive }: { position: [number, number, number]; pulseActive: boolean }) {
+  const pulseRef = useRef<Mesh>(null);
+  const rotationRef = useRef(0);
+  
+  useFrame((_, delta) => {
+    if (pulseRef.current && pulseActive) {
+      rotationRef.current += delta * 8;
+      pulseRef.current.rotation.z = rotationRef.current;
+    }
+  });
+  
   return (
     <group position={position}>
       {/* Motor body */}
@@ -120,8 +133,12 @@ function StepperMotor({ position }: { position: [number, number, number] }) {
         <boxGeometry args={[MOTOR_WIDTH_M, MOTOR_HEIGHT_M, MOTOR_DEPTH_M]} />
         <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.3} />
       </mesh>
-      {/* Motor shaft */}
-      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 + 0.01]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* Motor shaft - rotates when active */}
+      <mesh 
+        ref={pulseRef}
+        position={[0, 0, CONVEYOR_WIDTH_M / 2 + 0.01]} 
+        rotation={[Math.PI / 2, 0, 0]}
+      >
         <cylinderGeometry args={[0.015, 0.015, 0.03, 8]} />
         <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.2} />
       </mesh>
@@ -130,12 +147,206 @@ function StepperMotor({ position }: { position: [number, number, number] }) {
         <cylinderGeometry args={[0.035, 0.035, 0.025, 12]} />
         <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* Belt to drive roller (simplified) */}
+      {/* Belt to drive roller */}
       <mesh position={[0, DRIVE_ROLLER_RADIUS_M / 2, CONVEYOR_WIDTH_M / 2 - 0.02]}>
         <boxGeometry args={[0.01, DRIVE_ROLLER_RADIUS_M + 0.02, 0.015]} />
         <meshStandardMaterial color="#1e293b" />
       </mesh>
+      {/* Pulse indicator LED */}
+      <mesh position={[0, MOTOR_HEIGHT_M / 2 - 0.01, CONVEYOR_WIDTH_M / 2 + MOTOR_DEPTH_M + 0.025]}>
+        <sphereGeometry args={[0.008, 8, 8]} />
+        <meshStandardMaterial 
+          color={pulseActive ? '#22d3ee' : '#475569'}
+          emissive={pulseActive ? '#22d3ee' : '#000'}
+          emissiveIntensity={pulseActive ? 0.8 : 0}
+        />
+      </mesh>
     </group>
+  );
+}
+
+/** Laser beam from rangefinder to item */
+function LaserBeam({ active, itemY }: { active: boolean; itemY: number }) {
+  const beamRef = useRef<Mesh>(null);
+  const opacityRef = useRef(0.6);
+  
+  useFrame((_, delta) => {
+    if (beamRef.current && active) {
+      opacityRef.current = 0.4 + Math.sin(Date.now() / 100) * 0.3;
+    }
+  });
+  
+  if (!active) return null;
+  
+  const beamLength = LASER_HEIGHT_M - itemY;
+  const beamCenterY = itemY + beamLength / 2;
+  
+  return (
+    <group position={[ZONES.CAMERA.x, 0, 0]}>
+      {/* Main laser beam */}
+      <mesh ref={beamRef} position={[0, beamCenterY, 0]}>
+        <cylinderGeometry args={[0.003, 0.003, beamLength, 8]} />
+        <meshStandardMaterial 
+          color="#22d3ee"
+          emissive="#22d3ee"
+          emissiveIntensity={0.6}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+      {/* Laser dot on item */}
+      <mesh position={[0, itemY + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.015, 16]} />
+        <meshStandardMaterial 
+          color="#22d3ee"
+          emissive="#22d3ee"
+          emissiveIntensity={0.8}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      {/* Laser emitter */}
+      <mesh position={[0, LASER_HEIGHT_M, 0]}>
+        <boxGeometry args={[0.04, 0.02, 0.04]} />
+        <meshStandardMaterial 
+          color="#0ea5e9"
+          emissive="#0ea5e9"
+          emissiveIntensity={active ? 0.4 : 0}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/** Stereo camera lenses with view cones */
+function StereoCameraLenses({ active, itemPosition }: { active: boolean; itemPosition: [number, number, number] }) {
+  const baseline = STEREO_CAMERA.baseline;
+  const mountY = STEREO_CAMERA.mountY;
+  const cameraX = ZONES.CAMERA.x;
+  
+  return (
+    <group position={[cameraX, mountY, 0]}>
+      {/* Left lens */}
+      <mesh position={[0, 0, baseline / 2]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
+        <meshStandardMaterial 
+          color={active ? '#0ea5e9' : '#1e293b'}
+          emissive={active ? '#0ea5e9' : '#000'}
+          emissiveIntensity={active ? 0.3 : 0}
+        />
+      </mesh>
+      {/* Right lens */}
+      <mesh position={[0, 0, -baseline / 2]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
+        <meshStandardMaterial 
+          color={active ? '#0ea5e9' : '#1e293b'}
+          emissive={active ? '#0ea5e9' : '#000'}
+          emissiveIntensity={active ? 0.3 : 0}
+        />
+      </mesh>
+      {/* View cones when active */}
+      {active && (
+        <>
+          <Line
+            points={[
+              [0, 0, baseline / 2],
+              [0, itemPosition[1] - mountY, itemPosition[2]],
+            ]}
+            color="#0ea5e9"
+            lineWidth={1}
+            transparent
+            opacity={0.3}
+          />
+          <Line
+            points={[
+              [0, 0, -baseline / 2],
+              [0, itemPosition[1] - mountY, itemPosition[2]],
+            ]}
+            color="#0ea5e9"
+            lineWidth={1}
+            transparent
+            opacity={0.3}
+          />
+        </>
+      )}
+    </group>
+  );
+}
+
+/** Point cloud dots around item during stereo analysis */
+function PointCloud({ active, itemPosition, scale, isRound }: { 
+  active: boolean; 
+  itemPosition: [number, number, number];
+  scale: number;
+  isRound: boolean;
+}) {
+  if (!active) return null;
+  
+  const points = useMemo(() => {
+    const pts: [number, number, number][] = [];
+    const count = 12;
+    const radius = scale * 0.4;
+    
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const r = isRound ? radius : radius * (1 + Math.cos(angle * 2) * 0.3);
+      pts.push([
+        Math.cos(angle) * r,
+        0,
+        Math.sin(angle) * r,
+      ]);
+    }
+    return pts;
+  }, [scale, isRound]);
+  
+  return (
+    <group position={[itemPosition[0], itemPosition[1] + scale * 0.3, itemPosition[2]]}>
+      {points.map((pt, i) => (
+        <mesh key={i} position={pt}>
+          <sphereGeometry args={[0.008, 6, 6]} />
+          <meshStandardMaterial 
+            color="#38bdf8"
+            emissive="#38bdf8"
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Actuator/pusher animation during routing */
+function ActuatorPusher({ active, category }: { active: boolean; category: Category | null }) {
+  const pusherRef = useRef<Mesh>(null);
+  const extendRef = useRef(0);
+  
+  useFrame((_, delta) => {
+    if (pusherRef.current) {
+      const target = active && (category === 'C' || category === 'D') ? 0.15 : 0;
+      extendRef.current += (target - extendRef.current) * delta * 5;
+      
+      const direction = category === 'C' ? 1 : -1;
+      pusherRef.current.position.z = direction * extendRef.current;
+    }
+  });
+  
+  const gateX = ZONES.GATE.x;
+  const color = category === 'C' ? COLORS.routeC : category === 'D' ? COLORS.routeD : COLORS.gateFrame;
+  
+  return (
+    <mesh 
+      ref={pusherRef}
+      position={[gateX + 0.3, BELT_Y + 0.08, 0]}
+    >
+      <boxGeometry args={[0.15, 0.08, 0.06]} />
+      <meshStandardMaterial 
+        color={color}
+        emissive={active ? color : '#000'}
+        emissiveIntensity={active ? 0.3 : 0}
+        metalness={0.5}
+        roughness={0.4}
+      />
+    </mesh>
   );
 }
 
@@ -167,7 +378,7 @@ function SupportLeg({ x }: { x: number }) {
  * Conveyor belt - realistic roller conveyor
  * Belt top surface at 0.7m (BELT_TOP_Y)
  */
-function ConveyorBelt({ speedFactor }: { speedFactor: number }) {
+function ConveyorBelt({ speedFactor, pulseActive }: { speedFactor: number; pulseActive: boolean }) {
   const rollerCount = Math.floor(CONVEYOR_LENGTH / ROLLER_SPACING_M);
   
   const rollerPositions = useMemo(() => {
@@ -242,7 +453,7 @@ function ConveyorBelt({ speedFactor }: { speedFactor: number }) {
       ))}
       
       {/* Stepper motor at drive end */}
-      <StepperMotor position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} />
+      <StepperMotor position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} pulseActive={pulseActive} />
       
       {/* End caps / guards */}
       <mesh position={[CONVEYOR_START_X, BELT_Y - 0.05, 0]}>
@@ -714,6 +925,25 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
   
   const cameraHighlight = shouldHighlightCamera(phase);
   const showScan = shouldShowScanEffect(phase);
+  
+  // Measurement system states
+  const measurementData = getMeasurementData(playback);
+  const showLaser = shouldShowLaserBeam(phase);
+  const showPulse = shouldShowStepperPulse(phase);
+  const showCloud = shouldShowPointCloud(phase);
+  const showActuator = shouldShowActuator(phase);
+  
+  // Get item position for measurement visualization
+  const itemPosition = getItemPosition(playback);
+  const itemPos: [number, number, number] = [itemPosition.x, itemPosition.y, itemPosition.z];
+  
+  // Get item data for point cloud
+  const currentCase = playback.currentCase;
+  const itemId = currentCase.itemId.replace('-LC', '');
+  const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
+  const isRound = itemData.roundness >= 0.7;
+  const dims = itemData.dimensionsMm;
+  const itemScale = Math.max(dims.width, dims.depth, dims.height) / 1000 * 2;
 
   return (
     <>
@@ -747,7 +977,7 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
       </mesh>
 
       {/* Conveyor - belt top at 0.7m */}
-      <ConveyorBelt speedFactor={speedFactor} />
+      <ConveyorBelt speedFactor={speedFactor} pulseActive={showPulse} />
 
       {/* Zone markers on floor */}
       <ZoneMarker 
@@ -778,6 +1008,20 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
       {/* Camera rig - overhead above belt */}
       <CameraRig active={cameraHighlight} />
       
+      {/* Stereo camera lenses */}
+      <StereoCameraLenses active={cameraHighlight} itemPosition={itemPos} />
+      
+      {/* Laser beam for height measurement */}
+      <LaserBeam active={showLaser} itemY={itemPosition.y} />
+      
+      {/* Point cloud for stereo analysis */}
+      <PointCloud 
+        active={showCloud} 
+        itemPosition={itemPos} 
+        scale={itemScale}
+        isRound={isRound}
+      />
+      
       {/* Inspection zone on belt surface */}
       <InspectionZone active={cameraHighlight} />
       
@@ -786,6 +1030,9 @@ function ContinuousScene({ playback, simplified }: { playback: ContinuousPlaybac
 
       {/* Gate/diverter */}
       <GateZone category={category} />
+      
+      {/* Actuator pusher for routing */}
+      <ActuatorPusher active={showActuator} category={category} />
 
       {/* Route arrows on belt surface */}
       <RouteArrows activeRoute={activeRoute} />
