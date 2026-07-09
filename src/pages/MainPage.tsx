@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import ThreeFallback from '../components/ThreeD/ThreeFallback';
 import ThreeErrorBoundary from '../components/ThreeD/ThreeErrorBoundary';
@@ -6,6 +6,8 @@ import { prefer3DByDefault, useWebGLSupport } from '../components/ThreeD/useWebG
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../domain/demoPlaylist';
 import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
 import { getCaseProgress, getCurrentPhaseConfig } from '../domain/continuousPlayback';
+import { getInspectionData } from '../domain/inspectionViewModel';
+import CVInspectionOverlay from '../components/CVInspectionOverlay';
 
 const SorterDigitalTwinContinuous = lazy(() => import('../components/ThreeD/SorterDigitalTwinContinuous'));
 
@@ -44,6 +46,9 @@ export default function MainPage({
   const command = playback.command;
   const phaseConfig = getCurrentPhaseConfig(playback);
   const caseProgress = getCaseProgress(playback);
+  
+  const inspectionData = useMemo(() => getInspectionData(playback), [playback]);
+  const showInspection = inspectionData.visible && (isRunning || isPaused) && !isFinished;
 
   const handlePlayPause = () => {
     if (isRunning) {
@@ -82,6 +87,11 @@ export default function MainPage({
           </div>
         )}
       </div>
+
+      {/* CV Inspection Overlay - right center */}
+      {showInspection && width >= 768 && (
+        <CVInspectionOverlay data={inspectionData} />
+      )}
 
       {/* Minimal HUD - top right */}
       <div className="main-hud">
