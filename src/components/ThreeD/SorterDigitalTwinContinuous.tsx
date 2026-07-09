@@ -59,24 +59,31 @@ export interface SorterDigitalTwinContinuousProps {
   viewportType?: ViewportType;
 }
 
-/** Light color palette */
+/** 
+ * Refined color palette - warehouse aesthetic 
+ * Belt: matte PVC/tarpaulin look (blue-gray, not glossy)
+ * Frame: industrial metal gray
+ * Accents: subtle, not overly bright
+ */
 const COLORS = {
-  background: '#f6f9ff',
-  floor: '#eaf2ff',
-  gridCell: '#c9d8ee',
-  gridSection: '#a8c0de',
-  conveyorFrame: '#d8e6f8',
-  belt: '#7aa2d8',
-  beltStripe: '#9bc0eb',
-  sideGuards: '#9bb7d8',
-  rollers: '#b7c8dc',
-  supports: '#c7d8ef',
-  sensorAccent: '#2563eb',
-  sensorActive: '#38bdf8',
-  gateFrame: '#94a3b8',
-  routeB: '#22c55e',
-  routeC: '#f97316',
-  routeD: '#8b5cf6',
+  background: '#f4f7fb',
+  floor: '#e8eef6',
+  gridCell: '#d0dae8',
+  gridSection: '#b8c8dc',
+  conveyorFrame: '#8a9bb0',      // Industrial metal gray
+  belt: '#6b8298',              // Matte PVC blue-gray
+  beltStripe: '#7d96ad',        // Subtle stripe
+  sideGuards: '#7a8fa3',        // Metal guards
+  rollers: '#9aa8b8',           // Brushed metal
+  supports: '#a0afc0',          // Support legs
+  motor: '#5a6a7a',             // Dark motor housing
+  sensorAccent: '#3b82f6',      // Blue sensor (less saturated)
+  sensorActive: '#60a5fa',      // Active state
+  gateFrame: '#7a8a9a',         // Gate metal
+  routeB: '#16a34a',            // Green (softer)
+  routeC: '#ea580c',            // Orange (softer)
+  routeD: '#7c3aed',            // Purple (softer)
+  itemShadow: '#3a4a5a',        // Contact shadow
 };
 
 // Physical layout constants
@@ -194,23 +201,28 @@ function Roller({ position, speedFactor }: { position: [number, number, number];
   );
 }
 
-/** Moving stripe on conveyor belt - animates at belt surface */
+/** Moving stripe on conveyor belt - subtle texture movement at 1 m/s */
 function BeltStripe({ offset, speedFactor }: { offset: number; speedFactor: number }) {
   const meshRef = useRef<Mesh>(null);
   const posRef = useRef(offset);
   
   useFrame((_, delta) => {
     if (meshRef.current && speedFactor > 0) {
-      posRef.current += delta * speedFactor * 1.0;
+      posRef.current += delta * speedFactor * 1.0; // 1 m/s
       if (posRef.current > CONVEYOR_END_X) posRef.current = CONVEYOR_START_X;
       meshRef.current.position.x = posRef.current;
     }
   });
 
   return (
-    <mesh ref={meshRef} position={[offset, BELT_Y + 0.002, 0]}>
-      <boxGeometry args={[0.12, 0.004, CONVEYOR_WIDTH_M - 0.05]} />
-      <meshStandardMaterial color={COLORS.beltStripe} transparent opacity={0.5} />
+    <mesh ref={meshRef} position={[offset, BELT_Y + 0.001, 0]}>
+      <boxGeometry args={[0.08, 0.002, CONVEYOR_WIDTH_M - 0.06]} />
+      <meshStandardMaterial 
+        color={COLORS.beltStripe} 
+        transparent 
+        opacity={0.25}
+        roughness={0.9}
+      />
     </mesh>
   );
 }
@@ -500,35 +512,39 @@ function ConveyorBelt({ speedFactor, pulseActive }: { speedFactor: number; pulse
 
   return (
     <group>
-      {/* Main belt surface - top working surface at 0.7m */}
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]}>
+      {/* Main belt surface - matte PVC/tarpaulin look at 0.7m */}
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[CONVEYOR_LENGTH, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
-        <meshStandardMaterial color={COLORS.belt} />
+        <meshStandardMaterial 
+          color={COLORS.belt} 
+          roughness={0.85}
+          metalness={0.05}
+        />
       </mesh>
       
-      {/* Belt stripes (animated) - moving on belt surface */}
+      {/* Belt stripes (animated) - subtle texture movement */}
       {[-4, -2.5, -1, 0.5, 2, 3.5].map((offset, i) => (
         <BeltStripe key={i} offset={offset} speedFactor={speedFactor} />
       ))}
       
-      {/* Side guards - above belt level */}
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]}>
-        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.03]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.2} roughness={0.7} />
+      {/* Side guards - brushed metal above belt */}
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]} castShadow>
+        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.025]} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]}>
-        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.03]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.2} roughness={0.7} />
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]} castShadow>
+        <boxGeometry args={[CONVEYOR_LENGTH, SIDE_GUARD_HEIGHT_M, 0.025]} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
       </mesh>
       
-      {/* Frame rails under the belt */}
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]}>
+      {/* Frame rails - industrial metal */}
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]} castShadow>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]}>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]} castShadow>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
       
       {/* Rollers - rotating under the belt */}
@@ -1078,12 +1094,13 @@ function STLGeometry({
   }, [geometry]);
   
   return (
-    <mesh geometry={geometry} scale={scale}>
+    <mesh geometry={geometry} scale={scale} castShadow>
       <meshStandardMaterial 
         color={color}
         emissive={color}
-        emissiveIntensity={emissiveIntensity}
-        roughness={0.4}
+        emissiveIntensity={emissiveIntensity * 0.5}
+        roughness={0.5}
+        metalness={0.1}
       />
     </mesh>
   );
@@ -1103,17 +1120,29 @@ function FallbackPrimitive({
 }) {
   if (type === 'cylinder' || type === 'sphere') {
     return (
-      <mesh>
+      <mesh castShadow>
         <cylinderGeometry args={[Math.max(w, d) / 2, Math.max(w, d) / 2, h, 16]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={emissiveIntensity} />
+        <meshStandardMaterial 
+          color={color} 
+          emissive={color} 
+          emissiveIntensity={emissiveIntensity * 0.5}
+          roughness={0.5}
+          metalness={0.1}
+        />
       </mesh>
     );
   }
   
   return (
-    <mesh>
+    <mesh castShadow>
       <boxGeometry args={[w, h, d]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={emissiveIntensity} />
+      <meshStandardMaterial 
+        color={color} 
+        emissive={color} 
+        emissiveIntensity={emissiveIntensity * 0.5}
+        roughness={0.5}
+        metalness={0.1}
+      />
     </mesh>
   );
 }
@@ -1288,11 +1317,25 @@ function ContinuousScene({
       {/* Light background */}
       <color attach="background" args={[COLORS.background]} />
       
-      {/* Bright lighting */}
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[6, 10, 5]} intensity={1.2} />
-      <directionalLight position={[-4, 6, -3]} intensity={0.5} />
-      <hemisphereLight args={['#ffffff', '#e0e8f0', 0.6]} />
+      {/* Soft natural lighting - warehouse aesthetic */}
+      <ambientLight intensity={0.7} />
+      <hemisphereLight args={['#f8fafc', '#d0dae8', 0.5]} />
+      {/* Main directional light with soft shadow */}
+      <directionalLight 
+        position={[8, 12, 6]} 
+        intensity={0.9}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-far={30}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+        shadow-bias={-0.0001}
+      />
+      {/* Fill light from opposite side */}
+      <directionalLight position={[-5, 8, -4]} intensity={0.35} />
 
       {/* Grid */}
       <Grid
@@ -1308,10 +1351,10 @@ function ContinuousScene({
         position={[0, 0.001, 0]}
       />
 
-      {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      {/* Floor with shadow receiving */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[16, 12]} />
-        <meshStandardMaterial color={COLORS.floor} />
+        <meshStandardMaterial color={COLORS.floor} roughness={0.9} metalness={0} />
       </mesh>
 
       {/* Conveyor - belt top at 0.7m */}
@@ -1441,6 +1484,7 @@ export default function SorterDigitalTwinContinuous({
         <Canvas
           camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
           dpr={simplified ? [1, 1.25] : [1, 1.75]}
+          shadows={!simplified}
           gl={{ antialias: !simplified, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;
