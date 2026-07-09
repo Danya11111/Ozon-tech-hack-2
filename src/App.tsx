@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Header from './components/Header';
-import HeroSection from './components/HeroSection';
-import ProductDemoSection from './components/ProductDemoSection';
-import StorylineStepper from './components/StorylineStepper';
-import ScenarioCards from './components/ScenarioCards';
-import CPriorityExplanation from './components/CPriorityExplanation';
-import CriteriaCards from './components/CriteriaCards';
-import EngineeringDetails, { type EngineeringDetailsHandle } from './components/EngineeringDetails';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import MainPage from './pages/MainPage';
+import DetailsPage from './pages/DetailsPage';
 import { DEMO_STEPS } from './data/demoSteps';
 import { SCENARIOS } from './data/scenarios';
 import { createSimulation, stepSimulationToNextState, setRunning } from './domain/simulation';
@@ -20,43 +15,39 @@ import {
   updateAutoDemo,
   type DemoDirectorState,
 } from './domain/demoDirector';
+import { getPlaylistCase, nextPlaylistIndex } from './domain/demoPlaylist';
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function App() {
+function AppContent() {
   const [activeScenarioId, setActiveScenarioId] = useState<ScenarioId>('normal_flow');
   const [demoStepIndex, setDemoStepIndex] = useState(0);
-  const engineeringRef = useRef<EngineeringDetailsHandle>(null);
+  const [playlistIndex, setPlaylistIndex] = useState(0);
 
   const activeScenario = useMemo(
     () => SCENARIOS.find((scenario) => scenario.id === activeScenarioId) ?? SCENARIOS[0],
     [activeScenarioId],
   );
 
-  const currentDemoStep = DEMO_STEPS[demoStepIndex];
   const [simulation, setSimulation] = useState<SimulationState>(() => createSimulation(activeScenario));
-  
-  // Auto Demo Director state
+
   const [demoDirector, setDemoDirector] = useState<DemoDirectorState>(() =>
     createDemoDirectorState(activeScenario),
   );
-  
-  // Use refs to avoid triggering re-renders on every frame
+
   const rafIdRef = useRef<number | null>(null);
   const lastUpdateRef = useRef(performance.now());
-  const UPDATE_INTERVAL = 100; // Update UI only every 100ms instead of every frame
+  const UPDATE_INTERVAL = 100;
 
   useEffect(() => {
     setSimulation(createSimulation(activeScenario));
     setDemoDirector(createDemoDirectorState(activeScenario));
   }, [activeScenario]);
-  
-  // Auto Demo loop - throttled updates to prevent render loop
+
   useEffect(() => {
     if (!demoDirector.isAutoDemoRunning || demoDirector.paused) {
-      // Clean up RAF on stop/pause
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
@@ -69,13 +60,11 @@ export default function App() {
     const tick = () => {
       const now = performance.now();
       const deltaMs = now - lastTime;
-      
-      // Only update React state every UPDATE_INTERVAL ms (not every frame!)
+
       if (now - lastUpdateRef.current >= UPDATE_INTERVAL) {
         lastTime = now;
         lastUpdateRef.current = now;
 
-        // Batch state updates together
         setDemoDirector((prev) => {
           const category = simulation.currentItem?.classification.category;
           return updateAutoDemo(prev, deltaMs, category);
@@ -107,7 +96,7 @@ export default function App() {
         rafIdRef.current = null;
       }
     };
-  }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario]); // Removed circular dependency!
+  }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario]);
 
   const handleStartDemo = () => {
     scrollToId('demo');
@@ -148,19 +137,6 @@ export default function App() {
     scrollToId('demo');
   };
 
-  const handleOpenEngineering = () => {
-    engineeringRef.current?.open();
-  };
-
-  const handleShowScenarios = () => {
-    scrollToId('scenarios');
-  };
-
-  const handleShowCPriority = () => {
-    handleScenarioChange('c_priority');
-  };
-  
-  // Auto Demo handlers
   const handleStartAutoDemo = () => {
     scrollToId('demo');
     setDemoDirector((prev) => startAutoDemo(prev));
@@ -192,58 +168,67 @@ export default function App() {
     }
   };
 
+  // Main page handlers - use playlist
+  const handleMainPlay = () => {
+    const currentCase = getPlaylistCase(playlistIndex);
+    setActiveScenarioId(currentCase.scenarioId);
+    setDemoDirector((prev) => startAutoDemo(prev));
+    // TODO: Auto-advance to next playlist case when scenario completes
+    // For now, plays the current playlist case only
+  };
+
+  const handleMainPause = () => {
+    setDemoDirector((prev) => pauseAutoDemo(prev));
+  };
+
+  const handleMainStop = () => {
+    setDemoDirector((prev) => stopAutoDemo(prev));
+    setSimulation(createSimulation(activeScenario));
+    setPlaylistIndex(0);
+  };
+
   return (
-    <div className="product-page">
-      <Header
-        simulation={simulation}
-        onReset={handleReset}
-        onOpenDemo={() => scrollToId('demo')}
-        onOpenScenarios={handleShowScenarios}
-        onOpenEngineering={handleOpenEngineering}
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <MainPage
+            simulation={simulation}
+            demoDirector={demoDirector}
+            playlistIndex={playlistIndex}
+            onPlay={handleMainPlay}
+            onPause={handleMainPause}
+            onStop={handleMainStop}
+          />
+        }
       />
+      <Route
+        path="/details"
+        element={
+          <DetailsPage
+            simulation={simulation}
+            demoStepIndex={demoStepIndex}
+            demoDirector={demoDirector}
+            activeScenarioId={activeScenarioId}
+            onStartDemo={handleStartDemo}
+            onNext={handleNext}
+            onReset={handleReset}
+            onScenarioChange={handleScenarioChange}
+            onStartAutoDemo={handleStartAutoDemo}
+            onToggleAutoDemo={handleToggleAutoDemo}
+            onStopAutoDemo={handleStopAutoDemo}
+          />
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
-      <main className="product-main">
-        <HeroSection
-          onStartDemo={handleStartDemo}
-          onShowScenarios={handleShowScenarios}
-          onOpenEngineering={handleOpenEngineering}
-        />
-
-        <ProductDemoSection
-          simulation={simulation}
-          demoStepTitle={currentDemoStep.title}
-          demoDirector={demoDirector}
-          onStartDemo={handleStartDemo}
-          onNext={handleNext}
-          onReset={handleReset}
-          onOpenEngineering={handleOpenEngineering}
-          onStartAutoDemo={handleStartAutoDemo}
-          onToggleAutoDemo={handleToggleAutoDemo}
-          onStopAutoDemo={handleStopAutoDemo}
-        />
-
-        <StorylineStepper simulation={simulation} />
-
-        <ScenarioCards
-          scenarios={SCENARIOS}
-          activeScenarioId={activeScenarioId}
-          onScenarioChange={handleScenarioChange}
-        />
-
-        <CPriorityExplanation onShowCPriority={handleShowCPriority} />
-
-        <CriteriaCards onLinkedScenario={handleScenarioChange} />
-
-        <EngineeringDetails
-          ref={engineeringRef}
-          simulation={simulation}
-          onScenarioChange={handleScenarioChange}
-        />
-      </main>
-
-      <footer className="site-footer">
-        <p>OZON Tech Hackathon 2026 · Sorter Simulation · Product Demo</p>
-      </footer>
-    </div>
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }
