@@ -158,11 +158,11 @@ export const MODEL_ASSETS: ModelAsset[] = [
     displayName: 'Oversized round',
     categoryScenario: 'C',
     dimensions: { width: 500, depth: 300, height: 300 },
-    sourceFile: 'N/A',
-    frontendAssetPath: undefined,
-    loaderType: 'procedural',
+    sourceFile: 'input_info/extracted/Stl/Цилиндр.stl',
+    frontendAssetPath: '/models/cylinder.stl',
+    loaderType: 'stl',
     fallbackPrimitive: 'cylinder',
-    notes: 'No STL available for oversized round, using procedural cylinder.',
+    notes: 'Uses available round STL (cylinder.stl, 106 KB) for the oversized-round C-priority case.',
   },
 ];
 

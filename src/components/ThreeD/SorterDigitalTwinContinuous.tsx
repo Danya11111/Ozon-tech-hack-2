@@ -53,6 +53,9 @@ import {
   ROLL_CAGE,
   getRenderedItemDimensions,
   getItemYOnBelt,
+  B_RECEIVER,
+  CAGE_FLOOR_Y,
+  CONVEYOR_SPEED_MPS,
 } from '../../domain/physicalLayout';
 
 export interface SorterDigitalTwinContinuousProps {
@@ -225,21 +228,20 @@ function Roller({ position, speedFactor }: { position: [number, number, number];
   );
 }
 
-/** Moving stripe on conveyor belt - subtle texture movement at 1 m/s */
-function BeltStripe({ offset, speedFactor }: { offset: number; speedFactor: number }) {
-  const meshRef = useRef<Mesh>(null);
-  const posRef = useRef(offset);
-  
-  useFrame((_, delta) => {
-    if (meshRef.current && speedFactor > 0) {
-      posRef.current += delta * speedFactor * 1.0; // 1 m/s
-      if (posRef.current > CONVEYOR_END_X) posRef.current = CONVEYOR_START_X;
-      meshRef.current.position.x = posRef.current;
-    }
-  });
+/**
+ * Moving stripe on conveyor belt.
+ * Position is DETERMINISTIC from playback time (offset = time * 1 m/s), so the
+ * belt animation shares the exact tempo/direction of the item, is FPS-independent,
+ * freezes on pause and resets on stop.
+ */
+function BeltStripe({ baseOffset, elapsedMs }: { baseOffset: number; elapsedMs: number }) {
+  const beltLen = CONVEYOR_END_X - CONVEYOR_START_X;
+  const shift = ((elapsedMs / 1000) * CONVEYOR_SPEED_MPS) % beltLen;
+  let x = baseOffset + shift;
+  if (x > CONVEYOR_END_X) x -= beltLen;
 
   return (
-    <mesh ref={meshRef} position={[offset, BELT_Y + 0.001, 0]}>
+    <mesh position={[x, BELT_Y + 0.001, 0]}>
       <boxGeometry args={[0.08, 0.002, CONVEYOR_WIDTH_M - 0.06]} />
       <meshStandardMaterial 
         color={COLORS.beltStripe} 
@@ -515,7 +517,7 @@ function SupportLeg({ x }: { x: number }) {
  * Conveyor belt - realistic roller conveyor
  * Belt top surface at 0.7m (BELT_TOP_Y)
  */
-function ConveyorBelt({ speedFactor, pulseActive }: { speedFactor: number; pulseActive: boolean }) {
+function ConveyorBelt({ speedFactor, pulseActive, elapsedMs }: { speedFactor: number; pulseActive: boolean; elapsedMs: number }) {
   const rollerCount = Math.floor(CONVEYOR_LENGTH / ROLLER_SPACING_M);
   
   const rollerPositions = useMemo(() => {
@@ -546,9 +548,9 @@ function ConveyorBelt({ speedFactor, pulseActive }: { speedFactor: number; pulse
         />
       </mesh>
       
-      {/* Belt stripes (animated) - subtle texture movement */}
+      {/* Belt stripes — deterministic movement synced to item (offset = time * 1 m/s) */}
       {[-4, -2.5, -1, 0.5, 2, 3.5].map((offset, i) => (
-        <BeltStripe key={i} offset={offset} speedFactor={speedFactor} />
+        <BeltStripe key={i} baseOffset={offset} elapsedMs={elapsedMs} />
       ))}
       
       {/* Side guards - brushed metal above belt */}
@@ -641,6 +643,62 @@ function ZoneMarker({ position, label, color, active }: {
   );
 }
 
+/**
+ * B receiving zone — physical downstream receiving tray after the sorter.
+ * A short 0.5m-wide tray at belt height (0.7m) with low side walls and an end
+ * stop, so B items visibly land and remain instead of vanishing into thin air.
+ */
+function BReceiver({ active }: { active: boolean }) {
+  const { startX, endX, y, width, wallHeight } = B_RECEIVER;
+  const len = endX - startX;
+  const centerX = (startX + endX) / 2;
+  const emissive = active ? 0.35 : 0.05;
+  const legY = y / 2;
+
+  return (
+    <group>
+      {/* Tray floor at belt height */}
+      <mesh position={[centerX, y - 0.02, 0]} receiveShadow>
+        <boxGeometry args={[len, 0.04, width]} />
+        <meshStandardMaterial color="#334155" metalness={0.3} roughness={0.7} />
+      </mesh>
+      {/* Side walls */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[centerX, y + wallHeight / 2, s * (width / 2)]}>
+          <boxGeometry args={[len, wallHeight, 0.02]} />
+          <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.55} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+        </mesh>
+      ))}
+      {/* End stop wall */}
+      <mesh position={[endX, y + wallHeight / 2, 0]}>
+        <boxGeometry args={[0.03, wallHeight, width]} />
+        <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.6} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+      </mesh>
+      {/* Support legs */}
+      {[startX + 0.2, endX - 0.2].map((lx) => (
+        [-1, 1].map((s) => (
+          <mesh key={`${lx}-${s}`} position={[lx, legY, s * (width / 2 - 0.05)]}>
+            <boxGeometry args={[0.04, y, 0.04]} />
+            <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
+          </mesh>
+        ))
+      ))}
+      {/* Label */}
+      <Html position={[centerX, y + wallHeight + 0.18, 0]} center>
+        <div style={{
+          color: active ? COLORS.routeB : '#64748b',
+          fontSize: '20px',
+          fontWeight: 800,
+          textShadow: active ? `0 0 8px ${COLORS.routeB}` : 'none',
+          userSelect: 'none',
+        }}>
+          B
+        </div>
+      </Html>
+    </group>
+  );
+}
+
 /** Roll cage for C/D zones - realistic wireframe cage with wheels */
 function RollCage({ position, label, color, active }: {
   position: [number, number, number];
@@ -658,6 +716,12 @@ function RollCage({ position, label, color, active }: {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
         <planeGeometry args={[width + 0.2, depth + 0.2]} />
         <meshStandardMaterial color={color} transparent opacity={active ? 0.25 : 0.08} />
+      </mesh>
+
+      {/* Solid interior floor where items rest */}
+      <mesh position={[0, CAGE_FLOOR_Y - 0.005, 0]} receiveShadow>
+        <boxGeometry args={[width - frameThickness, 0.01, depth - frameThickness]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.3} roughness={0.7} />
       </mesh>
       
       {/* Cage frame - bottom rectangle */}
@@ -1317,7 +1381,7 @@ function ContinuousScene({
       </mesh>
 
       {/* Conveyor - belt top at 0.7m */}
-      <ConveyorBelt speedFactor={speedFactor} pulseActive={showPulse} />
+      <ConveyorBelt speedFactor={speedFactor} pulseActive={showPulse} elapsedMs={totalElapsedMs} />
 
       {/* Zone A - spawn point */}
       <ZoneMarker 
@@ -1327,13 +1391,8 @@ function ContinuousScene({
         active={playback.currentPhase === 'spawn'}
       />
       
-      {/* Zone B - main sorter exit */}
-      <ZoneMarker 
-        position={[ZONES.B.x, 0.01, ZONES.B.z]} 
-        label="B" 
-        color={COLORS.routeB} 
-        active={activeRoute === 'B'}
-      />
+      {/* Zone B - physical receiving tray at end of sorter */}
+      <BReceiver active={activeRoute === 'B'} />
       
       {/* Zone C - roll cage for oversized items */}
       <RollCage 

@@ -22,6 +22,7 @@ const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalne
   'SKU-006': { color: '#f8fafc', roughness: 0.42 },
   'SKU-007': { color: '#7dd3fc', roughness: 0.28 },
   'SKU-008': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 },
+  'SKU-011': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 },
 };
 
 function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, roughness, metalness }: any) {
@@ -92,14 +93,14 @@ export function PhysicalPlaybackItem({
     elapsedMs
   });
 
-  const { position, rotation, isSettled, phase } = pose;
+  const { position, rotation, isSettled, phase, surface } = pose;
   const isRouting = phase === 'routing';
+  // Item rests on a moving/transport surface (shadow makes sense there).
+  const onTransport = surface === 'main_belt'
+    || surface === 'inspection_station'
+    || surface === 'routing_junction'
+    || surface === 'b_receiver';
 
-  // Do not render B items that are settled (they exit the factory)
-  if (isSettled && caseData.expectedCategory === 'B') {
-    return null;
-  }
-  
   // Before spawn, don't show
   if (elapsedMs < 0) return null;
 
@@ -121,8 +122,8 @@ export function PhysicalPlaybackItem({
         <FallbackPrimitive type={fallbackType} color={material.color} accentColor={accentColor} emissiveIntensity={emissiveIntensity} roughness={material.roughness} metalness={material.metalness ?? 0.05} w={dims.width} h={dims.height} d={dims.depth} />
       )}
       
-      {/* Shadow on belt (only if on belt or chute) */}
-      {!isSettled && (
+      {/* Contact shadow only while riding a transport surface */}
+      {onTransport && (
         <mesh position={[0, -dims.height / 2 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[Math.max(dims.width, dims.depth) / 2 + 0.01, 16]} />
           <meshStandardMaterial color="#475569" transparent opacity={0.15} />

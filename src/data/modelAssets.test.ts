@@ -53,6 +53,34 @@ describe('modelAssets', () => {
     });
   });
 
+  describe('demo STL coverage', () => {
+    it('uses real STL for every available demo model', () => {
+      const stlMap: Record<string, string> = {
+        'SKU-001': '/models/box-300.stl',
+        'SKU-002': '/models/lunchbox.stl',
+        'SKU-004': '/models/box-400.stl',
+        'SKU-006': '/models/plate.stl',
+        'SKU-007': '/models/bottle.stl',
+        'SKU-008': '/models/cylinder.stl',
+        'SKU-011': '/models/cylinder.stl', // c_priority round item
+      };
+      for (const [id, path] of Object.entries(stlMap)) {
+        const asset = getModelAsset(id);
+        expect(asset?.loaderType).toBe('stl');
+        expect(asset?.frontendAssetPath).toBe(path);
+      }
+    });
+
+    it('keeps fallbacks explicit and only for heavy/missing STL', () => {
+      const fallbackIds = ['SKU-003', 'SKU-005', 'SKU-009', 'SKU-010'];
+      for (const id of fallbackIds) {
+        const asset = getModelAsset(id);
+        expect(asset?.loaderType).toBe('procedural');
+        expect(asset?.notes).toBeTruthy();
+      }
+    });
+  });
+
   describe('getModelAsset', () => {
     it('should return asset for valid item ID', () => {
       const asset = getModelAsset('SKU-006');

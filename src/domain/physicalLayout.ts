@@ -131,6 +131,32 @@ export const ROLL_CAGE = {
   frameThickness: 0.03, // 30mm frame tube
 };
 
+/** Interior floor height of the roll cage where items rest (just above wheels). */
+export const CAGE_FLOOR_Y = ROLL_CAGE.wheelRadius * 2; // 0.08m
+
+// =========================================================
+// Physical surface widths (per OZON spec)
+// =========================================================
+export const MAIN_BELT_WIDTH_M = CONVEYOR_WIDTH_M; // 0.5m
+export const CHUTE_C_WIDTH_M = 0.5;                 // 500mm chute
+export const CHUTE_D_WIDTH_M = 0.5;                 // 500mm chute
+export const CHUTE_SLOPE_START_Y = BELT_TOP_Y;      // 0.7m at junction
+export const CHUTE_END_Y = CAGE_FLOOR_Y + 0.05;     // safe entry height into cage
+
+// =========================================================
+// B receiving zone (short downstream receiving tray after sorter)
+// Physical tray at belt height with low side walls and an end stop,
+// so B items visibly land and remain instead of vanishing.
+// =========================================================
+export const B_RECEIVER = {
+  startX: ZONES.GATE.x + 0.7,   // 2.2m — begins after routing junction
+  endX: ZONES.B.x + 0.4,        // 4.4m — end stop
+  y: BELT_TOP_Y,                // 0.7m top surface
+  width: CONVEYOR_WIDTH_M,      // 0.5m
+  wallHeight: 0.12,             // 120mm side/end walls
+  restX: ZONES.B.x,             // 4.0m — where the item comes to rest
+};
+
 // =========================================================
 // Item positioning and scaling
 // =========================================================
