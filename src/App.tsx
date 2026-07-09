@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from './pages/MainPage';
 import DetailsPage from './pages/DetailsPage';
@@ -15,16 +15,24 @@ import {
   updateAutoDemo,
   type DemoDirectorState,
 } from './domain/demoDirector';
-import { getPlaylistCase, nextPlaylistIndex } from './domain/demoPlaylist';
+import {
+  createPlaybackState,
+  startPlayback,
+  pausePlayback,
+  resumePlayback,
+  stopPlayback,
+  updatePlayback,
+  type ContinuousPlaybackState,
+} from './domain/continuousPlayback';
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function AppContent() {
+  // Details page state (existing simulation system)
   const [activeScenarioId, setActiveScenarioId] = useState<ScenarioId>('normal_flow');
   const [demoStepIndex, setDemoStepIndex] = useState(0);
-  const [playlistIndex, setPlaylistIndex] = useState(0);
 
   const activeScenario = useMemo(
     () => SCENARIOS.find((scenario) => scenario.id === activeScenarioId) ?? SCENARIOS[0],
@@ -37,15 +45,23 @@ function AppContent() {
     createDemoDirectorState(activeScenario),
   );
 
+  // Main page state (continuous playback)
+  const [playback, setPlayback] = useState<ContinuousPlaybackState>(() => createPlaybackState());
+
   const rafIdRef = useRef<number | null>(null);
   const lastUpdateRef = useRef(performance.now());
+  const playbackRafRef = useRef<number | null>(null);
+  const playbackLastRef = useRef(performance.now());
   const UPDATE_INTERVAL = 100;
+  const PLAYBACK_INTERVAL = 50; // More frequent updates for smooth animation
 
+  // Sync activeScenario changes
   useEffect(() => {
     setSimulation(createSimulation(activeScenario));
     setDemoDirector(createDemoDirectorState(activeScenario));
   }, [activeScenario]);
 
+  // Details page auto demo loop
   useEffect(() => {
     if (!demoDirector.isAutoDemoRunning || demoDirector.paused) {
       if (rafIdRef.current) {
@@ -96,8 +112,42 @@ function AppContent() {
         rafIdRef.current = null;
       }
     };
-  }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario]);
+  }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario, simulation.currentItem?.classification.category]);
 
+  // Main page continuous playback loop
+  useEffect(() => {
+    if (playback.status !== 'running') {
+      if (playbackRafRef.current) {
+        cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+      return;
+    }
+
+    const tick = () => {
+      const now = performance.now();
+      const deltaMs = now - playbackLastRef.current;
+
+      if (deltaMs >= PLAYBACK_INTERVAL) {
+        playbackLastRef.current = now;
+        setPlayback((prev) => updatePlayback(prev, deltaMs));
+      }
+
+      playbackRafRef.current = requestAnimationFrame(tick);
+    };
+
+    playbackLastRef.current = performance.now();
+    playbackRafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (playbackRafRef.current) {
+        cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+    };
+  }, [playback.status]);
+
+  // Details page handlers
   const handleStartDemo = () => {
     scrollToId('demo');
     setSimulation((current) => {
@@ -168,24 +218,23 @@ function AppContent() {
     }
   };
 
-  // Main page handlers - use playlist
-  const handleMainPlay = () => {
-    const currentCase = getPlaylistCase(playlistIndex);
-    setActiveScenarioId(currentCase.scenarioId);
-    setDemoDirector((prev) => startAutoDemo(prev));
-    // TODO: Auto-advance to next playlist case when scenario completes
-    // For now, plays the current playlist case only
-  };
+  // Main page handlers - continuous playback
+  const handleMainPlay = useCallback(() => {
+    setPlayback((prev) => {
+      if (prev.status === 'paused') {
+        return resumePlayback(prev);
+      }
+      return startPlayback(prev);
+    });
+  }, []);
 
-  const handleMainPause = () => {
-    setDemoDirector((prev) => pauseAutoDemo(prev));
-  };
+  const handleMainPause = useCallback(() => {
+    setPlayback((prev) => pausePlayback(prev));
+  }, []);
 
-  const handleMainStop = () => {
-    setDemoDirector((prev) => stopAutoDemo(prev));
-    setSimulation(createSimulation(activeScenario));
-    setPlaylistIndex(0);
-  };
+  const handleMainStop = useCallback(() => {
+    setPlayback(stopPlayback);
+  }, []);
 
   return (
     <Routes>
@@ -193,9 +242,7 @@ function AppContent() {
         path="/"
         element={
           <MainPage
-            simulation={simulation}
-            demoDirector={demoDirector}
-            playlistIndex={playlistIndex}
+            playback={playback}
             onPlay={handleMainPlay}
             onPause={handleMainPause}
             onStop={handleMainStop}

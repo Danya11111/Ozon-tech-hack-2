@@ -3,25 +3,21 @@ import { Link } from 'react-router-dom';
 import ThreeFallback from '../components/ThreeD/ThreeFallback';
 import ThreeErrorBoundary from '../components/ThreeD/ThreeErrorBoundary';
 import { prefer3DByDefault, useWebGLSupport } from '../components/ThreeD/useWebGL';
-import { DEMO_PLAYLIST, getPlaylistCase, PLAYLIST_LENGTH } from '../domain/demoPlaylist';
-import type { SimulationState } from '../domain/types';
-import type { DemoDirectorState } from '../domain/demoDirector';
+import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../domain/demoPlaylist';
+import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
+import { getCaseProgress, getCurrentPhaseConfig } from '../domain/continuousPlayback';
 
-const SorterDigitalTwin = lazy(() => import('../components/ThreeD/SorterDigitalTwin'));
+const SorterDigitalTwinContinuous = lazy(() => import('../components/ThreeD/SorterDigitalTwinContinuous'));
 
 interface MainPageProps {
-  simulation: SimulationState;
-  demoDirector: DemoDirectorState;
-  playlistIndex: number;
+  playback: ContinuousPlaybackState;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
 }
 
 export default function MainPage({
-  simulation,
-  demoDirector,
-  playlistIndex,
+  playback,
   onPlay,
   onPause,
   onStop,
@@ -39,18 +35,15 @@ export default function MainPage({
   const show3D = prefer3DByDefault(width, webgl && !contextLost);
   const simplified = width < 900;
 
-  const isRunning = demoDirector.isAutoDemoRunning && !demoDirector.paused;
-  const isPaused = demoDirector.isAutoDemoRunning && demoDirector.paused;
+  const isRunning = playback.status === 'running';
+  const isPaused = playback.status === 'paused';
+  const isFinished = playback.status === 'finished';
 
-  const item = simulation.currentItem;
-  const category = item?.classification.category;
-  const command = simulation.machineState.startsWith('ROUTE_TO_')
-    ? simulation.machineState
-    : category
-      ? `ROUTE_TO_${category}`
-      : 'IDLE';
-
-  const currentCase = getPlaylistCase(playlistIndex);
+  const currentCase = playback.currentCase;
+  const category = playback.targetCategory;
+  const command = playback.command;
+  const phaseConfig = getCurrentPhaseConfig(playback);
+  const caseProgress = getCaseProgress(playback);
 
   const handlePlayPause = () => {
     if (isRunning) {
@@ -72,20 +65,21 @@ export default function MainPage({
             }}
           >
             <Suspense fallback={<div className="three-loading">Loading 3D...</div>}>
-              <SorterDigitalTwin
-                simulation={simulation}
+              <SorterDigitalTwinContinuous
+                playback={playback}
                 simplified={simplified}
-                showFps={false}
-                cleanView={true}
                 onContextLost={() => setContextLost(true)}
               />
             </Suspense>
           </ThreeErrorBoundary>
         ) : (
-          <ThreeFallback
-            simulation={simulation}
-            reason={!webgl || contextLost ? 'webgl' : width < 640 ? 'mobile' : 'user'}
-          />
+          <div className="main-fallback">
+            <div className="fallback-content">
+              <h2>3D Demo</h2>
+              <p>WebGL not available. Please use a modern browser.</p>
+              <Link to="/details" className="btn-primary">View Details Page</Link>
+            </div>
+          </div>
         )}
       </div>
 
@@ -93,12 +87,12 @@ export default function MainPage({
       <div className="main-hud">
         <div className="hud-row">
           <span className="hud-label">Item</span>
-          <span className="hud-value">{item?.item.name ?? 'Waiting...'}</span>
+          <span className="hud-value">{currentCase.title}</span>
         </div>
         <div className="hud-row">
           <span className="hud-label">Status</span>
-          <span className={`hud-value status-${simulation.systemStatus.toLowerCase()}`}>
-            {simulation.systemStatus}
+          <span className={`hud-value status-${playback.status}`}>
+            {isFinished ? 'FINISHED' : phaseConfig.label}
           </span>
         </div>
         <div className="hud-row">
@@ -115,23 +109,33 @@ export default function MainPage({
           <span className="hud-label">Speed</span>
           <span className="hud-value">1.0 m/s</span>
         </div>
+        {playback.warning && (
+          <div className="hud-row hud-warning">
+            <span className="hud-value warning-text">⚠ {playback.warning}</span>
+          </div>
+        )}
         <div className="hud-divider" />
         <div className="hud-row">
           <span className="hud-label">Case</span>
-          <span className="hud-value">{playlistIndex + 1}/{PLAYLIST_LENGTH}</span>
+          <span className="hud-value">{playback.currentCaseIndex + 1}/{PLAYLIST_LENGTH}</span>
         </div>
         <div className="hud-row hud-row-small">
-          <span className="hud-value">{currentCase.title}</span>
+          <span className="hud-value">{currentCase.description}</span>
         </div>
       </div>
 
-      {/* Playlist progress bar */}
+      {/* Case progress bar */}
+      <div className="main-case-progress">
+        <div className="case-progress-bar" style={{ width: `${caseProgress * 100}%` }} />
+      </div>
+
+      {/* Playlist progress dots */}
       <div className="main-progress">
         {DEMO_PLAYLIST.map((c, idx) => (
           <div
             key={c.id}
-            className={`progress-dot ${idx === playlistIndex ? 'active' : ''} ${idx < playlistIndex ? 'done' : ''}`}
-            title={c.title}
+            className={`progress-dot ${idx === playback.currentCaseIndex ? 'active' : ''} ${idx < playback.currentCaseIndex ? 'done' : ''}`}
+            title={`${idx + 1}. ${c.title} → ${c.expectedCategory}`}
           />
         ))}
       </div>
@@ -149,7 +153,9 @@ export default function MainPage({
           ) : (
             <span className="play-icon">▶</span>
           )}
-          <span className="play-text">{isRunning ? 'Pause' : isPaused ? 'Resume' : 'Play Demo'}</span>
+          <span className="play-text">
+            {isRunning ? 'Pause' : isPaused ? 'Resume' : isFinished ? 'Replay' : 'Play Demo'}
+          </span>
         </button>
 
         {(isRunning || isPaused) && (
@@ -159,15 +165,23 @@ export default function MainPage({
         )}
       </div>
 
+      {/* Finished overlay */}
+      {isFinished && (
+        <div className="main-finished-overlay">
+          <div className="finished-content">
+            <h2>Demo Complete</h2>
+            <p>All 8 cases demonstrated successfully</p>
+            <button type="button" className="btn-primary" onClick={onPlay}>
+              Replay Demo
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Details link - bottom right */}
       <Link to="/details" className="details-link">
         Details →
       </Link>
-
-      {/* TODO marker for future playlist auto-advance */}
-      {/* TODO: Implement full 8-case auto-advance when one scenario completes.
-          Current behavior: plays first playlist case only.
-          Need to connect playlist advancement to simulation completion events. */}
     </div>
   );
 }
