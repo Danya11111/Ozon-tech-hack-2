@@ -119,21 +119,22 @@ function RollCage({
 export default function SortingZones3D({ activeCategory, activeRoute }: Props) {
   const active = activeRoute ?? activeCategory;
   const cage = TWIN_LAYOUT.rollCageSize;
+  const beltY = TWIN_LAYOUT.beltY;
 
   return (
     <group>
-      {/* Zone A feed — always visible cyan */}
+      {/* Zone A feed — pad under belt (aligned to shared belt height) */}
       <ZoneBox
-        position={[TWIN_LAYOUT.startX, 0.22, 0]}
-        size={[1.0, 0.44, 1.0]}
+        position={[TWIN_LAYOUT.startX, beltY / 2, 0]}
+        size={[1.0, beltY, 1.0]}
         color="#38bdf8"
         active={active === undefined}
       />
 
       {/* Zone B main sorter — green, straight */}
       <ZoneBox
-        position={[TWIN_LAYOUT.zoneBX, 0.28, 0]}
-        size={[1.2, 0.56, 1.2]}
+        position={[TWIN_LAYOUT.zoneBX, beltY / 2, 0]}
+        size={[1.2, beltY, 1.2]}
         color={ROUTE_COLORS.B}
         active={active === 'B'}
       />

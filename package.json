@@ -8,9 +8,10 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 3100",
     "test": "vitest run --config vitest.config.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e": "playwright test --grep-invert @production",
+    "test:e2e:headed": "playwright test --headed --grep-invert @production",
+    "test:e2e:update": "playwright test --update-snapshots --grep-invert @production",
+    "test:e2e:production": "playwright test e2e/production.smoke.spec.ts",
     "agent:dry-run": "node agent/cli.mjs dry-run",
     "agent:run-once": "node agent/cli.mjs run-once",
     "agent:implement": "node agent/cli.mjs implement",
@@ -19,7 +20,8 @@
     "agent:resume": "node agent/cli.mjs resume",
     "demo:start": "bash scripts/demo-start.sh",
     "demo:stop": "bash scripts/demo-stop.sh",
-    "demo:health": "bash scripts/demo-health.sh"
+    "demo:health": "bash scripts/demo-health.sh",
+    "perf:gpu": "node scripts/headed-gpu-baseline.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

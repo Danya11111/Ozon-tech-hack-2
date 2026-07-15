@@ -1,8 +1,10 @@
 # Demo Runbook — OZON Tech Sorter Simulation
 
-**Назначение:** провести живую демонстрацию жюри/заказчику без сюрпризов.  
-**Дата актуализации:** 2026-07-15  
-**Публичный URL:** https://arhipovdan.ru/  
+**Назначение:** провести живую демонстрацию жюри/заказчику без сюрпризов.
+**Дата актуализации:** 2026-07-15
+**Рабочий публичный URL (временный):** Quick Tunnel — см. `PRODUCTION_DEPLOYMENT_REPORT.md`
+**Ожидаемый постоянный домен:** https://arhipovdan.ru/ — **BLOCKED_EXTERNAL** (`PUBLIC_DOMAIN_DIAGNOSTIC.md`)
+**Локальный production:** http://127.0.0.1:3100/
 **Репозиторий:** `/home/coder/arhipovdan/app`
 
 ---
@@ -24,7 +26,7 @@ npm test
 npm run build
 ```
 
-Ожидание: Vitest **153** passed / **16** files; build OK.
+Ожидание: Vitest **166** passed; build OK.
 
 ### 1.3. Health
 
@@ -105,16 +107,16 @@ npm run demo:stop
 
 Порядок storytelling (см. `demoPlaylist.ts`):
 
-1. Короб → **B**  
-2. ЛанчБокс → **B**  
-3. Негабарит → **C**  
-4. Мелкий item (ручка) → **C** (min dims)  
-5. Тарелка → **D** (K)  
-6. Бутылка → **D**  
-7. Oversized+round → **C** (priority)  
-8. (edge / доп. кейс по playlist)  
-9. **Jam**  
-10. **Emergency stop**  
+1. Короб → **B**
+2. ЛанчБокс → **B**
+3. Негабарит → **C**
+4. Мелкий item (ручка) → **C** (min dims)
+5. Тарелка → **D** (K)
+6. Бутылка → **D**
+7. Oversized+round → **C** (priority)
+8. (edge / доп. кейс по playlist)
+9. **Jam**
+10. **Emergency stop**
 
 Точные id/SKU — в `src/domain/demoPlaylist.ts`.
 
@@ -141,9 +143,9 @@ git checkout backup/pre-maximum-demo-realism-20260715
 
 ## 7. Что не обещать жюри
 
-- «Настоящий CV с камеры» — нет, pseudo-CV.  
-- «Полный physics engine» — нет, кинематика.  
-- «Агент сам выкатывает в prod» — запрещено.  
+- «Настоящий CV с камеры» — нет, pseudo-CV.
+- «Полный physics engine» — нет, кинематика.
+- «Агент сам выкатывает в prod» — запрещено.
 - «`/` и `/details` — идентичная 3D-сцена» — пока нет.
 
 ---

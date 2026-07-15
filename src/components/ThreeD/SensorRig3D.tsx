@@ -50,12 +50,14 @@ function SensorPole({
 
 export default function SensorRig3D({ sensors, machineState }: Props) {
   const detecting = machineState === 'DETECTING';
+  const poleH = TWIN_LAYOUT.beltY + 0.45;
+  const ultrasonicH = TWIN_LAYOUT.beltY + 0.3;
 
   return (
     <group>
-      <SensorPole x={TWIN_LAYOUT.cameraX} active={sensors.camera.active || detecting} labelColor="#38bdf8" />
-      <SensorPole x={TWIN_LAYOUT.laserX} active={sensors.laser.active} labelColor="#22d3ee" />
-      <SensorPole x={TWIN_LAYOUT.ultrasonicX} active={sensors.ultrasound.active} labelColor="#67e8f9" height={0.75} />
+      <SensorPole x={TWIN_LAYOUT.cameraX} active={sensors.camera.active || detecting} labelColor="#38bdf8" height={poleH} />
+      <SensorPole x={TWIN_LAYOUT.laserX} active={sensors.laser.active} labelColor="#22d3ee" height={poleH} />
+      <SensorPole x={TWIN_LAYOUT.ultrasonicX} active={sensors.ultrasound.active} labelColor="#67e8f9" height={ultrasonicH} />
 
       {/* Detection beam - more visible */}
       {detecting ? (

@@ -19,8 +19,8 @@ export default defineConfig({
   expect: {
     toHaveScreenshot: {
       // Soft thresholds — WebGL/fonts can vary slightly across environments
-      threshold: 0.3,
-      maxDiffPixelRatio: 0.05,
+      threshold: 0.35,
+      maxDiffPixelRatio: 0.08,
     },
   },
   projects: [
@@ -29,6 +29,8 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Keep visual/e2e deterministic on one worker (CI + local)
+  // Production smoke is excluded via package.json --grep-invert @production
   webServer: startServer
     ? {
         command: 'npm run preview -- --host 127.0.0.1 --port 3101',

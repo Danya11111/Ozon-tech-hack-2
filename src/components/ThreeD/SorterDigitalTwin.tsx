@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
 import type { SimulationState } from '../../domain/types';
 import Conveyor3D from './Conveyor3D';
 import SensorRig3D from './SensorRig3D';
@@ -13,6 +13,8 @@ import { PHYSICS_ENGINE_ENABLED } from './itemMotion';
 import { NOMINAL_CONVEYOR_SPEED_MPS } from '../../domain/simulation';
 import { DIMENSION_LIMITS } from '../../domain/classifier';
 import { INDUSTRIAL_PALETTE } from '../../domain/industrialTheme';
+import PerfCollector from './PerfCollector';
+import PerfOverlay from './PerfOverlay';
 
 export interface SorterDigitalTwinProps {
   simulation: SimulationState;
@@ -81,19 +83,19 @@ function TwinScene({
         args={[16, 16]}
         cellSize={0.5}
         cellThickness={0.7}
-        cellColor="#2a4a6a"
+        cellColor={INDUSTRIAL_PALETTE.metalDark}
         sectionSize={2}
         sectionThickness={1.2}
-        sectionColor="#3a6080"
+        sectionColor={INDUSTRIAL_PALETTE.frame}
         fadeDistance={16}
         infiniteGrid={false}
         position={[0, 0.001, 0]}
       />
 
-      {/* Floor with better contrast */}
+      {/* Floor — shared industrial tokens (dark engineering projection) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[14, 10]} />
-        <meshStandardMaterial color="#0f1a2a" />
+        <meshStandardMaterial color={INDUSTRIAL_PALETTE.backgroundDark} />
       </mesh>
 
       <Conveyor3D stopped={stopped} />
@@ -118,7 +120,7 @@ function TwinScene({
       {stopped ? (
         <mesh position={[0, 1.2, 0]}>
           <planeGeometry args={[6, 1.2]} />
-          <meshStandardMaterial color="#7f1d1d" transparent opacity={0.35} />
+          <meshStandardMaterial color={INDUSTRIAL_PALETTE.fault} transparent opacity={0.35} />
         </mesh>
       ) : null}
 
@@ -128,7 +130,7 @@ function TwinScene({
         maxPolarAngle={Math.PI / 2.1}
         minDistance={2.5}
         maxDistance={10}
-        target={[0.6, 0.4, 0]}
+        target={[0.6, 0.55, 0]}
       />
       <FpsMeter onFps={onFps} />
     </>
@@ -144,6 +146,12 @@ export default function SorterDigitalTwin({
   onContextLost,
 }: SorterDigitalTwinProps) {
   const [fps, setFps] = useState(0);
+  const perfEnabled = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('perf') === '1',
+    [],
+  );
   const category = simulation.currentItem?.classification.category;
   const command = simulation.machineState.startsWith('ROUTE_TO_')
     ? simulation.machineState
@@ -192,9 +200,18 @@ export default function SorterDigitalTwin({
               cleanView={cleanView}
               onFps={setFps} 
             />
+            {perfEnabled ? (
+              <PerfCollector
+                enabled
+                mode={simplified ? 'low' : 'demo'}
+                shadows={false}
+                antialias={!simplified}
+              />
+            ) : null}
           </Suspense>
         </Canvas>
       </div>
+      {perfEnabled ? <PerfOverlay enabled /> : null}
     </div>
   );
 }

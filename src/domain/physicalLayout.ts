@@ -217,6 +217,7 @@ export const CAMERA_RIG = {
 
 // =========================================================
 // Derived constants for legacy compatibility
+// Details twin layout is derived in domain/layout/sharedLayout.ts
 // =========================================================
 export const CONVEYOR_POSITIONS = {
   spawnX: ZONES.A.x,

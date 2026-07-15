@@ -13,27 +13,27 @@
 
 | ID | Риск | Вероятность | Влияние | Статус | Митигация |
 | -- | ---- | ----------- | ------- | ------ | --------- |
-| R01 | Production :3100 / https://arhipovdan.ru/ отдаёт старый dist | High | Critical | Open | `demo:health`; ручной redeploy; показывать :3101 при сомнении |
-| R02 | Визуальный разрыв `/` vs `/details` путает жюри | High | High | Open | Вести показ на `/`; unify twins в плане |
+| R01 | Production :3100 / https://arhipovdan.ru/ отдаёт старый dist / домен 404 | High | Critical | Open | Local+tunnel PASS; domain BLOCKED_EXTERNAL — `PUBLIC_DOMAIN_DIAGNOSTIC.md` |
+| R02 | Визуальный разрыв `/` vs `/details` путает жюри | Medium | High | Mitigated | `sharedLayout` + routeConsistency tests |
 | R03 | Жюри воспринимает кинематику как «фейк» | Medium | High | Mitigated | Proof HUD + честные формулировки; jam/e-stop |
 | R04 | Pseudo-CV раскрыт как «обман» | Medium | Medium | Accepted | RULE overlay + confidence; не обещать ML |
-| R05 | Просадка FPS на ноутбуке жюри | Medium | High | Mitigated | quality modes; shadows/effects off |
-| R06 | Регрессия classifier/min dims | Low | Critical | Mitigated | tests 153; measurement+DIMENSION_LIMITS |
+| R05 | Просадка FPS на ноутбуке жюри | Medium | High | Mitigated | quality modes; `?perf=1`; SwiftShader ≠ GPU |
+| R06 | Регрессия classifier/min dims | Low | Critical | Mitigated | tests 166; measurement+DIMENSION_LIMITS |
 | R07 | Fault freeze без recover ломает показ | Low | High | Mitigated | recover path + hotkeys R/N |
 | R08 | Agent/фоновые job портят ресурсы во время демо | Medium | High | Mitigated | kill switch; runbook stop |
 | R09 | Будущий auto-patch агента ломает main | Low (сейчас) | Critical | Mitigated | forbid merge/deploy; MVP verify-only |
 | R10 | Утечка секретов `.env` в отчёты/логи | Low | Critical | Mitigated | policy forbidSecretAccess; не документировать values |
-| R11 | Нет e2e в CI — UI регрессия незамечена | Medium | Medium | Open | ручные scripts; план CI 1 worker |
+| R11 | Нет e2e в CI — UI регрессия незамечена | Low | Medium | Mitigated | CI + 10 visual snapshots; production smoke manual |
 | R12 | OOM при локальной LLM + Playwright | Medium | High | Accepted (avoid) | Variant C; не совмещать |
 | R13 | Disk fill отчётами/скриншотами | Low | Medium | Open | ротация reports |
-| R14 | Нет docker CLI в operator env | High (факт) | Medium | Accepted | внешний deploy path документирован |
+| R14 | Нет docker CLI в operator env | High (факт) | Medium | Accepted | `DOCKER_HOST=tcp://127.0.0.1:2375` |
 | R15 | Swap thrash под нагрузкой | Low | High | Mitigated | лимиты 1 worker; demo mode без фона |
 | R16 | Расхождение playlist expectedCategory и classifyItem | Low | High | Mitigated | wire classifyItem; tests |
 | R17 | STL/fallback выглядят «игрушечно» | Medium | Low | Accepted | modelAssets notes; backlog textures |
-| R18 | Tunnel/cloudflared outage | Low | Critical | Open | fallback loopback :3100 / LAN preview |
+| R18 | Tunnel/cloudflared outage / permanent DNS | High | Critical | Open | Quick Tunnel temp; Named Tunnel + REG.RU DNS required |
 | R19 | Несогласованность документации и кода | Medium | Low | Mitigated | этот пакет docs = snapshot 2026-07-15 |
 | R20 | Попытка «добавить physics» перед показом → регрессия | Medium | High | Open | запрет P0-physics перед demo day |
-
+| R21 | Hardware GPU baseline недоступен в coder | High | Medium | Accepted | NVIDIA есть, Chromium→SwiftShader; измерять на demo laptop |
 ---
 
 ## 2. Детали по критическим рискам

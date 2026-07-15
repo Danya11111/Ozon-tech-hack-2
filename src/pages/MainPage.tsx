@@ -107,7 +107,13 @@ export default function MainPage({
   }, [playback.status, onPlay, onPause, onStop, onSeekNext, onSeekPrev, onSeekCase]);
 
   const show3D = prefer3DByDefault(width, webgl && !contextLost);
-  const qualityMode = detectQualityMode(width);
+  const qualityOverride = useMemo(() => {
+    if (typeof window === 'undefined') return undefined;
+    const q = new URLSearchParams(window.location.search).get('quality');
+    if (q === 'low' || q === 'medium' || q === 'high' || q === 'demo') return q;
+    return undefined;
+  }, []);
+  const qualityMode = qualityOverride ?? detectQualityMode(width);
   const simplified = width < 900 || qualityMode === 'low';
   const viewportType: ViewportType = getViewportType(width);
 

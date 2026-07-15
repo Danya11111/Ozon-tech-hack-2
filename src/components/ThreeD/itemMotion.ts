@@ -1,25 +1,19 @@
 import type { Category, MachineState, SimulationState } from '../../domain/types';
+import {
+  CATEGORY_COLORS,
+  DETAILS_TWIN_LAYOUT,
+} from '../../domain/layout/sharedLayout';
 
-/** Compact digital-twin coordinates (1 unit ≈ 1 m, scaled layout). */
-export const TWIN_LAYOUT = {
-  beltY: 0.35,
-  startX: -4.2,
-  endX: 4.2,
-  cameraX: -1.2,
-  laserX: -0.2,
-  ultrasonicX: 1.0,
-  gateX: 1.6,
-  accumulatorX: 1.4,
-  zoneBX: 3.8,
-  zoneCZ: 2.4,
-  zoneDZ: -2.4,
-  rollCageSize: { x: 1.2, y: 0.8, z: 0.8 },
-} as const;
+/**
+ * Details-twin layout — derived from shared physical constants
+ * (belt height, zone X/Z, sensors, gate) so `/details` matches continuous scale.
+ */
+export const TWIN_LAYOUT = DETAILS_TWIN_LAYOUT;
 
 export const ROUTE_COLORS: Record<Category, string> = {
-  B: '#4ade80',
-  C: '#f59e0b',
-  D: '#c084fc',
+  B: CATEGORY_COLORS.B,
+  C: CATEGORY_COLORS.C,
+  D: CATEGORY_COLORS.D,
 };
 
 export function progressForState(state: MachineState, elapsedMs: number): number {

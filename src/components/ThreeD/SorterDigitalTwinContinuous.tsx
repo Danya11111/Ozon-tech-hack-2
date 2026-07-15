@@ -55,6 +55,8 @@ import {
   CAGE_FLOOR_Y,
   CONVEYOR_SPEED_MPS,
 } from '../../domain/physicalLayout';
+import PerfCollector from './PerfCollector';
+import PerfOverlay from './PerfOverlay';
 
 export interface SorterDigitalTwinContinuousProps {
   playback: ContinuousPlaybackState;
@@ -1452,6 +1454,10 @@ export default function SorterDigitalTwinContinuous({
   const mode = qualityMode ?? detectQualityMode(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const quality = getQualitySettings(mode);
   const useSimplified = simplified || mode === 'low';
+  const antialias = quality.antialias && !useSimplified;
+  const perfEnabled =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('perf') === '1';
   return (
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
@@ -1459,7 +1465,7 @@ export default function SorterDigitalTwinContinuous({
           camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
           dpr={[1, quality.dprMax]}
           shadows={quality.shadows}
-          gl={{ antialias: quality.antialias && !useSimplified, powerPreference: 'high-performance' }}
+          gl={{ antialias, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;
             const handleLost = (event: Event) => {
@@ -1477,9 +1483,18 @@ export default function SorterDigitalTwinContinuous({
               autoCameraEnabled={autoCameraEnabled}
               viewportType={viewportType}
             />
+            {perfEnabled ? (
+              <PerfCollector
+                enabled
+                mode={mode}
+                shadows={quality.shadows}
+                antialias={antialias}
+              />
+            ) : null}
           </Suspense>
         </Canvas>
       </div>
+      {perfEnabled ? <PerfOverlay enabled /> : null}
     </div>
   );
 }
