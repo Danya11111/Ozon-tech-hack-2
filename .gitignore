@@ -7,3 +7,7 @@ vite.config.d.ts
 .env.*
 npm-debug.log*
 input_info/extracted/
+agent/state/
+agent/reports/
+.demo-preview.pid
+.demo-preview.log

@@ -40,6 +40,9 @@ const PHASE_LABELS: Record<CasePhase, string> = {
   routing: 'Routing to zone',
   exit: 'Exiting',
   clear_gap: 'Clear',
+  fault_hold: 'FAULT / Jam',
+  emergency_hold: 'EMERGENCY STOP',
+  recover: 'Recovering',
 };
 
 const VISIBLE_PHASES: CasePhase[] = [
@@ -48,6 +51,8 @@ const VISIBLE_PHASES: CasePhase[] = [
   'classification',
   'command_sent',
   'routing',
+  'fault_hold',
+  'emergency_hold',
 ];
 
 function normalizeShape(shape: string, roundness: number): DetectedShape {

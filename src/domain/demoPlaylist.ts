@@ -1,9 +1,11 @@
 /**
- * Demo Playlist — 8 showcase cases for the main page auto-demo.
- * Each case demonstrates a specific classification scenario.
+ * Demo Playlist — showcase cases for the main page auto-demo.
+ * Includes classification cases + jam / emergency safety demos.
  */
 
 import type { Category, ScenarioId } from './types';
+
+export type FaultType = 'jam' | 'emergency_stop';
 
 export interface PlaylistCase {
   id: string;
@@ -13,11 +15,13 @@ export interface PlaylistCase {
   scenarioId: ScenarioId;
   expectedCategory: Category;
   warning?: string;
+  /** Optional safety fault sequence (no routing). */
+  faultType?: FaultType;
 }
 
 /**
- * 8 showcase cases for continuous demo playback.
- * Order is designed for storytelling: B → C → D → edge cases.
+ * Showcase playlist: B → C → D → edge cases → safety.
+ * Order is designed for storytelling for jury / investors.
  */
 export const DEMO_PLAYLIST: PlaylistCase[] = [
   {
@@ -84,6 +88,26 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
     scenarioId: 'low_confidence',
     expectedCategory: 'B',
     warning: 'Low confidence is a warning, not a 4th category. Rules still apply.',
+  },
+  {
+    id: 'jam_fault',
+    title: 'Заклинивание у gate',
+    description: 'Jam → FAULT, конвейер остановлен, затем recovery',
+    itemId: 'SKU-004',
+    scenarioId: 'jam',
+    expectedCategory: 'C',
+    faultType: 'jam',
+    warning: 'FAULT: item jammed at stop-gate',
+  },
+  {
+    id: 'emergency_stop',
+    title: 'Аварийная остановка',
+    description: 'E-STOP — все приводы заморожены, затем reset',
+    itemId: 'SKU-001',
+    scenarioId: 'emergency_stop',
+    expectedCategory: 'B',
+    faultType: 'emergency_stop',
+    warning: 'EMERGENCY STOP engaged',
   },
 ];
 

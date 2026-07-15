@@ -1,8 +1,9 @@
 import { Suspense, memo, useEffect, useMemo } from 'react';
 import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
 import { getModelAsset } from '../../data/modelAssets';
-import { ITEMS } from '../../data/items';
+import { resolveItem } from '../../data/resolveItem';
 import type { PlaylistCase } from '../../domain/demoPlaylist';
+import { classifyItem } from '../../domain/classifier';
 import { getRenderedItemDimensions } from '../../domain/physicalLayout';
 import * as THREE from 'three';
 import { useLoader } from '@react-three/fiber';
@@ -33,9 +34,6 @@ interface RenderProps {
   metalness: number;
 }
 
-// STL geometry is cached globally by useLoader (one geometry per URL, shared
-// across items). We only render the solid mesh — no per-item wireframe overlay,
-// which keeps draw calls and allocations low.
 function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, roughness, metalness }: RenderProps & {
   path: string;
   scale: [number, number, number];
@@ -60,7 +58,6 @@ function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughn
   type: 'box' | 'cylinder' | 'sphere';
   w: number; h: number; d: number;
 }) {
-  // Memoize the geometry once per size so we don't allocate every render.
   const geometry = useMemo<THREE.BufferGeometry>(() => {
     if (type === 'cylinder' || type === 'sphere') {
       const r = Math.max(w, d) / 2;
@@ -81,29 +78,32 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
   caseData,
   elapsedMs,
   slotIndex = 0,
+  jitter,
 }: {
   caseData: PlaylistCase;
   elapsedMs: number;
   slotIndex?: number;
+  jitter?: { x: number; z: number; yaw: number };
 }) {
-  const itemId = caseData.itemId.replace('-LC', '');
-  const itemData = useMemo(() => ITEMS.find(i => i.id === itemId) ?? ITEMS[0], [itemId]);
+  const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
+  const classification = useMemo(() => classifyItem(itemData), [itemData]);
+  const itemId = itemData.id.replace('-LC', '');
   const asset = getModelAsset(itemId);
-
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
 
   const pose = getPhysicalItemPose({
     caseId: caseData.id,
     slotIndex,
     dimensionsMm: itemData.dimensionsMm,
-    targetCategory: caseData.expectedCategory,
+    targetCategory: classification.category,
     elapsedMs,
+    faultType: caseData.faultType,
+    jitter,
   });
 
   const { position, rotation, phase, surface, isSettled } = pose;
   const isRouting = phase === 'routing';
   const useSimplifiedMesh = phase === 'settled' || isSettled;
-  // Contact shadow only while the item rides a flat transport surface.
   const onTransport = surface === 'main_belt'
     || surface === 'inspection_station'
     || surface === 'routing_junction'
@@ -111,13 +111,14 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
 
   if (elapsedMs < 0) return null;
 
-  const routeAccent = COLORS[caseData.expectedCategory] ?? COLORS.sensorAccent;
+  const routeAccent = COLORS[classification.category] ?? COLORS.sensorAccent;
   const material = ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
-  const bodyColor = useSimplifiedMesh ? (material.color ?? '#b8b2a8') : material.color;
+  const bodyColor = phase === 'fault' ? '#ef4444' : useSimplifiedMesh ? (material.color ?? '#b8b2a8') : material.color;
   const accentColor = useSimplifiedMesh ? '#94a3b8' : routeAccent;
-  const emissiveIntensity = useSimplifiedMesh ? 0.01 : (isRouting ? 0.12 : 0.03);
+  const emissiveIntensity = useSimplifiedMesh
+    ? 0.01
+    : (phase === 'fault' ? 0.25 : isRouting ? 0.12 : 0.03);
   const metalness = material.metalness ?? 0.05;
-
   const useSTL = !useSimplifiedMesh && asset?.loaderType === 'stl' && asset?.frontendAssetPath;
   const stlPath = asset?.frontendAssetPath ?? '';
   const fallbackType = asset?.fallbackPrimitive ?? 'box';

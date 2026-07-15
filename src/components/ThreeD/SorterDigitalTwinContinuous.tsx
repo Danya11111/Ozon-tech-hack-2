@@ -22,7 +22,7 @@ import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
 import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
-import { CASE_DURATION_MS } from '../../domain/continuousPlayback';
+import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
 import {
   getCameraConfig,
   smoothCameraTransition,
@@ -133,13 +133,14 @@ function CinematicCameraController({
   // Get item position for camera following
   const itemPosition = useMemo(() => {
     if (playback.status === 'idle') return null;
-    const currentItemElapsed = playback.totalElapsedMs - (playback.currentCaseIndex * CASE_DURATION_MS);
     const pose = getPhysicalItemPose({
       caseId: playback.currentCase.id,
-      dimensionsMm: { width: 300, depth: 200, height: 200 }, // rough approx for camera target
+      dimensionsMm: { width: 300, depth: 200, height: 200 },
       targetCategory: playback.targetCategory,
-      elapsedMs: currentItemElapsed,
-      slotIndex: playback.currentCaseIndex
+      elapsedMs: playback.caseElapsedMs,
+      slotIndex: playback.currentCaseIndex,
+      faultType: playback.currentCase.faultType,
+      jitter: playback.positionJitter,
     });
     return pose.position;
   }, [playback]);
@@ -1211,8 +1212,9 @@ function ContinuousScene({
   
   // Compute physical items based on elapsed time. Cap the number of
   // simultaneously rendered items to keep the scene lightweight.
-  const { totalElapsedMs, currentCase, currentCaseIndex } = playback;
-  const casesSpawned = Math.floor(totalElapsedMs / CASE_DURATION_MS) + 1;
+  // Use cumulative playlist durations (cases may differ: jam / e-stop).
+  const { totalElapsedMs, currentCase, currentCaseIndex, caseElapsedMs, positionJitter } = playback;
+  const casesSpawned = currentCaseIndex + 1;
   const startIndex = Math.max(0, casesSpawned - MAX_VISIBLE_ITEMS);
 
   const sceneItems = useMemo(() => {
@@ -1220,16 +1222,20 @@ function ContinuousScene({
     for (let i = startIndex; i < casesSpawned; i++) {
       const playlistIndex = i % PLAYLIST_LENGTH;
       const caseData = DEMO_PLAYLIST[playlistIndex];
-      const elapsedMs = totalElapsedMs - (i * CASE_DURATION_MS);
+      const caseStart = cumulativePlaylistDurationMs(i);
+      const elapsedMs = i === currentCaseIndex
+        ? caseElapsedMs
+        : getPlaylistCaseDurationMs(caseData) + 1; // settled past end for prior cases
       items.push({
         id: `item-${i}-${caseData.id}`,
         slotIndex: i,
         caseData,
-        elapsedMs,
+        elapsedMs: Math.max(0, elapsedMs),
+        caseStart,
       });
     }
     return items;
-  }, [totalElapsedMs, casesSpawned, startIndex]);
+  }, [caseElapsedMs, casesSpawned, startIndex, currentCaseIndex]);
 
   // Get item data for the current case
   const itemId = currentCase.itemId.replace('-LC', '');
@@ -1239,13 +1245,15 @@ function ContinuousScene({
   const itemScale = Math.max(dims.width, dims.depth, dims.height);
   
   // Get item position for measurement visualization using physical model
-  const currentItemElapsed = totalElapsedMs - (currentCaseIndex * CASE_DURATION_MS);
+  const currentItemElapsed = caseElapsedMs;
   const currentPose = getPhysicalItemPose({
     caseId: currentCase.id,
     dimensionsMm: itemData.dimensionsMm,
     targetCategory: category,
     elapsedMs: currentItemElapsed,
-    slotIndex: currentCaseIndex
+    slotIndex: currentCaseIndex,
+    faultType: currentCase.faultType,
+    jitter: positionJitter,
   });
   const itemPos = currentPose.position;
   const activeRoute = currentPose.activeRoute;
@@ -1377,6 +1385,7 @@ function ContinuousScene({
           caseData={item.caseData}
           elapsedMs={item.elapsedMs}
           slotIndex={item.slotIndex}
+          jitter={item.slotIndex === currentCaseIndex ? positionJitter : undefined}
         />
       ))}
       

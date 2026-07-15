@@ -39,21 +39,28 @@ A → подающий конвейер → накопитель → CV/laser/ul
 
 ### Автоматическая демонстрация
 
-**Главная возможность** — Auto Demo:
-- **ВАЖНО**: Сначала нажмите "3D Digital Twin" toggle для включения 3D (по умолчанию 2D fallback на первой загрузке)
-- Нажмите "🎬 Запустить автодемо" для полного автоматического цикла
-- Товар автоматически: появляется → сканируется → классифицируется → маршрутизируется в B/C/D
-- Controls: Пауза/Продолжить, Остановить, Reset
-- Режимы: Автоматический (по умолчанию) или ручной (Next step)
+**Главная страница `/`** — Continuous Playback (10 кейсов: B/C/D + low confidence + jam + E-stop):
+
+1. Откройте сайт и нажмите **Play Demo** (или Space).
+2. Управление:
+   - **Space** — play/pause
+   - **N / →** — следующий кейс, **B / ←** — предыдущий
+   - **1–0** — прыжок к кейсу
+   - **R** — аварийный reset сценария
+   - **P** — presentation mode, **F** — fullscreen
+   - **E** — журнал событий
+   - **0.5×–2×** — скорость
+3. HUD показывает live `classifyItem` (DIM / K / reason) — не заскриптованный override.
+4. Engineering / step demo: `/details`
+
+Проверка: `npm test` (153+), `npm run build`, `./scripts/demo-health.sh`.
 
 **3D Verification Checklist** (для защиты):
-1. Открыть https://arhipovdan.ru/ в desktop Chrome/Edge
-2. Нажать "3D Digital Twin" toggle
-3. Проверить: 3D scene renders (green floor, A/B/C/D zones visible)
-4. Нажать "🎬 Запустить автодемо"
-5. Проверить: NO black screen, item moves, FPS stable (~60)
-6. Открыть Console (F12): no errors
-7. Проверить mobile (<640px): 2D fallback автоматически
+1. Desktop Chrome/Edge → Play Demo
+2. Нет чёрного экрана, товар движется, FPS стабилен (~30–60)
+3. Console без ошибок
+4. Кейсы 9–10: jam (FAULT) и emergency stop
+5. Mobile (<640px): упрощённая сцена / fallback
 
 **Реальные 3D модели** (6 STL, 55%):
 - Бутылка, Тарелка, Цилиндр, Короб 300, Короб 400, ЛанчБокс

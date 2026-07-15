@@ -121,8 +121,9 @@ describe('Playlist Items Physical Constraints', () => {
     }
   });
 
-  it('playlist has 8 cases', () => {
-    expect(DEMO_PLAYLIST).toHaveLength(8);
+  it('playlist has classification and safety cases', () => {
+    expect(DEMO_PLAYLIST.length).toBeGreaterThanOrEqual(8);
+    expect(DEMO_PLAYLIST).toHaveLength(10);
   });
 
   it('low confidence case still has B/C/D category', () => {

@@ -22,7 +22,12 @@ import {
   resumePlayback,
   stopPlayback,
   updatePlayback,
+  seekToCase,
+  seekNextCase,
+  seekPrevCase,
+  setPlaybackSpeed,
   type ContinuousPlaybackState,
+  type PlaybackSpeed,
 } from './domain/continuousPlayback';
 
 function scrollToId(id: string) {
@@ -236,6 +241,22 @@ function AppContent() {
     setPlayback(stopPlayback);
   }, []);
 
+  const handleSeekCase = useCallback((index: number) => {
+    setPlayback((prev) => seekToCase(prev, index));
+  }, []);
+
+  const handleSeekNext = useCallback(() => {
+    setPlayback((prev) => seekNextCase(prev));
+  }, []);
+
+  const handleSeekPrev = useCallback(() => {
+    setPlayback((prev) => seekPrevCase(prev));
+  }, []);
+
+  const handleSetSpeed = useCallback((speed: PlaybackSpeed) => {
+    setPlayback((prev) => setPlaybackSpeed(prev, speed));
+  }, []);
+
   return (
     <Routes>
       <Route
@@ -246,6 +267,10 @@ function AppContent() {
             onPlay={handleMainPlay}
             onPause={handleMainPause}
             onStop={handleMainStop}
+            onSeekCase={handleSeekCase}
+            onSeekNext={handleSeekNext}
+            onSeekPrev={handleSeekPrev}
+            onSetSpeed={handleSetSpeed}
           />
         }
       />

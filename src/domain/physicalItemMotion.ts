@@ -7,7 +7,8 @@
  */
 
 import type { Category, DimensionsMm } from './types';
-import { CASE_PHASES } from './continuousPlayback';
+import type { FaultType } from './demoPlaylist';
+import { CASE_PHASES, JAM_CASE_PHASES, ESTOP_CASE_PHASES } from './continuousPlayback';
 import {
   SURFACES,
   lerp3,
@@ -17,7 +18,7 @@ import {
 } from './conveyorNetwork';
 
 export type SurfaceType = SurfaceName;
-export type MotionPhase = 'feed' | 'inspection' | 'decision' | 'routing' | 'settled';
+export type MotionPhase = 'feed' | 'inspection' | 'decision' | 'routing' | 'settled' | 'fault' | 'recover';
 
 export interface PhysicalItemPose {
   position: Vec3;
@@ -34,13 +35,16 @@ export interface PoseInput {
   dimensionsMm: DimensionsMm;
   targetCategory: Category | null;
   elapsedMs: number;
+  faultType?: FaultType;
+  /** Optional seeded visual jitter (meters / radians). */
+  jitter?: { x: number; z: number; yaw: number };
 }
 
-/** Cumulative phase start times reconstructed once from CASE_PHASES. */
-function phaseStarts() {
+/** Cumulative phase start times from a phase table. */
+function phaseStartsFrom(phases: typeof CASE_PHASES) {
   let cumulative = 0;
   const starts: Record<string, number> = {};
-  for (const p of CASE_PHASES) {
+  for (const p of phases) {
     starts[p.phase] = cumulative;
     cumulative += p.durationMs;
   }
@@ -51,7 +55,6 @@ function phaseStarts() {
 function poseOnSurface(name: SurfaceName, t: number, itemHeightM: number): { pos: Vec3; rotY: number } {
   const s = SURFACES[name];
   const p = lerp3(s.start, s.end, t);
-  // Item bottom sits on the surface: center = surfaceTop + half height.
   return {
     pos: [p[0], p[1] + itemHeightM / 2, p[2]],
     rotY: surfaceHeading(name),
@@ -69,9 +72,9 @@ function settledSlot(name: SurfaceName, slotIndex: number, itemHeightM: number):
   const cz = (b.minZ + b.maxZ) / 2;
   const spanX = b.maxX - b.minX;
   const spanZ = b.maxZ - b.minZ;
-  const col = slotIndex % 3;                 // 0,1,2
-  const row = Math.floor(slotIndex / 3) % 2; // 0,1
-  const offsetX = (col - 1) * (spanX / 3.5); // stays well within bounds
+  const col = slotIndex % 3;
+  const row = Math.floor(slotIndex / 3) % 2;
+  const offsetX = (col - 1) * (spanX / 3.5);
   const offsetZ = (row - 0.5) * (spanZ / 3.0);
   return {
     pos: [cx + offsetX, s.surfaceY + itemHeightM / 2, cz + offsetZ],
@@ -79,12 +82,85 @@ function settledSlot(name: SurfaceName, slotIndex: number, itemHeightM: number):
   };
 }
 
+function applyJitter(pos: Vec3, rotY: number, jitter?: PoseInput['jitter']): { pos: Vec3; rotY: number } {
+  if (!jitter) return { pos, rotY };
+  return {
+    pos: [pos[0] + jitter.x, pos[1], pos[2] + jitter.z],
+    rotY: rotY + jitter.yaw,
+  };
+}
+
+/** Jam / E-stop motion: freeze at junction, then recover (no settle into bin). */
+function getFaultPose(input: PoseInput): PhysicalItemPose {
+  const { dimensionsMm, elapsedMs, faultType, jitter } = input;
+  const itemHeightM = dimensionsMm.height / 1000;
+  const phases = faultType === 'emergency_stop' ? ESTOP_CASE_PHASES : JAM_CASE_PHASES;
+  const { starts, total } = phaseStartsFrom(phases);
+
+  const feedStart = starts['move_to_detection'] ?? 0;
+  const inspectStart = starts['detection'] ?? feedStart;
+  const measureStart = starts['measurement'] ?? inspectStart;
+  const classifyStart = starts['classification'] ?? measureStart;
+  const faultStart =
+    starts['fault_hold'] ?? starts['emergency_hold'] ?? classifyStart;
+  const recoverStart = starts['recover'] ?? faultStart;
+  const clearStart = starts['clear_gap'] ?? recoverStart;
+
+  let pos: Vec3;
+  let rotY = 0;
+  let surface: SurfaceType = 'main_belt';
+  let phase: MotionPhase = 'feed';
+
+  if (elapsedMs <= feedStart) {
+    const r = poseOnSurface('main_belt', 0, itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
+  } else if (elapsedMs <= inspectStart) {
+    const t = (elapsedMs - feedStart) / Math.max(inspectStart - feedStart, 1);
+    const r = poseOnSurface('main_belt', t, itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
+  } else if (elapsedMs <= faultStart) {
+    // Hold under inspection / approach gate
+    const r = poseOnSurface('inspection_station', 0.4, itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'inspection_station'; phase = 'inspection';
+  } else if (elapsedMs <= recoverStart) {
+    // Freeze at routing junction (jam / e-stop visual)
+    const r = poseOnSurface('routing_junction', 0.35, itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'routing_junction'; phase = 'fault';
+  } else if (elapsedMs <= clearStart) {
+    // Slight reverse toward belt for recovery narrative
+    const t = (elapsedMs - recoverStart) / Math.max(clearStart - recoverStart, 1);
+    const r = poseOnSurface('routing_junction', 0.35 * (1 - t * 0.5), itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'routing_junction'; phase = 'recover';
+  } else {
+    const r = poseOnSurface('main_belt', 0.15, itemHeightM);
+    pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'recover';
+  }
+
+  const j = applyJitter(pos, rotY, jitter);
+  if (!Number.isFinite(j.pos[0]) || !Number.isFinite(j.pos[1]) || !Number.isFinite(j.pos[2])) {
+    j.pos = [SURFACES.main_belt.start[0], SURFACES.main_belt.surfaceY + itemHeightM / 2, 0];
+  }
+
+  return {
+    position: j.pos,
+    rotation: [0, j.rotY, 0],
+    surface,
+    phase,
+    isSettled: elapsedMs >= total && false,
+    activeRoute: (input.targetCategory as 'B' | 'C' | 'D') || 'B',
+  };
+}
+
 export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
-  const { dimensionsMm, targetCategory, elapsedMs, slotIndex = 0 } = input;
+  if (input.faultType) {
+    return getFaultPose(input);
+  }
+
+  const { dimensionsMm, targetCategory, elapsedMs, slotIndex = 0, jitter } = input;
   const category: 'B' | 'C' | 'D' = (targetCategory as 'B' | 'C' | 'D') || 'B';
   const itemHeightM = dimensionsMm.height / 1000;
 
-  const { starts, total } = phaseStarts();
+  const { starts, total } = phaseStartsFrom(CASE_PHASES);
   const feedStart = starts['move_to_detection'];
   const inspectStart = starts['detection'];
   const junctionStart = starts['measurement'];
@@ -98,25 +174,20 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
   let isSettled = false;
 
   if (elapsedMs <= feedStart) {
-    // Spawn dwell at belt entry (A).
     const r = poseOnSurface('main_belt', 0, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
   } else if (elapsedMs <= inspectStart) {
-    // Feed along the main belt A → inspection.
     const t = (elapsedMs - feedStart) / (inspectStart - feedStart);
     const r = poseOnSurface('main_belt', t, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
   } else if (elapsedMs <= junctionStart) {
-    // Dwell under the inspection station.
     const r = poseOnSurface('inspection_station', 0, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'inspection_station'; phase = 'inspection';
   } else if (elapsedMs <= routingStart) {
-    // Travel to the routing junction.
     const t = (elapsedMs - junctionStart) / (routingStart - junctionStart);
     const r = poseOnSurface('routing_junction', t, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'routing_junction'; phase = 'decision';
   } else if (category === 'B') {
-    // B: short transfer spur → drop chute → settle inside floor bin.
     const exitStart = starts['exit'];
     const travelSpan = exitStart - routingStart;
     const t = (elapsedMs - routingStart) / travelSpan;
@@ -132,7 +203,6 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
       isSettled = elapsedMs >= total;
     }
   } else {
-    // C / D: slide down the chute, then settle on the cage floor.
     const chuteName: SurfaceName = category === 'C' ? 'chute_c' : 'chute_d';
     const cageName: SurfaceName = category === 'C' ? 'c_cage_floor' : 'd_cage_floor';
     const travelSpan = clearStart - routingStart;
@@ -147,14 +217,14 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
     }
   }
 
-  // Guarantee no NaN/Infinity escapes.
-  if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1]) || !Number.isFinite(pos[2])) {
-    pos = [SURFACES.main_belt.start[0], SURFACES.main_belt.surfaceY + itemHeightM / 2, 0];
+  const j = applyJitter(pos, rotY, jitter);
+  if (!Number.isFinite(j.pos[0]) || !Number.isFinite(j.pos[1]) || !Number.isFinite(j.pos[2])) {
+    j.pos = [SURFACES.main_belt.start[0], SURFACES.main_belt.surfaceY + itemHeightM / 2, 0];
   }
 
   return {
-    position: pos,
-    rotation: [0, rotY, 0],
+    position: j.pos,
+    rotation: [0, j.rotY, 0],
     surface,
     phase,
     isSettled,

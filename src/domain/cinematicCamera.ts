@@ -123,6 +123,11 @@ export function getCameraModeForPhase(phase: CasePhase): CameraMode {
       return 'resultZone';
     case 'clear_gap':
       return 'nextItemReset';
+    case 'fault_hold':
+    case 'emergency_hold':
+      return 'routingWide';
+    case 'recover':
+      return 'overview';
     default:
       return 'overview';
   }

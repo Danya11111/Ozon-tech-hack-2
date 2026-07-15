@@ -40,6 +40,8 @@ export default function CVInspectionOverlay({ data, visible }: CVInspectionOverl
     command,
     cPriorityApplied,
     isLowConfidence,
+    classificationReason,
+    classificationLabel,
     itemTitle,
     itemDimensions,
   } = data;
@@ -173,6 +175,16 @@ export default function CVInspectionOverlay({ data, visible }: CVInspectionOverl
             >
               {finalCategory}
               {cPriorityApplied && <span className="cv-priority"> (C priority)</span>}
+            </span>
+          </div>
+        )}
+
+        {classificationReason && (
+          <div className="cv-row cv-reason-row">
+            <span className="cv-label">RULE</span>
+            <span className="cv-value cv-reason">
+              {classificationLabel ? `${classificationLabel} — ` : ''}
+              {classificationReason}
             </span>
           </div>
         )}
