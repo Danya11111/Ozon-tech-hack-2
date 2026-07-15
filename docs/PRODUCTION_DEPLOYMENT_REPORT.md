@@ -8,21 +8,21 @@
 | Поле | Значение |
 | ---- | -------- |
 | Container | `owl-web-1` |
-| Image | `owl-web:20260715-2215` |
+| Image | `owl-web:20260715-2221` |
 | Bundle | `index-AagIOJbd.js` |
 | Version endpoint | `/version.json` |
-| Deployed commit (identity) | `16e7930` |
-| Release id | `20260715-2215` |
+| Deployed commit (identity) | `4fcce5b` |
+| Release id | `20260715-2221` |
 | Publish | `127.0.0.1:3100→80` |
-| Backup container | `owl-web-1-backup-20260715-2215` |
+| Backup container | `owl-web-1-backup-20260715-2221` |
 
 ## Previous
 
 | Поле | Значение |
 | ---- | -------- |
-| Release | `20260715-1712` |
-| Bundle | `index-ncgt6PBL.js` |
-| Commit identity | *(pre-version.json)* |
+| Release | `20260715-2215` (interim) / `20260715-1712` |
+| Bundle | `index-AagIOJbd.js` / `index-ncgt6PBL.js` |
+| Commit identity | `16e7930` then superseded by `4fcce5b` |
 
 ## Public access
 
@@ -36,7 +36,7 @@
 
 ```bash
 export DOCKER_HOST=tcp://127.0.0.1:2375
-EXPECTED_COMMIT=16e7930 bash scripts/deploy-production.sh 20260715-2215
+EXPECTED_COMMIT=4fcce5b bash scripts/deploy-production.sh 20260715-2221
 ```
 
 Build args inject `BUILD_COMMIT` / `BUILD_BRANCH` / `BUILD_RELEASE` because `.git` is dockerignored.

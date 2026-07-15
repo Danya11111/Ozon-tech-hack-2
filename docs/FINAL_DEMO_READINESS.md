@@ -7,7 +7,7 @@
 | Область | Статус | Комментарий |
 | ------- | ------ | ----------- |
 | Git | PASS | Feature branch; no push |
-| Production container | PASS | `20260715-2215` / `index-AagIOJbd.js` / `version.json` → `16e7930` |
+| Production container | PASS | `20260715-2221` / `index-AagIOJbd.js` / `version.json` → `4fcce5b` |
 | Permanent domain | BLOCKED_EXTERNAL | REG.RU → openresty; CF Named Tunnel not auth'd |
 | TLS (permanent) | BLOCKED_EXTERNAL | SNI fail on 185.160.137.162 |
 | Quick Tunnel | PASS | Temporary public URL OK |
