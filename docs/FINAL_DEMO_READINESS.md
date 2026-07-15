@@ -1,40 +1,40 @@
 # FINAL_DEMO_READINESS
 
 Дата: 2026-07-15
-Ветка: `feature/maximum-demo-realism`
-Production release (не тронут этим коммитом): `20260715-1712` / `index-ncgt6PBL.js`
 
 ## Status board
 
 | Область | Статус | Комментарий |
 | ------- | ------ | ----------- |
-| Git | PASS | Feature branch clean after commit; no push |
-| Production container | PASS | `owl-web-1` на `:3100`, bundle `index-ncgt6PBL.js` |
-| Permanent domain | BLOCKED_EXTERNAL | `arhipovdan.ru` → openresty 404 / TLS SNI fail |
-| TLS | BLOCKED_EXTERNAL | Нет SNI-сертификата на destination IP |
-| Main route | PASS | Local + Quick Tunnel |
-| Details route | PASS | SPA fallback 200 |
-| Unit tests | PASS | 166 |
-| E2E | PASS | 15 (excl. production) |
-| Visual regression | PASS | 10 snapshots |
-| GPU performance | PARTIAL | SwiftShader/xvfb only; hardware baseline blocked in coder |
-| Safety scenarios | PASS | Jam + E-stop e2e |
-| Rollback | PASS | Tag `backup/pre-maximum-demo-realism-20260715` + docker rename |
-| Agent safety | PASS | Worktree / dry-run / no auto DNS |
+| Git | PASS | Feature branch; no push |
+| Production container | PASS | `20260715-2215` / `index-AagIOJbd.js` / `version.json` → `16e7930` |
+| Permanent domain | BLOCKED_EXTERNAL | REG.RU → openresty; CF Named Tunnel not auth'd |
+| TLS (permanent) | BLOCKED_EXTERNAL | SNI fail on 185.160.137.162 |
+| Quick Tunnel | PASS | Temporary public URL OK |
+| Main / details | PASS | Local + tunnel |
+| Unit / E2E / visual | PASS | 166 / 15 / 10 |
+| GPU hardware (server) | BLOCKED_BY_DISPLAY_ENVIRONMENT | SwiftShader only |
+| Portable benchmark | PASS tooling | `npm run perf:browser` on laptop |
+| Replay stability | STABLE | See `REPLAY_RESOURCE_STABILITY.md` |
+| Rollback | PASS | docker rename backup |
+| Agent / secrets | PASS | no credentials in git |
+
+## Application readiness
+
+```text
+READY
+```
+
+## Public domain readiness
+
+```text
+WAITING — Cloudflare login + NS cutover (see CLOUDFLARE_NAMED_TUNNEL_SETUP.md)
+```
 
 ## Verdict
 
 ```text
-READY WITH EXTERNAL DOMAIN BLOCKER
+READY FOR LIVE DEMO VIA QUICK TUNNEL
 ```
 
-Live demo **можно** вести с:
-
-- `http://127.0.0.1:3100/` (локально), или
-- актуального Quick Tunnel `https://invitations-based-characters-accent.trycloudflare.com/`
-
-Постоянный домен `https://arhipovdan.ru/` **не готов** до DNS/proxy фикса пользователем (см. `PUBLIC_DOMAIN_DIAGNOSTIC.md`).
-
-## Next deploy note
-
-Новый код (perf overlay, twin layout, visual snapshots) собран как `index-DEbogfOZ.js` в `dist/`, но **не** задеплоен в `owl-web-1`, чтобы не нарушить работающий production. Redeploy — отдельный шаг после доменного фикса или явного запроса.
+After user completes Cloudflare zone + NS change → `READY, WAITING FOR NS CUTOVER` then permanent PASS.

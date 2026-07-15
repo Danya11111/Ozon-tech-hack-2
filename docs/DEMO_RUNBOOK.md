@@ -5,6 +5,7 @@
 **Рабочий публичный URL (временный):** Quick Tunnel — см. `PRODUCTION_DEPLOYMENT_REPORT.md`
 **Ожидаемый постоянный домен:** https://arhipovdan.ru/ — **BLOCKED_EXTERNAL** (`PUBLIC_DOMAIN_DIAGNOSTIC.md`)
 **Локальный production:** http://127.0.0.1:3100/
+**Проверка версии:** `curl -s http://127.0.0.1:3100/version.json`
 **Репозиторий:** `/home/coder/arhipovdan/app`
 
 ---

@@ -2992,7 +2992,7 @@ button:disabled {
   color: #e8f0f7;
   background: rgba(8, 14, 22, 0.78);
   border: 1px solid rgba(120, 160, 200, 0.35);
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
 }
 .perf-overlay-title {
@@ -3004,7 +3004,39 @@ button:disabled {
 .perf-overlay .perf-muted { color: rgba(200, 220, 240, 0.55); }
 .perf-overlay .perf-soft { color: #f0b4a0; margin-top: 4px; }
 .perf-overlay .perf-hw { color: #a8e0b8; margin-top: 4px; }
-.main-page.presentation-mode .perf-overlay { display: none; }
+.perf-export-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 10px;
+  color: #0b1220;
+  background: #9fd0ff;
+  border: none;
+  cursor: pointer;
+}
+.perf-export-btn:hover { background: #c5e4ff; }
+.build-identity {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 35;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: #c8d8e8;
+  background: rgba(8, 14, 22, 0.7);
+  border: 1px solid rgba(120, 160, 200, 0.3);
+  pointer-events: none;
+}
+.build-identity-label { text-transform: uppercase; letter-spacing: 0.08em; color: #7aa8cc; }
+.build-identity-commit { color: #e8f4ff; font-weight: 600; }
+.build-identity-release { color: rgba(200, 220, 240, 0.55); }
+.main-page.presentation-mode .perf-overlay,
+.main-page.presentation-mode .build-identity { display: none; }
 
 .main-page.presentation-mode .main-hud,
 .main-page.presentation-mode .main-progress,

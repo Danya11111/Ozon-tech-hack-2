@@ -1,38 +1,33 @@
 # PERFORMANCE_AFTER_MAXIMUM_DEMO
 
-Measured: 2026-07-15
-Commits referenced: `985f7c3` / tooling on current branch
+## Production identity
 
-## Bundle (production container, unchanged)
-
-| Метрика | Значение |
-| ------- | -------: |
-| Main chunk | `index-ncgt6PBL.js` |
-| Release | `20260715-1712` |
+| Field | Value |
+| ----- | ----- |
+| Release | `20260715-2215` |
+| Bundle | `index-AagIOJbd.js` |
+| Commit | `16e7930` (via `/version.json`) |
 
 ## software/headless WebGL diagnostic baseline
 
-**Не является характеристикой живой демонстрации.**
+**Not a live-demo GPU characteristic.**
 
 ```text
-Average FPS: 9.6
-Minimum FPS: 3.3
-p95 frame time: 200 ms
+Average FPS: ~8.9–9.6
+Renderer: SwiftShader
+Status: BLOCKED_BY_DISPLAY_ENVIRONMENT on server
 ```
 
-Повторено под xvfb/SwiftShader (~8.9 FPS demo) — см. `HEADED_GPU_PERFORMANCE_REPORT.md`.
+## Replay geometries
 
-## Headed / GPU tooling
+Earlier probe showed +12 geometries after 3 replays under SwiftShader.
+Re-run on production (`npm run perf:replay-stability`): **STABLE** (147 geos flat through 10 replays; +3 after GC pause only).
 
-| Item | Status |
-| ---- | ------ |
-| `?perf=1` overlay | Implemented |
-| `?quality=low\|medium\|high\|demo` | Implemented |
-| `npm run perf:gpu` | Writes report + JSON |
-| Hardware NVIDIA WebGL in coder | **Not available** (Chromium → SwiftShader) |
-| True GPU baseline | Run on presentation laptop with DISPLAY + real GPU |
+## Tooling
 
-## Notes
-
-- Demo quality keeps `shadows=false` for stable FPS.
-- Do not quote SwiftShader FPS to jury as demo capability.
+| Command | Purpose |
+| ------- | ------- |
+| `npm run perf:gpu` | Server/xvfb diagnostic |
+| `npm run perf:browser` | Portable headed laptop benchmark |
+| `npm run perf:replay-stability` | Geometry/heap plateau check |
+| `/?perf=1` → Export benchmark | Local JSON download |

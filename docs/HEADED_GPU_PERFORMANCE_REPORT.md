@@ -7,13 +7,15 @@ Display: headed (:99)
 Software renderer detected: **YES**
 Verdict: **NOT A GPU BASELINE — software renderer (SwiftShader/llvmpipe/etc.)**
 
-## Notes
+## Server hardware WebGL re-check (2026-07-15)
 
-- Headed Chromium with GPU-preferring flags.
-- PerfCollector only with `?perf=1`; quality forced via `?quality=`.
-- Prior headless ~9.6 FPS is labeled software/headless WebGL diagnostic baseline.
-- **Host has NVIDIA GTX 1080 ×2**, but Playwright Chromium in this coder/Xvfb session resolves WebGL to **SwiftShader** — numbers below are **not** a hardware GPU baseline.
-- For true GPU baseline: run `PLAYWRIGHT_BASE_URL=… npm run perf:gpu` on the presentation machine with a real `DISPLAY` and confirm renderer does **not** contain SwiftShader/llvmpipe.
+Tried Chromium flags independently (`--use-gl=egl`, `--use-angle=gl-egl`, `--use-angle=gl`, Vulkan ANGLE) with NVIDIA EGL vendor file present. All resolved to **SwiftShader**.
+
+```text
+BLOCKED_BY_DISPLAY_ENVIRONMENT
+```
+
+Portable path: `npm run perf:browser` / `docs/HARDWARE_BENCHMARK_RUNBOOK.md`.
 
 ## Mode table (after Play)
 

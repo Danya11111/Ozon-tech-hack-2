@@ -21,7 +21,10 @@
     "demo:start": "bash scripts/demo-start.sh",
     "demo:stop": "bash scripts/demo-stop.sh",
     "demo:health": "bash scripts/demo-health.sh",
-    "perf:gpu": "node scripts/headed-gpu-baseline.mjs"
+    "perf:gpu": "node scripts/headed-gpu-baseline.mjs",
+    "perf:browser": "node scripts/portable-browser-benchmark.mjs",
+    "perf:browser:export": "node scripts/portable-browser-benchmark.mjs --export",
+    "perf:replay-stability": "node scripts/replay-stability.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

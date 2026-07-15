@@ -9,6 +9,7 @@ import { getMeasurementData, shouldShowMeasurement } from '../domain/measurement
 import { getViewportType, type ViewportType } from '../domain/cinematicCamera';
 import { detectQualityMode } from '../domain/qualityMode';
 import { resolveItem } from '../data/resolveItem';
+import BuildIdentityBadge from '../components/BuildIdentityBadge';
 import CVInspectionOverlay from '../components/CVInspectionOverlay';
 
 const SorterDigitalTwinContinuous = lazy(() => import('../components/ThreeD/SorterDigitalTwinContinuous'));
@@ -391,6 +392,8 @@ export default function MainPage({
           Exit presentation (P)
         </button>
       )}
+
+      <BuildIdentityBadge />
     </div>
   );
 }

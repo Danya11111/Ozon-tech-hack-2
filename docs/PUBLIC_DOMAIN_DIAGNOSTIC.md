@@ -9,7 +9,11 @@
 BLOCKED_EXTERNAL
 ```
 
-Постоянный домен `https://arhipovdan.ru/` **не обслуживается** текущим production-контейнером `owl-web-1`. Приложение на `127.0.0.1:3100` здорово и отдаёт актуальный bundle; проблема на уровне DNS → чужой openresty на публичном IP.
+Постоянный домен `https://arhipovdan.ru/` **не** обслуживает `owl-web-1`.
+Production на `:3100` и Quick Tunnel обновлены до commit `16e7930` (`/version.json`).
+
+Named Tunnel: **не создан** из этого окружения — нет Cloudflare origin cert / API token.
+См. `CLOUDFLARE_NAMED_TUNNEL_SETUP.md` и `DNS_MIGRATION_INVENTORY.md`.
 
 ## DNS
 

@@ -49,6 +49,22 @@ export default function PerfOverlay({ enabled }: PerfOverlayProps) {
 
   const soft = !snap.hardwareAccelerated;
 
+  const exportBenchmark = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      snapshot: snap,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `sorter-benchmark-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div
       className="perf-overlay"
@@ -86,6 +102,14 @@ export default function PerfOverlay({ enabled }: PerfOverlayProps) {
         {soft ? 'SW' : 'GPU'} {snap.renderer.slice(0, 42)}
         {snap.renderer.length > 42 ? '…' : ''}
       </div>
+      <button
+        type="button"
+        className="perf-export-btn"
+        data-testid="perf-export"
+        onClick={exportBenchmark}
+      >
+        Export benchmark
+      </button>
     </div>
   );
 }

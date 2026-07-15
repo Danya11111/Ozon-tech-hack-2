@@ -1,10 +1,10 @@
 # Реестр рисков (Risk Register)
 
-**Проект:** OZON Tech Sorter Simulation  
-**Дата:** 2026-07-15  
+**Проект:** OZON Tech Sorter Simulation
+**Дата:** 2026-07-15
 **Ветка:** `feature/maximum-demo-realism`
 
-Шкала: вероятность / влияние = Low · Medium · High · Critical.  
+Шкала: вероятность / влияние = Low · Medium · High · Critical.
 Статус: Open · Mitigated · Accepted.
 
 ---
@@ -13,7 +13,10 @@
 
 | ID | Риск | Вероятность | Влияние | Статус | Митигация |
 | -- | ---- | ----------- | ------- | ------ | --------- |
-| R01 | Production :3100 / https://arhipovdan.ru/ отдаёт старый dist / домен 404 | High | Critical | Open | Local+tunnel PASS; domain BLOCKED_EXTERNAL — `PUBLIC_DOMAIN_DIAGNOSTIC.md` |
+| R01 | Production :3100 / arhipovdan.ru | Medium | Critical | Partially mitigated | Local+tunnel on `16e7930`+version.json; domain still BLOCKED_EXTERNAL |
+| R18 | Tunnel/cloudflared outage / permanent DNS | High | Critical | Open | Quick Tunnel kept; Named Tunnel needs CF login — `CLOUDFLARE_NAMED_TUNNEL_SETUP.md` |
+| R21 | Hardware GPU baseline недоступен в coder | High | Medium | Accepted | `BLOCKED_BY_DISPLAY_ENVIRONMENT`; portable `perf:browser` |
+| R22 | DNS NS cutover теряет MX/TXT | Medium | High | Open | `DNS_MIGRATION_INVENTORY.md` — check REG.RU panel before NS change |
 | R02 | Визуальный разрыв `/` vs `/details` путает жюри | Medium | High | Mitigated | `sharedLayout` + routeConsistency tests |
 | R03 | Жюри воспринимает кинематику как «фейк» | Medium | High | Mitigated | Proof HUD + честные формулировки; jam/e-stop |
 | R04 | Pseudo-CV раскрыт как «обман» | Medium | Medium | Accepted | RULE overlay + confidence; не обещать ML |
@@ -40,15 +43,15 @@
 
 ### R01 — Устаревший production dist
 
-**Симптом:** локально proof/hotkeys есть, на https://arhipovdan.ru/ — нет.  
-**Детектор:** сравнить UI; `demo:health`; hash файлов в контейнере (если доступен docker на хосте).  
-**Реакция:** ручной redeploy; на показе переключиться на проверенный preview.  
+**Симптом:** локально proof/hotkeys есть, на https://arhipovdan.ru/ — нет.
+**Детектор:** сравнить UI; `demo:health`; hash файлов в контейнере (если доступен docker на хосте).
+**Реакция:** ручной redeploy; на показе переключиться на проверенный preview.
 **Тип данных о риске:** подтверждён аудитом как **процессный** факт («may still serve OLD dist»).
 
 ### R09 — Автономный агент vs production
 
-**Симптом:** гипотетический merge/deploy без человека.  
-**Текущий контроль:** `forbidMergeToMain`, `forbidProductionDeploy`, нет Implementer auto-patch.  
+**Симптом:** гипотетический merge/deploy без человека.
+**Текущий контроль:** `forbidMergeToMain`, `forbidProductionDeploy`, нет Implementer auto-patch.
 **Остаточный риск:** появится при расширении MVP без обновления safety caps.
 
 ### R10 — Секреты
@@ -93,11 +96,11 @@
 
 ## 6. Триггеры пересмотра реестра
 
-- Смена хоста/GPU/RAM.  
-- Включение Implementer auto-patch.  
-- Добавление physics engine.  
-- Подключение реального CV inference.  
-- Появление CI e2e.  
+- Смена хоста/GPU/RAM.
+- Включение Implementer auto-patch.
+- Добавление physics engine.
+- Подключение реального CV inference.
+- Появление CI e2e.
 - Инцидент на живом показе.
 
 ---

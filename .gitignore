@@ -7,10 +7,12 @@ playwright.config.js
 playwright.config.d.ts
 .env
 .env.*
+public/version.json
 npm-debug.log*
 input_info/extracted/
 agent/state/
 agent/reports/
+docs/HARDWARE_BROWSER_BENCHMARK_LATEST.md
 .agent/worktrees/
 .demo-preview.pid
 .demo-preview.log
