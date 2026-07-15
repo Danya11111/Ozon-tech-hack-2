@@ -41,7 +41,7 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
     mode: 'high',
     dprMax: 1.5,
     antialias: true,
-    shadows: false,
+    shadows: true,
     maxVisibleItems: 6,
     effectsEnabled: false,
     rollerDetail: 'full',
@@ -51,7 +51,7 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
     mode: 'demo',
     dprMax: 1.5,
     antialias: true,
-    shadows: false,
+    shadows: false, // contact shadows via mesh only — stable demo FPS
     maxVisibleItems: 6,
     effectsEnabled: false,
     rollerDetail: 'full',

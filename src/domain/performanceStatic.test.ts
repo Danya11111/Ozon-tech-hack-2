@@ -23,7 +23,8 @@ describe('performance and production hygiene', () => {
 
   it('disables heavy demo effects by default', () => {
     expect(sceneSource).toMatch(/ENABLE_DEMO_EFFECTS\s*=\s*false/);
-    expect(sceneSource).toMatch(/shadows=\{false\}/);
+    // Shadows controlled by quality presets; demo mode keeps shadows false in qualityMode.ts
+    expect(sceneSource).toMatch(/shadows=\{quality\.shadows\}/);
   });
 
   it('keeps console.error only in error boundaries', () => {

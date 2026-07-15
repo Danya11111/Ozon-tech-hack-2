@@ -7,10 +7,16 @@
     "dev": "vite --host 127.0.0.1 --port 3100",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 3100",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:update": "playwright test --update-snapshots",
     "agent:dry-run": "node agent/cli.mjs dry-run",
     "agent:run-once": "node agent/cli.mjs run-once",
+    "agent:implement": "node agent/cli.mjs implement",
     "agent:status": "node agent/cli.mjs status",
+    "agent:stop": "node agent/cli.mjs stop",
+    "agent:resume": "node agent/cli.mjs resume",
     "demo:start": "bash scripts/demo-start.sh",
     "demo:stop": "bash scripts/demo-stop.sh",
     "demo:health": "bash scripts/demo-health.sh"
@@ -27,6 +33,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

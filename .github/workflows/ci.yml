@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [feature/**, dan_branch, main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start preview
+        run: |
+          npx vite preview --host 127.0.0.1 --port 3101 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3101/ && break; sleep 1; done
+      - name: E2E smoke
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3101
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore

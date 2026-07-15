@@ -156,6 +156,7 @@ export default function MainPage({
                 onContextLost={() => setContextLost(true)}
                 autoCameraEnabled={autoCameraEnabled}
                 viewportType={viewportType}
+                qualityMode={qualityMode}
               />
             </Suspense>
           </ThreeErrorBoundary>
@@ -175,29 +176,35 @@ export default function MainPage({
       )}
 
       {!presentationMode && (
-        <div className="main-hud">
+        <div className="main-hud" data-testid="demo-hud">
           <div className="hud-row">
             <span className="hud-label">Item</span>
             <span className="hud-value">{currentCase.title}</span>
           </div>
           <div className="hud-row">
             <span className="hud-label">Status</span>
-            <span className={`hud-value status-${playback.status} ${faultActive ? 'status-fault' : ''}`}>
+            <span
+              className={`hud-value status-${playback.status} ${faultActive ? 'status-fault' : ''}`}
+              data-testid="demo-status"
+            >
               {isFinished ? 'FINISHED' : phaseConfig.label}
             </span>
           </div>
           <div className="hud-row">
             <span className="hud-label">Category</span>
-            <span className={`hud-value ${category ? `category-${category}` : ''}`}>
+            <span
+              className={`hud-value ${category ? `category-${category}` : ''}`}
+              data-testid="demo-category"
+            >
               {category ?? '—'}
             </span>
           </div>
           <div className="hud-row">
             <span className="hud-label">Command</span>
-            <span className="hud-value">{command}</span>
+            <span className="hud-value" data-testid="demo-command">{command}</span>
           </div>
           {playback.classification && (
-            <div className="hud-row hud-row-small">
+            <div className="hud-row hud-row-small" data-testid="demo-proof">
               <span className="hud-value proof-text">
                 {playback.classification.dimensionsPass ? 'DIM✓' : 'DIM✗'} · K=
                 {resolveItem(currentCase.itemId).roundness.toFixed(2)} · {playback.classification.reason}
@@ -216,7 +223,9 @@ export default function MainPage({
           <div className="hud-divider" />
           <div className="hud-row">
             <span className="hud-label">Case</span>
-            <span className="hud-value">{playback.currentCaseIndex + 1}/{PLAYLIST_LENGTH}</span>
+            <span className="hud-value" data-testid="demo-case-label">
+              {playback.currentCaseIndex + 1}/{PLAYLIST_LENGTH}
+            </span>
           </div>
           <div className="hud-row hud-row-small">
             <span className="hud-value">{currentCase.description}</span>
@@ -241,13 +250,21 @@ export default function MainPage({
               title={`${idx + 1}. ${c.title} → ${c.faultType ?? c.expectedCategory}`}
               onClick={() => onSeekCase(idx)}
               aria-label={`Jump to case ${idx + 1}`}
+              data-testid={`demo-case-${idx}`}
             />
           ))}
         </div>
       )}
 
       <div className="main-controls">
-        <button type="button" className="ctrl-nav" onClick={onSeekPrev} aria-label="Previous case" title="Prev (← / B)">
+        <button
+          type="button"
+          className="ctrl-nav"
+          onClick={onSeekPrev}
+          aria-label="Previous case"
+          title="Prev (← / B)"
+          data-testid="demo-prev"
+        >
           ⏮
         </button>
         <button
@@ -255,6 +272,7 @@ export default function MainPage({
           className="play-button"
           onClick={handlePlayPause}
           aria-label={isRunning ? 'Pause demo' : 'Play demo'}
+          data-testid={isRunning ? 'demo-pause' : 'demo-play'}
         >
           {isRunning ? (
             <span className="play-icon">⏸</span>
@@ -265,12 +283,26 @@ export default function MainPage({
             {isRunning ? 'Pause' : isPaused ? 'Resume' : isFinished ? 'Replay' : 'Play Demo'}
           </span>
         </button>
-        <button type="button" className="ctrl-nav" onClick={onSeekNext} aria-label="Next case" title="Next (→ / N)">
+        <button
+          type="button"
+          className="ctrl-nav"
+          onClick={onSeekNext}
+          aria-label="Next case"
+          title="Next (→ / N)"
+          data-testid="demo-next"
+        >
           ⏭
         </button>
 
         {(isRunning || isPaused) && (
-          <button type="button" className="stop-button" onClick={onStop} aria-label="Stop demo" title="Reset (R)">
+          <button
+            type="button"
+            className="stop-button"
+            onClick={onStop}
+            aria-label="Stop demo"
+            title="Reset (R)"
+            data-testid="demo-stop"
+          >
             ⏹
           </button>
         )}
@@ -283,6 +315,7 @@ export default function MainPage({
                 type="button"
                 className={`speed-btn ${playback.speed === s ? 'active' : ''}`}
                 onClick={() => onSetSpeed(s)}
+                data-testid={`demo-speed-${s}`}
               >
                 {s}×
               </button>
@@ -292,7 +325,7 @@ export default function MainPage({
       </div>
 
       {isFinished && (
-        <div className="main-finished-overlay">
+        <div className="main-finished-overlay" data-testid="demo-finished">
           <div className="finished-content">
             <h2>Demo Complete</h2>
             <p>All {PLAYLIST_LENGTH} cases demonstrated — including safety scenarios</p>
@@ -304,7 +337,7 @@ export default function MainPage({
       )}
 
       {showEventLog && !presentationMode && (
-        <div className="main-event-log" aria-live="polite">
+        <div className="main-event-log" aria-live="polite" data-testid="demo-event-log">
           <div className="event-log-header">Event journal</div>
           <ul>
             {playback.events.slice(0, 8).map((ev) => (
@@ -331,7 +364,13 @@ export default function MainPage({
 
       {!presentationMode && (
         <>
-          <button type="button" className="presentation-toggle" onClick={enterFullscreen} title="Presentation (P / F)">
+          <button
+            type="button"
+            className="presentation-toggle"
+            onClick={enterFullscreen}
+            title="Presentation (P / F)"
+            data-testid="demo-presentation"
+          >
             Present
           </button>
           <Link to="/details" className="details-link">

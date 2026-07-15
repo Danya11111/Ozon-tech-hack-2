@@ -3,3 +3,13 @@ dist
 .git
 npm-debug.log
 .DS_Store
+.agent
+releases
+e2e
+playwright-report
+test-results
+agent/reports
+agent/state
+docs
+*.md
+.git

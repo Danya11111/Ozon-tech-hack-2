@@ -23,6 +23,8 @@ import type { Category } from '../../domain/types';
 import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
 import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
+import { INDUSTRIAL_PALETTE } from '../../domain/industrialTheme';
+import { detectQualityMode, getQualitySettings, type QualityMode } from '../../domain/qualityMode';
 import {
   getCameraConfig,
   smoothCameraTransition,
@@ -60,6 +62,7 @@ export interface SorterDigitalTwinContinuousProps {
   onContextLost?: () => void;
   autoCameraEnabled?: boolean;
   viewportType?: ViewportType;
+  qualityMode?: QualityMode;
 }
 
 /** 
@@ -69,24 +72,24 @@ export interface SorterDigitalTwinContinuousProps {
  * Accents: subtle, not overly bright
  */
 const COLORS = {
-  background: '#f4f7fb',
-  floor: '#e8eef6',
-  gridCell: '#d0dae8',
-  gridSection: '#b8c8dc',
-  conveyorFrame: '#8a9bb0',      // Industrial metal gray
-  belt: '#6b8298',              // Matte PVC blue-gray
-  beltStripe: '#7d96ad',        // Subtle stripe
-  sideGuards: '#7a8fa3',        // Metal guards
-  rollers: '#9aa8b8',           // Brushed metal
-  supports: '#a0afc0',          // Support legs
-  motor: '#5a6a7a',             // Dark motor housing
-  sensorAccent: '#3b82f6',      // Blue sensor (less saturated)
-  sensorActive: '#60a5fa',      // Active state
-  gateFrame: '#7a8a9a',         // Gate metal
-  routeB: '#16a34a',            // Green (softer)
-  routeC: '#ea580c',            // Orange (softer)
-  routeD: '#7c3aed',            // Purple (softer)
-  itemShadow: '#3a4a5a',        // Contact shadow
+  background: INDUSTRIAL_PALETTE.background,
+  floor: INDUSTRIAL_PALETTE.floor,
+  gridCell: INDUSTRIAL_PALETTE.gridCell,
+  gridSection: INDUSTRIAL_PALETTE.gridSection,
+  conveyorFrame: INDUSTRIAL_PALETTE.frame,
+  belt: INDUSTRIAL_PALETTE.belt,
+  beltStripe: INDUSTRIAL_PALETTE.beltStripe,
+  sideGuards: INDUSTRIAL_PALETTE.metal,
+  rollers: INDUSTRIAL_PALETTE.metal,
+  supports: INDUSTRIAL_PALETTE.plastic,
+  motor: INDUSTRIAL_PALETTE.metalDark,
+  sensorAccent: INDUSTRIAL_PALETTE.sensorAccent,
+  sensorActive: '#60a5fa',
+  gateFrame: INDUSTRIAL_PALETTE.metal,
+  routeB: INDUSTRIAL_PALETTE.routeB,
+  routeC: INDUSTRIAL_PALETTE.routeC,
+  routeD: INDUSTRIAL_PALETTE.routeD,
+  itemShadow: '#3a4a5a',
 };
 
 const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalness?: number }> = {
@@ -1444,15 +1447,19 @@ export default function SorterDigitalTwinContinuous({
   onContextLost,
   autoCameraEnabled = true,
   viewportType = 'desktop',
+  qualityMode,
 }: SorterDigitalTwinContinuousProps) {
+  const mode = qualityMode ?? detectQualityMode(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const quality = getQualitySettings(mode);
+  const useSimplified = simplified || mode === 'low';
   return (
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
           camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
-          dpr={simplified ? [1, 1.25] : [1, 1.5]}
-          shadows={false}
-          gl={{ antialias: !simplified, powerPreference: 'high-performance' }}
+          dpr={[1, quality.dprMax]}
+          shadows={quality.shadows}
+          gl={{ antialias: quality.antialias && !useSimplified, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;
             const handleLost = (event: Event) => {
@@ -1466,7 +1473,7 @@ export default function SorterDigitalTwinContinuous({
           <Suspense fallback={null}>
             <ContinuousScene 
               playback={playback} 
-              simplified={simplified}
+              simplified={useSimplified}
               autoCameraEnabled={autoCameraEnabled}
               viewportType={viewportType}
             />

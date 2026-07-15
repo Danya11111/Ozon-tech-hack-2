@@ -12,6 +12,7 @@ import SceneLabels3D from './SceneLabels3D';
 import { PHYSICS_ENGINE_ENABLED } from './itemMotion';
 import { NOMINAL_CONVEYOR_SPEED_MPS } from '../../domain/simulation';
 import { DIMENSION_LIMITS } from '../../domain/classifier';
+import { INDUSTRIAL_PALETTE } from '../../domain/industrialTheme';
 
 export interface SorterDigitalTwinProps {
   simulation: SimulationState;
@@ -67,8 +68,8 @@ function TwinScene({
 
   return (
     <>
-      {/* Darker blue-gray background for industrial feel */}
-      <color attach="background" args={['#0a1520']} />
+      {/* Shared industrial palette — dark engineering projection of the same system */}
+      <color attach="background" args={[INDUSTRIAL_PALETTE.backgroundDark]} />
       
       {/* Improved lighting for better visibility */}
       <ambientLight intensity={0.7} />
