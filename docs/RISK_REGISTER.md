@@ -13,7 +13,7 @@
 
 | ID | Риск | Вероятность | Влияние | Статус | Митигация |
 | -- | ---- | ----------- | ------- | ------ | --------- |
-| R01 | Production :3100 / arhipovdan.ru | Medium | Critical | Partially mitigated | Local+tunnel on `16e7930`+version.json; domain still BLOCKED_EXTERNAL |
+| R01 | Production :3100 / arhipovdan.ru | Medium | Critical | Partially mitigated | Local+tunnel on `4fcce5b`+version.json; domain still BLOCKED_EXTERNAL |
 | R18 | Tunnel/cloudflared outage / permanent DNS | High | Critical | Open | Quick Tunnel kept; Named Tunnel needs CF login — `CLOUDFLARE_NAMED_TUNNEL_SETUP.md` |
 | R21 | Hardware GPU baseline недоступен в coder | High | Medium | Accepted | `BLOCKED_BY_DISPLAY_ENVIRONMENT`; portable `perf:browser` |
 | R22 | DNS NS cutover теряет MX/TXT | Medium | High | Open | `DNS_MIGRATION_INVENTORY.md` — check REG.RU panel before NS change |

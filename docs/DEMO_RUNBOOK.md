@@ -1,10 +1,10 @@
 # Demo Runbook — OZON Tech Sorter Simulation
 
 **Назначение:** провести живую демонстрацию жюри/заказчику без сюрпризов.
-**Дата актуализации:** 2026-07-15
-**Рабочий публичный URL (временный):** Quick Tunnel — см. `PRODUCTION_DEPLOYMENT_REPORT.md`
+**Дата актуализации:** 2026-07-16
+**Рабочий публичный URL (временный):** `https://invitations-based-characters-accent.trycloudflare.com/`
 **Ожидаемый постоянный домен:** https://arhipovdan.ru/ — **BLOCKED_EXTERNAL** (`PUBLIC_DOMAIN_DIAGNOSTIC.md`)
-**Локальный production:** http://127.0.0.1:3100/
+**Локальный production:** http://127.0.0.1:3100/ — commit `4fcce5b`
 **Проверка версии:** `curl -s http://127.0.0.1:3100/version.json`
 **Репозиторий:** `/home/coder/arhipovdan/app`
 

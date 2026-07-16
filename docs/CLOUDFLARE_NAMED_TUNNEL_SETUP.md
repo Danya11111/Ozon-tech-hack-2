@@ -89,12 +89,13 @@ Never commit:
 * API tokens
 * tunnel tokens in systemd unit Environment=
 
-## Status
+## Status (2026-07-16)
 
 ```text
-Named Tunnel created: NO (auth missing)
+Named Tunnel created: NO (auth missing — no cert.pem / CLOUDFLARE_API_TOKEN)
 Ingress prepared as docs: YES
 Connector healthy: N/A
 DNS route: N/A
-NS cutover: WAITING_USER
+NS cutover: WAITING_USER — Cloudflare nameservers not assigned yet
+Quick Tunnel: KEEP RUNNING until permanent HTTPS PASS
 ```

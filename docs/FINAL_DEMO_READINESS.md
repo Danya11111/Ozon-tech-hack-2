@@ -1,6 +1,6 @@
 # FINAL_DEMO_READINESS
 
-Дата: 2026-07-15
+Дата: 2026-07-16 (re-verified)
 
 ## Status board
 
@@ -10,13 +10,13 @@
 | Production container | PASS | `20260715-2221` / `index-AagIOJbd.js` / `version.json` → `4fcce5b` |
 | Permanent domain | BLOCKED_EXTERNAL | REG.RU → openresty; CF Named Tunnel not auth'd |
 | TLS (permanent) | BLOCKED_EXTERNAL | SNI fail on 185.160.137.162 |
-| Quick Tunnel | PASS | Temporary public URL OK |
+| Quick Tunnel | PASS | Temporary public URL OK; smoke PASS |
 | Main / details | PASS | Local + tunnel |
-| Unit / E2E / visual | PASS | 166 / 15 / 10 |
+| Unit / E2E / visual | PASS | 166 / 15 / 10 (2026-07-16) |
 | GPU hardware (server) | BLOCKED_BY_DISPLAY_ENVIRONMENT | SwiftShader only |
 | Portable benchmark | PASS tooling | `npm run perf:browser` on laptop |
 | Replay stability | STABLE | See `REPLAY_RESOURCE_STABILITY.md` |
-| Rollback | PASS | docker rename backup |
+| Rollback | PASS | `owl-web-1-backup-20260715-2221` |
 | Agent / secrets | PASS | no credentials in git |
 
 ## Application readiness

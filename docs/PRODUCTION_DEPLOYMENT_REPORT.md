@@ -1,6 +1,6 @@
 # PRODUCTION_DEPLOYMENT_REPORT
 
-Дата: 2026-07-15
+Дата: 2026-07-16 (re-verified)
 Ветка: `feature/maximum-demo-realism`
 
 ## Current production
@@ -28,7 +28,7 @@
 
 | URL | Status |
 | --- | ------ |
-| `http://127.0.0.1:3100/` | PASS — commit `16e7930` |
+| `http://127.0.0.1:3100/` | PASS — commit `4fcce5b` |
 | Quick Tunnel | PASS — same commit (kept running) |
 | `https://arhipovdan.ru/` | BLOCKED_EXTERNAL — openresty / TLS SNI |
 
@@ -46,7 +46,7 @@ Build args inject `BUILD_COMMIT` / `BUILD_BRANCH` / `BUILD_RELEASE` because `.gi
 ```bash
 export DOCKER_HOST=tcp://127.0.0.1:2375
 docker stop owl-web-1 && docker rm owl-web-1
-docker rename owl-web-1-backup-20260715-2215 owl-web-1
+docker rename owl-web-1-backup-20260715-2221 owl-web-1
 docker start owl-web-1
 ```
 
@@ -54,8 +54,8 @@ docker start owl-web-1
 
 ```bash
 curl -s http://127.0.0.1:3100/version.json
-PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 EXPECTED_COMMIT=16e7930 npm run test:e2e:production
-PLAYWRIGHT_BASE_URL=https://invitations-based-characters-accent.trycloudflare.com EXPECTED_COMMIT=16e7930 npm run test:e2e:production
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 EXPECTED_COMMIT=4fcce5b npm run test:e2e:production
+PLAYWRIGHT_BASE_URL=https://invitations-based-characters-accent.trycloudflare.com EXPECTED_COMMIT=4fcce5b npm run test:e2e:production
 ```
 
 Both local and Quick Tunnel: **PASS**.

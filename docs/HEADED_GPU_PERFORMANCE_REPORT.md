@@ -7,9 +7,12 @@ Display: headed (:99)
 Software renderer detected: **YES**
 Verdict: **NOT A GPU BASELINE — software renderer (SwiftShader/llvmpipe/etc.)**
 
-## Server hardware WebGL re-check (2026-07-15)
+## Server hardware WebGL re-check (2026-07-15 / 2026-07-16)
 
-Tried Chromium flags independently (`--use-gl=egl`, `--use-angle=gl-egl`, `--use-angle=gl`, Vulkan ANGLE) with NVIDIA EGL vendor file present. All resolved to **SwiftShader**.
+- `nvidia-smi`: GTX 1080 ×2 present; `/dev/nvidia*`, `/dev/dri` exist.
+- Current user/groups: root; `video` group exists but no display server (`DISPLAY` empty, no `/tmp/.X11-unix`).
+- Chromium probes (`--use-gl=egl`, `--use-angle=gl-egl`, `--use-angle=gl`, Vulkan ANGLE, `--ignore-gpu-blocklist`) all resolve to **SwiftShader**.
+- No driver/display-server changes applied.
 
 ```text
 BLOCKED_BY_DISPLAY_ENVIRONMENT

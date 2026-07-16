@@ -1,6 +1,6 @@
 # DNS_MIGRATION_INVENTORY
 
-Дата: 2026-07-15
+Дата: 2026-07-16 (re-verified)
 Домен: `arhipovdan.ru`
 Источник: публичные `dig` запросы с OwlPrime/coder.
 

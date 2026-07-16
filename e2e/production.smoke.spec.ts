@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Production smoke — manual only:
- *   PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 EXPECTED_COMMIT=16e7930 npm run test:e2e:production
+ *   PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 EXPECTED_COMMIT=4fcce5b npm run test:e2e:production
  */
 test.describe('production smoke @production', () => {
   test('version, routes, controls, safety, webgl', async ({ page }) => {

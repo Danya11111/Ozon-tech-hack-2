@@ -10,7 +10,7 @@ BLOCKED_EXTERNAL
 ```
 
 Постоянный домен `https://arhipovdan.ru/` **не** обслуживает `owl-web-1`.
-Production на `:3100` и Quick Tunnel обновлены до commit `16e7930` (`/version.json`).
+Production на `:3100` и Quick Tunnel обновлены до commit `4fcce5b` (`/version.json` → release `20260715-2221`, bundle `index-AagIOJbd.js`).
 
 Named Tunnel: **не создан** из этого окружения — нет Cloudflare origin cert / API token.
 См. `CLOUDFLARE_NAMED_TUNNEL_SETUP.md` и `DNS_MIGRATION_INVENTORY.md`.
@@ -40,7 +40,7 @@ dig NS arhipovdan.ru +short   # ns1.reg.ru. ns2.reg.ru.
 | Egress IP хоста (ipify) | `185.160.137.162` (совпадает с A) |
 | `127.0.0.1:80` / `:443` на хосте | **closed** |
 | `185.160.137.162:80` / `:443` | **open**, отвечает **openresty** |
-| `127.0.0.1:3100` | **open**, `owl-web-1` nginx → `index-ncgt6PBL.js` |
+| `127.0.0.1:3100` | **open**, `owl-web-1` nginx → `index-AagIOJbd.js` / `version.json` → `4fcce5b` |
 
 Вывод: порт-форвард / другой хост за тем же публичным IP принимает 80/443. Это **не** namespace текущего Docker host listener set (на host net видны лишь `:3100` и `:8082`).
 
@@ -62,7 +62,7 @@ dig NS arhipovdan.ru +short   # ns1.reg.ru. ns2.reg.ru.
 | Process | `/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:3100` (pid в coder) |
 | Named Tunnel | **не найден** (нет systemd unit, нет config.yml credentials) |
 | Permanent ingress for arhipovdan.ru | **отсутствует** |
-| Working public URL | `https://invitations-based-characters-accent.trycloudflare.com/` → bundle `index-ncgt6PBL.js` |
+| Working public URL | `https://invitations-based-characters-accent.trycloudflare.com/` → `version.json` → `4fcce5b` |
 
 Quick Tunnel **не** является завершённым production DNS-решением.
 
@@ -75,8 +75,8 @@ Quick Tunnel **не** является завершённым production DNS-р�
 
 ## Что было исправлено в коде/инфре приложения
 
-- Production container уже отдаёт `index-ncgt6PBL.js` на `:3100`.
-- Добавлены диагностика, production smoke script, документация (этот файл).
+- Production container отдаёт `index-AagIOJbd.js` + `/version.json` на `:3100` (commit `4fcce5b`).
+- Добавлены диагностика, Named Tunnel prep docs, production smoke с `EXPECTED_COMMIT`, DNS inventory.
 - DNS/openresty **не** изменялись из этого окружения (нет доступа к REG.RU и к openresty vhost).
 
 ## Действия пользователя (точные)
@@ -94,8 +94,8 @@ Quick Tunnel **не** является завершённым production DNS-р�
 ```bash
 dig A arhipovdan.ru +short
 curl -I https://arhipovdan.ru/
-curl -s https://arhipovdan.ru/ | grep -Eo 'index-[A-Za-z0-9_-]+\.js'
-# ожидается: index-ncgt6PBL.js
+curl -s https://arhipovdan.ru/version.json
+# ожидается: "commit": "4fcce5b" (или актуальный production SHA)
 ```
 
 ### Вариант 2 — починить openresty на том, кто слушает 185.160.137.162:80/443
@@ -120,7 +120,7 @@ Proxy status: DNS only (если не Cloudflare) или Proxied (если Cloud
 ```bash
 curl -I https://arhipovdan.ru/
 curl -I https://arhipovdan.ru/details
-curl -I https://arhipovdan.ru/assets/index-ncgt6PBL.js
+curl -s https://arhipovdan.ru/version.json
 curl -s https://arhipovdan.ru/ | grep -Eo 'index-[A-Za-z0-9_-]+\.js'
-PLAYWRIGHT_BASE_URL=https://arhipovdan.ru/ npm run test:e2e:production
+PLAYWRIGHT_BASE_URL=https://arhipovdan.ru EXPECTED_COMMIT=4fcce5b npm run test:e2e:production
 ```

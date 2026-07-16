@@ -6,7 +6,7 @@
 | ----- | ----- |
 | Release | `20260715-2215` |
 | Bundle | `index-AagIOJbd.js` |
-| Commit | `16e7930` (via `/version.json`) |
+| Commit | `4fcce5b` (via `/version.json`) |
 
 ## software/headless WebGL diagnostic baseline
 

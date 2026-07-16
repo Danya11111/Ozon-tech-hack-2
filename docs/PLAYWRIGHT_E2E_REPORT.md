@@ -56,7 +56,8 @@ HUD snapshots preferred over full WebGL pixel-perfect. Golden files are not auto
 
 ```text
 15 passed (e2e, excl. production)
-Production smoke @ :3100 — PASS (index-ncgt6PBL.js)
-Production smoke @ Quick Tunnel — PASS
-Production smoke @ arhipovdan.ru — FAIL (TLS/DNS blocker)
+Unit: 166 passed
+Production smoke @ :3100 — PASS (version.json → 4fcce5b, index-AagIOJbd.js)
+Production smoke @ Quick Tunnel — PASS (same commit)
+Production smoke @ arhipovdan.ru — BLOCKED_EXTERNAL (TLS/DNS)
 ```
