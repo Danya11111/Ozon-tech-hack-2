@@ -90,6 +90,30 @@ function applyJitter(pos: Vec3, rotY: number, jitter?: PoseInput['jitter']): { p
   };
 }
 
+/**
+ * Stage 2 — case time (ms within case) at which the item is handed from
+ * kinematic authority to rigid-body physics:
+ *  - B: fraction 0.35 of the B travel span (end of b_transfer spur, belt edge);
+ *  - C/D: fraction 0.12 of the C/D routing span — item fully past the belt
+ *    edge and ON the gravity chute (tall items must clear the belt slab);
+ *  - fault cases: null (no physics handoff — domain fault pose is truth).
+ */
+export function getDropHandoffTimeMs(
+  targetCategory: Category | null,
+  faultType?: FaultType,
+): number | null {
+  if (faultType) return null;
+  const category: 'B' | 'C' | 'D' = (targetCategory as 'B' | 'C' | 'D') || 'B';
+  const { starts } = phaseStartsFrom(CASE_PHASES);
+  const routingStart = starts['routing'];
+  if (category === 'B') {
+    const exitStart = starts['exit'];
+    return routingStart + 0.35 * (exitStart - routingStart);
+  }
+  const clearStart = starts['clear_gap'];
+  return routingStart + 0.12 * (clearStart - routingStart);
+}
+
 /** Jam / E-stop motion: freeze at junction, then recover (no settle into bin). */
 function getFaultPose(input: PoseInput): PhysicalItemPose {
   const { dimensionsMm, elapsedMs, faultType, jitter } = input;

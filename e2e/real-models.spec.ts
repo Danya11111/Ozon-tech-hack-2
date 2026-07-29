@@ -100,6 +100,11 @@ test.describe('Stage 1 real models', () => {
     page.on('request', (req) => {
       if (MODEL_RE.test(req.url())) modelRequests.push(req.url());
     });
+    // Stage 2 §16: fallback path is for weak devices — stub low capability.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'hardwareConcurrency', { value: 4, configurable: true });
+      Object.defineProperty(navigator, 'deviceMemory', { value: 2, configurable: true });
+    });
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="main-svg-fallback"]', { timeout: 30000 });

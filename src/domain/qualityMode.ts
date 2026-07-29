@@ -51,7 +51,7 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
     mode: 'demo',
     dprMax: 1.5,
     antialias: true,
-    shadows: false, // contact shadows via mesh only — stable demo FPS
+    shadows: true, // Stage 2: PCFSoft contact shadows in the default premium look
     maxVisibleItems: 6,
     effectsEnabled: false,
     rollerDetail: 'full',

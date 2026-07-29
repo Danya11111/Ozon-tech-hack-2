@@ -21,3 +21,5 @@ playwright-report/
 blob-report/
 releases/backup-*/
 scripts/.perf-tmp.cjs
+tools/stage2-cad/out/
+__pycache__

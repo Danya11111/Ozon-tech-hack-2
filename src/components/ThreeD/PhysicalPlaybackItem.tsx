@@ -58,20 +58,20 @@ function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughn
   );
 }
 
-export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
+/** Inner visual content of an item (shared by kinematic and physics drivers). */
+export function ItemVisualContent({
   caseData,
-  elapsedMs,
-  slotIndex = 0,
-  jitter,
+  phase,
+  surface,
+  isSettled,
   castShadow = false,
   verifySku = null,
 }: {
   caseData: PlaylistCase;
-  elapsedMs: number;
-  slotIndex?: number;
-  jitter?: { x: number; z: number; yaw: number };
+  phase: string;
+  surface: string;
+  isSettled: boolean;
   castShadow?: boolean;
-  /** Stage 1 verification: SKU to overlay (null = off, 'follow' handled by caller passing current SKU). */
   verifySku?: string | null;
 }) {
   const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
@@ -80,24 +80,11 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
   const asset = getModelAsset(itemId);
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
 
-  const pose = getPhysicalItemPose({
-    caseId: caseData.id,
-    slotIndex,
-    dimensionsMm: itemData.dimensionsMm,
-    targetCategory: classification.category,
-    elapsedMs,
-    faultType: caseData.faultType,
-    jitter,
-  });
-
-  const { position, rotation, phase, surface, isSettled } = pose;
   const isRouting = phase === 'routing';
   const onTransport = surface === 'main_belt'
     || surface === 'inspection_station'
     || surface === 'routing_junction'
     || surface === 'b_transfer';
-
-  if (elapsedMs < 0) return null;
 
   const routeAccent = COLORS[classification.category] ?? COLORS.sensorAccent;
   const material = ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
@@ -137,7 +124,7 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
   const verifying = verifySku != null && verifySku === itemId && asset != null;
 
   return (
-    <group position={position} rotation={rotation}>
+    <>
       {useReal && asset ? (
         <group position={[0, pivotOffsetY, 0]}>
           <RealItemModel
@@ -179,6 +166,53 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
           <meshStandardMaterial color="#475569" transparent opacity={0.15} />
         </mesh>
       )}
+    </>
+  );
+}
+
+export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
+  caseData,
+  elapsedMs,
+  slotIndex = 0,
+  jitter,
+  castShadow = false,
+  verifySku = null,
+}: {
+  caseData: PlaylistCase;
+  elapsedMs: number;
+  slotIndex?: number;
+  jitter?: { x: number; z: number; yaw: number };
+  castShadow?: boolean;
+  /** Stage 1 verification: SKU to overlay (null = off, 'follow' handled by caller passing current SKU). */
+  verifySku?: string | null;
+}) {
+  const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
+  const classification = useMemo(() => classifyItem(itemData), [itemData]);
+
+  const pose = getPhysicalItemPose({
+    caseId: caseData.id,
+    slotIndex,
+    dimensionsMm: itemData.dimensionsMm,
+    targetCategory: classification.category,
+    elapsedMs,
+    faultType: caseData.faultType,
+    jitter,
+  });
+
+  const { position, rotation, phase, surface, isSettled } = pose;
+
+  if (elapsedMs < 0) return null;
+
+  return (
+    <group position={position} rotation={rotation}>
+      <ItemVisualContent
+        caseData={caseData}
+        phase={phase}
+        surface={surface}
+        isSettled={isSettled}
+        castShadow={castShadow}
+        verifySku={verifySku}
+      />
     </group>
   );
 });

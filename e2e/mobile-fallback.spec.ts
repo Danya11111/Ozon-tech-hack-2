@@ -14,6 +14,14 @@ import { test, expect } from '@playwright/test';
 const MOBILE_UA =
   'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
 
+/** Stage 2 §16: fallback tests emulate a WEAK device (capable phones get Mobile Low 3D). */
+async function stubWeakDevice(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'hardwareConcurrency', { value: 4, configurable: true });
+    Object.defineProperty(navigator, 'deviceMemory', { value: 2, configurable: true });
+  });
+}
+
 function collectErrors(page: import('@playwright/test').Page) {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -35,6 +43,7 @@ test.describe('mobile fallback (390x844)', () => {
 
   test('shows honest SVG fallback, no false WebGL error, UI stays functional', async ({ page }) => {
     const { pageErrors, consoleErrors } = collectErrors(page);
+    await stubWeakDevice(page);
 
     await page.goto('/');
 
@@ -160,6 +169,40 @@ test.describe('webgl context loss and recovery', () => {
     await expect(page.locator('canvas')).toHaveCount(0);
 
     // No uncaught errors may escape the boundary
+    expect(pageErrors, `pageerrors: ${pageErrors.join('; ')}`).toEqual([]);
+  });
+});
+
+test.describe('stage2 mobile capability policy', () => {
+  test('capable phone gets Mobile Low 3D (no SVG fallback)', async ({ page }) => {
+    const { pageErrors } = collectErrors(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'hardwareConcurrency', { value: 8, configurable: true });
+      Object.defineProperty(navigator, 'deviceMemory', { value: 8, configurable: true });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    // Mobile Low mounts the real 3D canvas at low quality
+    await expect(page.locator('canvas')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('main-svg-fallback')).toHaveCount(0);
+    await page.getByTestId('demo-play').click();
+    await page.waitForTimeout(4000);
+    expect(pageErrors, `pageerrors: ${pageErrors.join('; ')}`).toEqual([]);
+  });
+
+  test('Telegram WebView is forced to SVG until real-device verification', async ({ page }) => {
+    const { pageErrors } = collectErrors(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'hardwareConcurrency', { value: 8, configurable: true });
+      Object.defineProperty(navigator, 'deviceMemory', { value: 8, configurable: true });
+      // iOS-style Telegram WebView marker
+      (window as unknown as { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy = { postEvent: () => undefined };
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const fallback = page.getByTestId('main-svg-fallback');
+    await expect(fallback).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('canvas')).toHaveCount(0);
     expect(pageErrors, `pageerrors: ${pageErrors.join('; ')}`).toEqual([]);
   });
 });

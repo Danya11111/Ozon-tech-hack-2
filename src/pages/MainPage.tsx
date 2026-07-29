@@ -10,6 +10,7 @@ import { getViewportType, type ViewportType } from '../domain/cinematicCamera';
 import { detectQualityMode } from '../domain/qualityMode';
 import { parseStage0Config, collectDeviceSignals, choosePrototypeQuality } from '../domain/stage0';
 import { parseStage1Config } from '../domain/stage1';
+import { decideMobileTier, collectMobileSignals, MOBILE_MIN_FPS, MOBILE_FPS_SAMPLE_MS, type MobileTier } from '../domain/mobilePolicy';
 import { playbackToSimulation } from '../domain/playbackAdapter';
 import SorterScene from '../components/SorterScene';
 import { resolveItem } from '../data/resolveItem';
@@ -123,11 +124,46 @@ export default function MainPage({
     [],
   );
 
+  // Stage 2 §13.6: technical HUD (speed, case dots, hotkeys, command rows)
+  // is opt-in via ?debug=1; the default HUD stays presentation-clean.
+  const debugMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('debug') === '1';
+  }, []);
+
+  // Stage 2 §16: mobile tier from capability signals (not viewport width).
+  const mobileTier: MobileTier = useMemo(() => decideMobileTier(collectMobileSignals()), []);
+  // First-FPS watchdog: sustained low FPS on mobile drops to SVG permanently.
+  const [mobileFpsDead, setMobileFpsDead] = useState(false);
+  useEffect(() => {
+    if (mobileTier !== 'mobile-low') return;
+    const started = performance.now();
+    let frames = 0;
+    let raf = 0;
+    const tick = () => {
+      frames += 1;
+      const elapsed = performance.now() - started;
+      if (elapsed >= MOBILE_FPS_SAMPLE_MS) {
+        const fps = (frames / elapsed) * 1000;
+        if (fps < MOBILE_MIN_FPS) setMobileFpsDead(true);
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [mobileTier]);
+
   // NOTE: contextLost must NOT flip show3D — the canvas stays mounted (hidden)
   // during the recovery window so `webglcontextrestored` can actually arrive.
-  // Default route: 3D only on >= 640px with WebGL (unchanged heuristic).
-  // Prototype mode: 3D forced on any width so mobile GPU profiles can be measured.
-  const show3D = stage0.enabled ? webgl : prefer3DByDefault(width, webgl);
+  // Mobile policy: svg tier never mounts 3D; mobile-low mounts 3D at low quality.
+  const show3D = stage0.enabled
+    ? webgl
+    : mobileTier === 'svg'
+      ? false
+      : mobileTier === 'mobile-low'
+        ? webgl && !mobileFpsDead
+        : prefer3DByDefault(width, webgl);
 
   // WebGL context recovery: on loss the canvas stays mounted (hidden) so a
   // real `webglcontextrestored` can arrive; exactly one safe retry is allowed,
@@ -174,7 +210,11 @@ export default function MainPage({
   const deviceSignals = useMemo(() => collectDeviceSignals(), []);
   const qualityMode =
     qualityOverride ??
-    (stage0.enabled ? choosePrototypeQuality(width, deviceSignals) : detectQualityMode(width));
+    (stage0.enabled
+      ? choosePrototypeQuality(width, deviceSignals)
+      : mobileTier === 'mobile-low'
+        ? 'low' // Mobile Low: DPR<=1.25, no shadows/post, 30 FPS target
+        : detectQualityMode(width));
   const simplified = width < 900 || qualityMode === 'low';
   const viewportType: ViewportType = getViewportType(width);
 
@@ -281,10 +321,12 @@ export default function MainPage({
               {category ?? '—'}
             </span>
           </div>
-          <div className="hud-row">
-            <span className="hud-label">Command</span>
-            <span className="hud-value" data-testid="demo-command">{command}</span>
-          </div>
+          {debugMode && (
+            <div className="hud-row">
+              <span className="hud-label">Command</span>
+              <span className="hud-value" data-testid="demo-command">{command}</span>
+            </div>
+          )}
           {playback.classification && (
             <div className="hud-row hud-row-small" data-testid="demo-proof">
               <span className="hud-value proof-text">
@@ -293,25 +335,29 @@ export default function MainPage({
               </span>
             </div>
           )}
-          <div className="hud-row">
-            <span className="hud-label">Speed</span>
-            <span className="hud-value">{playback.speed.toFixed(1)}× · 1.0 m/s</span>
-          </div>
+          {debugMode && (
+            <>
+              <div className="hud-row">
+                <span className="hud-label">Speed</span>
+                <span className="hud-value">{playback.speed.toFixed(1)}× · 1.0 m/s</span>
+              </div>
+              <div className="hud-divider" />
+              <div className="hud-row">
+                <span className="hud-label">Case</span>
+                <span className="hud-value" data-testid="demo-case-label">
+                  {playback.currentCaseIndex + 1}/{PLAYLIST_LENGTH}
+                </span>
+              </div>
+              <div className="hud-row hud-row-small">
+                <span className="hud-value">{currentCase.description}</span>
+              </div>
+            </>
+          )}
           {playback.warning && (
             <div className="hud-row hud-warning">
               <span className="hud-value warning-text">⚠ {playback.warning}</span>
             </div>
           )}
-          <div className="hud-divider" />
-          <div className="hud-row">
-            <span className="hud-label">Case</span>
-            <span className="hud-value" data-testid="demo-case-label">
-              {playback.currentCaseIndex + 1}/{PLAYLIST_LENGTH}
-            </span>
-          </div>
-          <div className="hud-row hud-row-small">
-            <span className="hud-value">{currentCase.description}</span>
-          </div>
         </div>
       )}
 
@@ -322,7 +368,7 @@ export default function MainPage({
         />
       </div>
 
-      {!presentationMode && (
+      {!presentationMode && debugMode && (
         <div className="main-progress">
           {DEMO_PLAYLIST.map((c, idx) => (
             <button
@@ -389,7 +435,7 @@ export default function MainPage({
           </button>
         )}
 
-        {!presentationMode && (
+        {!presentationMode && debugMode && (
           <div className="speed-controls" role="group" aria-label="Playback speed">
             {SPEEDS.map((s) => (
               <button
@@ -458,7 +504,9 @@ export default function MainPage({
           <Link to="/details" className="details-link">
             Details →
           </Link>
-          <div className="hotkey-hint">Space play · N/B seek · 1–0 jump · R reset · P present · E log · F fullscreen</div>
+          {debugMode && (
+            <div className="hotkey-hint">Space play · N/B seek · 1–0 jump · R reset · P present · E log · F fullscreen</div>
+          )}
         </>
       )}
 

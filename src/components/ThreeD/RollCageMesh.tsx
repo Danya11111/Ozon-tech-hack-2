@@ -26,6 +26,13 @@ interface CageInstances {
   wheels: THREE.Matrix4[];
 }
 
+/**
+ * Stage 2: roll cages are 3-sided with an OPEN FRONT on the conveyor-facing
+ * side (real roll-container design) plus a 40mm sill — items enter through
+ * the opening from the gravity chute. Matches physicsWorldLayout colliders.
+ */
+export type CageOpenSide = 'z-' | 'z+' | 'none';
+
 function boxInstance(x: number, y: number, z: number, sx: number, sy: number, sz: number): THREE.Matrix4 {
   return new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),
@@ -34,11 +41,12 @@ function boxInstance(x: number, y: number, z: number, sx: number, sy: number, sz
   );
 }
 
-/** Deterministic instance layout for the cage (built once). */
-function buildInstances(): CageInstances {
+/** Deterministic instance layout for the cage (built once per open side). */
+function buildInstances(openSide: CageOpenSide): CageInstances {
   const boxes: THREE.Matrix4[] = [];
   const yBot = WHEEL_D; // bottom of frame body
   const yTop = H; // top of frame body (exterior top)
+  const openSign = openSide === 'z-' ? -1 : openSide === 'z+' ? 1 : 0;
 
   // 4 corner posts
   for (const sx of [-1, 1]) {
@@ -46,12 +54,18 @@ function buildInstances(): CageInstances {
       boxes.push(boxInstance(sx * (W / 2 - FT / 2), yBot + BODY_H / 2, sz * (D / 2 - FT / 2), FT, BODY_H, FT));
     }
   }
-  // bottom + top frame rectangles
+  // bottom + top frame rectangles (skip the open side's tubes; sill added below)
   for (const y of [yBot + FT / 2, yTop - FT / 2]) {
-    boxes.push(boxInstance(0, y, D / 2 - FT / 2, W, FT, FT));
-    boxes.push(boxInstance(0, y, -(D / 2 - FT / 2), W, FT, FT));
+    for (const sz of [-1, 1]) {
+      if (sz === openSign && y === yTop - FT / 2) continue; // open front: no top tube
+      boxes.push(boxInstance(0, y, sz * (D / 2 - FT / 2), W, FT, FT));
+    }
     boxes.push(boxInstance(W / 2 - FT / 2, y, 0, FT, FT, D - FT * 2));
     boxes.push(boxInstance(-(W / 2 - FT / 2), y, 0, FT, FT, D - FT * 2));
+  }
+  // 40mm sill across the open front (matches entry-sill collider)
+  if (openSign !== 0) {
+    boxes.push(boxInstance(0, yBot + 0.02, openSign * (D / 2 - FT / 2), W, 0.04, FT));
   }
 
   // grid walls between frames (interior span)
@@ -66,6 +80,7 @@ function buildInstances(): CageInstances {
   const vCols = Math.floor((xInner * 2) / GRID_STEP) - 1; // exclude corners (posts)
   const hRows = Math.max(1, Math.round(gridH / GRID_STEP) - 1);
   for (const sz of [-1, 1]) {
+    if (sz === openSign) continue; // open front: no grid wall
     const z = sz * (D / 2 - ROD / 2);
     for (let i = 1; i <= vCols; i++) {
       const x = -xInner + (i * (xInner * 2)) / (vCols + 1);
@@ -106,12 +121,13 @@ function buildInstances(): CageInstances {
   return { boxes, wheels };
 }
 
-export default function RollCageMesh({ color, active = false, shadows = false }: {
+export default function RollCageMesh({ color, active = false, shadows = false, openSide = 'none' }: {
   color: string;
   active?: boolean;
   shadows?: boolean;
+  openSide?: CageOpenSide;
 }) {
-  const instances = useMemo(buildInstances, []);
+  const instances = useMemo(() => buildInstances(openSide), [openSide]);
   const boxGeo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const wheelGeo = useMemo(() => new THREE.CylinderGeometry(WR, WR, 0.03, 12), []);
   const boxesRef = useRef<THREE.InstancedMesh>(null);
