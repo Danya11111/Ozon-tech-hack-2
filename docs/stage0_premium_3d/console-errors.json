@@ -1,0 +1,51 @@
+{
+  "description": "Aggregated browser console errors captured during Stage 0 benchmark runs (3 runs per profile, 32 s each) and the e2e suite. Sources: performance-*.json (Playwright, headless Chromium 149, NVIDIA GTX 1080) and e2e/mobile-fallback.spec.ts.",
+  "generatedAt": "2026-07-29T17:05:00.000Z",
+  "profiles": {
+    "baseline": {
+      "url": "http://127.0.0.1:3101/?perf=1",
+      "consoleErrors": [
+        {
+          "run": 1,
+          "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "rootCause": "missing favicon.ico request",
+          "fix": "inline SVG favicon added to index.html",
+          "reproducibleAfterFix": false
+        }
+      ],
+      "runsWithoutErrors": [2, 3]
+    },
+    "cinematic-light": {
+      "url": "http://127.0.0.1:3101/?stage0=1&perf=1&shadows=1&camera=1&post=0",
+      "consoleErrors": [],
+      "runsWithoutErrors": [1, 2, 3]
+    },
+    "cinematic-full": {
+      "url": "http://127.0.0.1:3101/?stage0=1&perf=1&shadows=1&camera=1&post=1",
+      "consoleErrors": [],
+      "runsWithoutErrors": [1, 2, 3]
+    },
+    "mobile-low": {
+      "url": "http://127.0.0.1:3101/?stage0=1&perf=1&quality=low&shadows=0&post=0&camera=0",
+      "consoleErrors": [],
+      "runsWithoutErrors": [1, 2, 3]
+    }
+  },
+  "e2e": {
+    "mobile-fallback.spec.ts": {
+      "tests": 5,
+      "uncaughtPageErrors": [],
+      "consoleErrors": []
+    }
+  },
+  "webglContextErrors": {
+    "contextLostEventsOutsideTest": 0,
+    "contextRestoredFailures": 0,
+    "note": "Context loss occurred only when forced via WEBGL_lose_context in the dedicated e2e test; single safe retry succeeded; second loss parked the SVG fallback without an error loop."
+  },
+  "summary": {
+    "uniqueErrors": 1,
+    "uniqueErrorsAfterFix": 0,
+    "criticalErrors": 0
+  }
+}

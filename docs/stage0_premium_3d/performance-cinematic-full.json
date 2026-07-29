@@ -1,0 +1,169 @@
+{
+  "profile": "cinematic-full",
+  "url": "http://127.0.0.1:3101/?stage0=1&perf=1&shadows=1&camera=1&post=1",
+  "runs": [
+    {
+      "snapshot": {
+        "mode": "medium",
+        "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1080/PCIe/SSE2, OpenGL ES 3.2)",
+        "averageFps": 59.9,
+        "minimumFps": 32.68,
+        "p95FrameTimeMs": 20.9,
+        "p99FrameTimeMs": 24.9,
+        "longFramesOver33": 0,
+        "longFramesOver50": 0,
+        "drawCalls": 1,
+        "triangles": 1,
+        "geometries": 154,
+        "textures": 29,
+        "programs": 17,
+        "heapMb": 37.37,
+        "dpr": 1,
+        "shadows": true,
+        "antialias": false,
+        "hardwareAccelerated": true
+      },
+      "sceneLoadMs": 663,
+      "consoleErrors": [],
+      "adaptLog": []
+    },
+    {
+      "snapshot": {
+        "mode": "medium",
+        "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1080/PCIe/SSE2, OpenGL ES 3.2)",
+        "averageFps": 59.8,
+        "minimumFps": 33,
+        "p95FrameTimeMs": 21.7,
+        "p99FrameTimeMs": 25.61,
+        "longFramesOver33": 0,
+        "longFramesOver50": 0,
+        "drawCalls": 1,
+        "triangles": 1,
+        "geometries": 154,
+        "textures": 29,
+        "programs": 17,
+        "heapMb": 41.68,
+        "dpr": 1,
+        "shadows": true,
+        "antialias": false,
+        "hardwareAccelerated": true
+      },
+      "sceneLoadMs": 595,
+      "consoleErrors": [],
+      "adaptLog": []
+    },
+    {
+      "snapshot": {
+        "mode": "medium",
+        "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1080/PCIe/SSE2, OpenGL ES 3.2)",
+        "averageFps": 59.7,
+        "minimumFps": 23.42,
+        "p95FrameTimeMs": 22.8,
+        "p99FrameTimeMs": 26.61,
+        "longFramesOver33": 3,
+        "longFramesOver50": 0,
+        "drawCalls": 1,
+        "triangles": 1,
+        "geometries": 154,
+        "textures": 29,
+        "programs": 17,
+        "heapMb": 39.39,
+        "dpr": 1,
+        "shadows": true,
+        "antialias": false,
+        "hardwareAccelerated": true
+      },
+      "sceneLoadMs": 561,
+      "consoleErrors": [],
+      "adaptLog": []
+    }
+  ],
+  "median": {
+    "averageFps": 59.8,
+    "minimumFps": 32.68,
+    "p95FrameTimeMs": 21.7,
+    "drawCalls": 1,
+    "triangles": 1,
+    "geometries": 154,
+    "textures": 29,
+    "heapMb": 39.39,
+    "dpr": 1
+  },
+  "device": {
+    "webglVersion": "webgl2",
+    "vendor": "Google Inc. (NVIDIA Corporation)",
+    "hardwareConcurrency": 6,
+    "deviceMemory": 16,
+    "devicePixelRatio": 1,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36"
+  },
+  "renderer": "ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1080/PCIe/SSE2, OpenGL ES 3.2)",
+  "softwareRenderer": false,
+  "validity": "HARDWARE_GPU_VALID",
+  "memoryLoop": {
+    "samples": [
+      {
+        "heapMb": 29.59,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 50.96,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 31.63,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 54.16,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 50.11,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 39.59,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 51.58,
+        "geometries": 148,
+        "textures": 23
+      },
+      {
+        "heapMb": 26.97,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 40.39,
+        "geometries": 148,
+        "textures": 29
+      },
+      {
+        "heapMb": 42.69,
+        "geometries": 148,
+        "textures": 23
+      }
+    ],
+    "growth": {
+      "heapMbDelta": 13.1,
+      "geometriesDelta": 0,
+      "texturesDelta": -6
+    }
+  },
+  "consoleErrorCount": 0,
+  "measuredAt": "2026-07-29T16:48:28.552Z",
+  "durationMsPerRun": 32000
+}

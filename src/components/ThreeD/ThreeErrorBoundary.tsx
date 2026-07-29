@@ -3,6 +3,8 @@ import { Component, ReactNode } from 'react';
 interface Props {
   children: ReactNode;
   onError?: (error: Error) => void;
+  /** Explicit switch-to-2D action (replaces the old dead `use-2d-fallback` event). */
+  onUse2D?: () => void;
 }
 
 interface State {
@@ -36,9 +38,7 @@ export default class ThreeErrorBoundary extends Component<Props, State> {
 
   handleUse2D = () => {
     this.setState({ hasError: false, error: null });
-    // Trigger 2D fallback via parent component
-    const event = new CustomEvent('use-2d-fallback');
-    window.dispatchEvent(event);
+    this.props.onUse2D?.();
   };
 
   render() {
@@ -115,22 +115,24 @@ export default class ThreeErrorBoundary extends Component<Props, State> {
               Reload 3D
             </button>
             
-            <button
-              type="button"
-              onClick={this.handleUse2D}
-              style={{
-                padding: '10px 20px',
-                background: 'rgba(148, 163, 184, 0.15)',
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                borderRadius: '8px',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 600,
-              }}
-            >
-              Use 2D Fallback
-            </button>
+            {this.props.onUse2D && (
+              <button
+                type="button"
+                onClick={this.handleUse2D}
+                style={{
+                  padding: '10px 20px',
+                  background: 'rgba(148, 163, 184, 0.15)',
+                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                  borderRadius: '8px',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                }}
+              >
+                Use 2D Fallback
+              </button>
+            )}
           </div>
         </div>
       );

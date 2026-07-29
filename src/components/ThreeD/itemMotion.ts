@@ -41,7 +41,9 @@ export function progressForState(state: MachineState, elapsedMs: number): number
 export function itemPosition3D(simulation: SimulationState): [number, number, number] {
   const progress = progressForState(simulation.machineState, simulation.elapsedInStateMs);
   const x = TWIN_LAYOUT.startX + progress * (TWIN_LAYOUT.endX - TWIN_LAYOUT.startX);
-  const y = TWIN_LAYOUT.beltY + 0.12;
+  // Stage 1: bottom-contact semantics — the item's bottom point rests on the
+  // belt surface (was beltY + 0.12, a 12cm visual float).
+  const y = TWIN_LAYOUT.beltY;
   let z = 0;
 
   if (simulation.machineState === 'ROUTE_TO_C') {

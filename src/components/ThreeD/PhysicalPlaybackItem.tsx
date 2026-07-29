@@ -1,4 +1,4 @@
-import { Suspense, memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
 import { getModelAsset } from '../../data/modelAssets';
 import { resolveItem } from '../../data/resolveItem';
@@ -6,8 +6,8 @@ import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { classifyItem } from '../../domain/classifier';
 import { getRenderedItemDimensions } from '../../domain/physicalLayout';
 import * as THREE from 'three';
-import { useLoader } from '@react-three/fiber';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import RealItemModel from './RealItemModel';
+import { ItemVerificationOverlay } from './RealModelVerification';
 
 const COLORS = {
   B: '#16a34a',
@@ -16,14 +16,17 @@ const COLORS = {
   sensorAccent: '#3b82f6',
 };
 
+/** Base real-model materials per SKU (Stage 1 §20 — basic, form-revealing). */
 const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalness?: number }> = {
-  'SKU-001': { color: '#b68b58', roughness: 0.82 },
-  'SKU-002': { color: '#e8eef6', roughness: 0.5 },
-  'SKU-004': { color: '#c49a6c', roughness: 0.82 },
-  'SKU-006': { color: '#f8fafc', roughness: 0.42 },
-  'SKU-007': { color: '#7dd3fc', roughness: 0.28 },
+  'SKU-001': { color: '#b68b58', roughness: 0.82 },          // cardboard
+  'SKU-002': { color: '#e8eef6', roughness: 0.5 },           // lunchbox plastic
+  'SKU-003': { color: '#93c5fd', roughness: 0.38 },          // detergent jug plastic
+  'SKU-004': { color: '#c49a6c', roughness: 0.82 },          // cardboard
+  'SKU-005': { color: '#a78bfa', roughness: 0.92 },          // soft pouf fabric
+  'SKU-006': { color: '#f8fafc', roughness: 0.42 },          // plate ceramic
+  'SKU-007': { color: '#7dd3fc', roughness: 0.28 },          // bottle plastic
   'SKU-008': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 },
-  'SKU-011': { color: '#cbd5e1', roughness: 0.35, metalness: 0.15 },
+  'SKU-009': { color: '#475569', roughness: 0.5 },           // pen body
 };
 
 interface RenderProps {
@@ -34,29 +37,10 @@ interface RenderProps {
   metalness: number;
 }
 
-function STLGeometry({ path, scale, color, accentColor, emissiveIntensity, roughness, metalness }: RenderProps & {
-  path: string;
-  scale: [number, number, number];
-}) {
-  const geometry = useLoader(STLLoader, path) as THREE.BufferGeometry;
-  useMemo(() => {
-    if (geometry) {
-      geometry.center();
-      geometry.computeVertexNormals();
-    }
-  }, [geometry]);
-  return (
-    <group scale={scale}>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
-      </mesh>
-    </group>
-  );
-}
-
-function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughness, metalness, w, h, d }: RenderProps & {
+function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughness, metalness, w, h, d, castShadow }: RenderProps & {
   type: 'box' | 'cylinder' | 'sphere';
   w: number; h: number; d: number;
+  castShadow?: boolean;
 }) {
   const geometry = useMemo<THREE.BufferGeometry>(() => {
     if (type === 'cylinder' || type === 'sphere') {
@@ -68,7 +52,7 @@ function FallbackPrimitive({ type, color, accentColor, emissiveIntensity, roughn
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
-    <mesh geometry={geometry}>
+    <mesh geometry={geometry} castShadow={castShadow}>
       <meshStandardMaterial color={color} emissive={accentColor} emissiveIntensity={emissiveIntensity} roughness={roughness} metalness={metalness} />
     </mesh>
   );
@@ -79,11 +63,16 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
   elapsedMs,
   slotIndex = 0,
   jitter,
+  castShadow = false,
+  verifySku = null,
 }: {
   caseData: PlaylistCase;
   elapsedMs: number;
   slotIndex?: number;
   jitter?: { x: number; z: number; yaw: number };
+  castShadow?: boolean;
+  /** Stage 1 verification: SKU to overlay (null = off, 'follow' handled by caller passing current SKU). */
+  verifySku?: string | null;
 }) {
   const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
   const classification = useMemo(() => classifyItem(itemData), [itemData]);
@@ -103,7 +92,6 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
 
   const { position, rotation, phase, surface, isSettled } = pose;
   const isRouting = phase === 'routing';
-  const useSimplifiedMesh = phase === 'settled' || isSettled;
   const onTransport = surface === 'main_belt'
     || surface === 'inspection_station'
     || surface === 'routing_junction'
@@ -113,15 +101,23 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
 
   const routeAccent = COLORS[classification.category] ?? COLORS.sensorAccent;
   const material = ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
-  const bodyColor = phase === 'fault' ? '#ef4444' : useSimplifiedMesh ? (material.color ?? '#b8b2a8') : material.color;
-  const accentColor = useSimplifiedMesh ? '#94a3b8' : routeAccent;
-  const emissiveIntensity = useSimplifiedMesh
-    ? 0.01
-    : (phase === 'fault' ? 0.25 : isRouting ? 0.12 : 0.03);
+  const bodyColor = phase === 'fault' ? '#ef4444' : material.color;
+  const accentColor = isSettled ? '#94a3b8' : routeAccent;
+  const emissiveIntensity = phase === 'fault' ? 0.25 : isRouting ? 0.12 : isSettled ? 0.01 : 0.03;
   const metalness = material.metalness ?? 0.05;
-  const useSTL = !useSimplifiedMesh && asset?.loaderType === 'stl' && asset?.frontendAssetPath;
-  const stlPath = asset?.frontendAssetPath ?? '';
+
+  // Real official model is the default when the manifest provides one;
+  // procedural fallback only for missing assets or load failure (Stage 1 §15.1).
+  const useReal = Boolean(asset?.defaultRealAsset && asset?.runtimePath);
   const fallbackType = asset?.fallbackPrimitive ?? 'box';
+
+  // Pose position is the EXPECTED bbox center (surfaceY + h/2). Real models use
+  // a bottom-center pivot, so the mesh is offset down by half the model height.
+  // Contact epsilon vs the surface is therefore exactly 0 mm by construction.
+  const modelHeightM = asset?.worldExpectedMm
+    ? asset.worldExpectedMm.y / 1000
+    : dims.height;
+  const pivotOffsetY = -modelHeightM / 2;
 
   const fallback = (
     <FallbackPrimitive
@@ -134,28 +130,43 @@ export const PhysicalPlaybackItem = memo(function PhysicalPlaybackItem({
       w={dims.width}
       h={dims.height}
       d={dims.depth}
+      castShadow={castShadow}
     />
   );
 
+  const verifying = verifySku != null && verifySku === itemId && asset != null;
+
   return (
     <group position={position} rotation={rotation}>
-      {useSTL ? (
-        <Suspense fallback={fallback}>
-          <STLGeometry
-            path={stlPath}
-            scale={[0.001, 0.001, 0.001]}
-            color={bodyColor}
-            accentColor={accentColor}
-            emissiveIntensity={emissiveIntensity}
-            roughness={material.roughness}
-            metalness={metalness}
+      {useReal && asset ? (
+        <group position={[0, pivotOffsetY, 0]}>
+          <RealItemModel
+            asset={asset}
+            material={{
+              color: bodyColor,
+              emissive: accentColor,
+              emissiveIntensity,
+              roughness: material.roughness,
+              metalness,
+            }}
+            castShadow={castShadow}
+            fallback={fallback}
           />
-        </Suspense>
+        </group>
       ) : (
         fallback
       )}
 
-      {useSimplifiedMesh && (
+      {verifying && asset && (
+        <ItemVerificationOverlay
+          asset={asset}
+          pivotOffsetY={pivotOffsetY}
+          cardY={modelHeightM + 0.3}
+          fallbackSizeM={{ x: dims.width, y: dims.height, z: dims.depth }}
+        />
+      )}
+
+      {isSettled && (
         <mesh position={[0, -dims.height / 2 + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[Math.max(dims.width, dims.depth) * 0.35, Math.max(dims.width, dims.depth) * 0.42, 20]} />
           <meshBasicMaterial color={routeAccent} transparent opacity={0.5} />

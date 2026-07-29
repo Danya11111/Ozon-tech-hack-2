@@ -23,8 +23,10 @@ describe('performance and production hygiene', () => {
 
   it('disables heavy demo effects by default', () => {
     expect(sceneSource).toMatch(/ENABLE_DEMO_EFFECTS\s*=\s*false/);
-    // Shadows controlled by quality presets; demo mode keeps shadows false in qualityMode.ts
-    expect(sceneSource).toMatch(/shadows=\{quality\.shadows\}/);
+    // Shadows stay preset-driven on the default route; stage0 prototype opt-in
+    // is the only override and never turns shadows unconditionally on.
+    expect(sceneSource).toMatch(/const shadowsEnabled = proto \? protoShadows : quality\.shadows/);
+    expect(sceneSource).not.toMatch(/shadows=\{true\}/);
   });
 
   it('keeps console.error only in error boundaries', () => {

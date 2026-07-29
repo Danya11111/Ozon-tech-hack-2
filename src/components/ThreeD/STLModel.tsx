@@ -7,7 +7,7 @@ import { useLoader } from '@react-three/fiber';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { Center } from '@react-three/drei';
 import type { BufferGeometry, Mesh as ThreeMesh } from 'three';
-import { useRef, useEffect } from 'react';
+import { Suspense, useRef, useEffect, useMemo } from 'react';
 
 interface STLModelProps {
   /** Path to STL file in public folder */
@@ -38,7 +38,19 @@ interface STLModelProps {
   fallback?: React.ReactNode;
 }
 
-export default function STLModel({
+/**
+ * Outer wrapper: Suspense boundary around the loader. Load errors propagate
+ * to the nearest ErrorBoundary (hooks must not live inside try/catch).
+ */
+export default function STLModel(props: STLModelProps) {
+  return (
+    <Suspense fallback={props.fallback ? <>{props.fallback}</> : null}>
+      <STLModelInner {...props} />
+    </Suspense>
+  );
+}
+
+function STLModelInner({
   path,
   scale,
   rotation = [0, 0, 0],
@@ -47,34 +59,21 @@ export default function STLModel({
   emissive,
   emissiveIntensity = 0.2,
   roughness = 0.5,
-  fallback,
 }: STLModelProps) {
   const meshRef = useRef<ThreeMesh>(null);
-  
-  let geometry: BufferGeometry | null = null;
-  
-  try {
-    // Load STL geometry
-    geometry = useLoader(STLLoader, path);
-  } catch (error) {
-    if (import.meta.env.DEV) {
-      console.warn(`Failed to load STL model: ${path}`, error);
-    }
-    return fallback ? <>{fallback}</> : null;
-  }
-  
-  // Center the geometry on load
-  useEffect(() => {
-    if (meshRef.current && geometry) {
-      geometry.center();
-      geometry.computeVertexNormals();
-    }
-  }, [geometry]);
-  
-  if (!geometry) {
-    return fallback ? <>{fallback}</> : null;
-  }
-  
+
+  const shared = useLoader(STLLoader, path) as BufferGeometry;
+
+  // Clone the loader-cached geometry before centering so the shared cache
+  // entry is never mutated; dispose the clone on unmount.
+  const geometry = useMemo(() => {
+    const g = shared.clone();
+    g.center();
+    g.computeVertexNormals();
+    return g;
+  }, [shared]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
   return (
     <Center position={position} rotation={rotation}>
       <mesh ref={meshRef} geometry={geometry} scale={scale}>

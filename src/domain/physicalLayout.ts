@@ -83,8 +83,11 @@ export const MM_PER_STEP = (DRIVE_ROLLER_CIRCUMFERENCE_M * 1000) / STEPS_PER_REV
 
 // =========================================================
 // Laser rangefinder (must be above max item)
+// Stage 1: aligned to official ground truth 1150mm (docs/MEASUREMENT_SYSTEM_REPORT.md,
+// OZON spec). Previously 1.4m. Measurement math is mount-height invariant
+// (measuredHeight ≡ itemTop), so this changes no business result.
 // =========================================================
-export const LASER_HEIGHT_M = 1.4;            // Laser at 1.4m (above max item)
+export const LASER_HEIGHT_M = 1.15;           // Laser at 1.15m (official mount height)
 export const LASER_POSITION_X = ZONES.CAMERA.x; // Co-located with camera
 
 // =========================================================

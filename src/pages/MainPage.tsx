@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useMemo, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import ThreeErrorBoundary from '../components/ThreeD/ThreeErrorBoundary';
 import { prefer3DByDefault, useWebGLSupport } from '../components/ThreeD/useWebGL';
@@ -8,6 +8,10 @@ import { getCaseProgress, getCurrentPhaseConfig, isFaultActive } from '../domain
 import { getMeasurementData, shouldShowMeasurement } from '../domain/measurementSystem';
 import { getViewportType, type ViewportType } from '../domain/cinematicCamera';
 import { detectQualityMode } from '../domain/qualityMode';
+import { parseStage0Config, collectDeviceSignals, choosePrototypeQuality } from '../domain/stage0';
+import { parseStage1Config } from '../domain/stage1';
+import { playbackToSimulation } from '../domain/playbackAdapter';
+import SorterScene from '../components/SorterScene';
 import { resolveItem } from '../data/resolveItem';
 import BuildIdentityBadge from '../components/BuildIdentityBadge';
 import CVInspectionOverlay from '../components/CVInspectionOverlay';
@@ -107,14 +111,70 @@ export default function MainPage({
     return () => window.removeEventListener('keydown', onKey);
   }, [playback.status, onPlay, onPause, onStop, onSeekNext, onSeekPrev, onSeekCase]);
 
-  const show3D = prefer3DByDefault(width, webgl && !contextLost);
+  // Stage 0 prototype config (inert on the default route unless ?stage0=1)
+  const stage0 = useMemo(
+    () => parseStage0Config(typeof window === 'undefined' ? '' : window.location.search),
+    [],
+  );
+
+  // Stage 1 real-models verification config (inert unless ?stage1=1&verify=real-models)
+  const stage1 = useMemo(
+    () => parseStage1Config(typeof window === 'undefined' ? '' : window.location.search),
+    [],
+  );
+
+  // NOTE: contextLost must NOT flip show3D — the canvas stays mounted (hidden)
+  // during the recovery window so `webglcontextrestored` can actually arrive.
+  // Default route: 3D only on >= 640px with WebGL (unchanged heuristic).
+  // Prototype mode: 3D forced on any width so mobile GPU profiles can be measured.
+  const show3D = stage0.enabled ? webgl : prefer3DByDefault(width, webgl);
+
+  // WebGL context recovery: on loss the canvas stays mounted (hidden) so a
+  // real `webglcontextrestored` can arrive; exactly one safe retry is allowed,
+  // after that the canvas is dropped and the SVG fallback stays forever.
+  const [contextDead, setContextDead] = useState(false);
+  const restoreUsedRef = useRef(false);
+
+  const handleContextLost = useCallback(() => {
+    if (restoreUsedRef.current) {
+      setContextDead(true);
+    }
+    setContextLost(true);
+  }, []);
+
+  const handleContextRestored = useCallback(() => {
+    if (restoreUsedRef.current) return;
+    restoreUsedRef.current = true;
+    setContextLost(false);
+  }, []);
+
+  // If the context does not recover in time, unmount the dead canvas.
+  useEffect(() => {
+    if (!contextLost || contextDead) return;
+    const timer = window.setTimeout(() => setContextDead(true), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [contextLost, contextDead]);
+
+  const render3D = show3D && !contextDead;
+  const fallbackVisible = !render3D || contextLost;
+
+  // Why the 2D fallback is on screen — drives the honest badge text.
+  const fallbackReason: 'webgl' | 'context' | 'mobile' =
+    !webgl ? 'webgl' : contextLost || contextDead ? 'context' : 'mobile';
+
+  const fallbackSimulation = useMemo(() => playbackToSimulation(playback), [playback]);
+
   const qualityOverride = useMemo(() => {
+    if (stage0.quality) return stage0.quality;
     if (typeof window === 'undefined') return undefined;
     const q = new URLSearchParams(window.location.search).get('quality');
     if (q === 'low' || q === 'medium' || q === 'high' || q === 'demo') return q;
     return undefined;
-  }, []);
-  const qualityMode = qualityOverride ?? detectQualityMode(width);
+  }, [stage0]);
+  const deviceSignals = useMemo(() => collectDeviceSignals(), []);
+  const qualityMode =
+    qualityOverride ??
+    (stage0.enabled ? choosePrototypeQuality(width, deviceSignals) : detectQualityMode(width));
   const simplified = width < 900 || qualityMode === 'low';
   const viewportType: ViewportType = getViewportType(width);
 
@@ -149,30 +209,45 @@ export default function MainPage({
   return (
     <div className={`main-page ${presentationMode ? 'presentation-mode' : ''} ${faultActive ? 'fault-active' : ''}`}>
       <div className="main-demo-viewport">
-        {show3D ? (
-          <ThreeErrorBoundary
-            onError={(error) => {
-              console.error('3D Canvas failed:', error);
-              setContextLost(true);
-            }}
-          >
-            <Suspense fallback={<div className="three-loading">Loading 3D...</div>}>
-              <SorterDigitalTwinContinuous
-                playback={playback}
-                simplified={simplified}
-                onContextLost={() => setContextLost(true)}
-                autoCameraEnabled={autoCameraEnabled}
-                viewportType={viewportType}
-                qualityMode={qualityMode}
-              />
-            </Suspense>
-          </ThreeErrorBoundary>
-        ) : (
-          <div className="main-fallback">
-            <div className="fallback-content">
-              <h2>3D Demo</h2>
-              <p>WebGL not available. Please use a modern browser.</p>
-              <Link to="/details" className="btn-primary">View Details Page</Link>
+        {render3D && (
+          <div className="canvas-holder" style={contextLost ? { visibility: 'hidden', position: 'absolute', inset: 0 } : undefined}>
+            <ThreeErrorBoundary
+              onError={(error) => {
+                console.error('3D Canvas failed:', error);
+                handleContextLost();
+              }}
+              onUse2D={handleContextLost}
+            >
+              <Suspense fallback={<div className="three-loading">Loading 3D...</div>}>
+                <SorterDigitalTwinContinuous
+                  playback={playback}
+                  simplified={simplified}
+                  onContextLost={handleContextLost}
+                  onContextRestored={handleContextRestored}
+                  autoCameraEnabled={autoCameraEnabled}
+                  viewportType={viewportType}
+                  qualityMode={qualityMode}
+                  stage0={stage0}
+                  stage1={stage1}
+                />
+              </Suspense>
+            </ThreeErrorBoundary>
+          </div>
+        )}
+        {fallbackVisible && (
+          <div className="main-fallback" data-testid="main-svg-fallback">
+            <div className={`fallback-badge fallback-badge-${fallbackReason}`} data-testid="fallback-reason">
+              {fallbackReason === 'webgl'
+                ? '3D недоступно в этом браузере — показана облегчённая версия'
+                : fallbackReason === 'context'
+                  ? '3D-сцена прервана — показана облегчённая версия'
+                  : 'Облегчённый режим — мобильное устройство'}
+            </div>
+            <Link to="/details" className="fallback-details-link" data-testid="fallback-details-link">
+              Подробнее на странице Details →
+            </Link>
+            <div className="fallback-scene">
+              <SorterScene simulation={fallbackSimulation} variant={width < 640 ? 'simple' : 'full'} />
             </div>
           </div>
         )}
@@ -182,7 +257,7 @@ export default function MainPage({
         <CVInspectionOverlay data={measurementData} visible={showMeasurement} />
       )}
 
-      {!presentationMode && (
+      {!presentationMode && (!stage0.enabled || stage0.hud) && (
         <div className="main-hud" data-testid="demo-hud">
           <div className="hud-row">
             <span className="hud-label">Item</span>
@@ -357,7 +432,7 @@ export default function MainPage({
         </div>
       )}
 
-      {show3D && !presentationMode && (
+      {render3D && !contextLost && !presentationMode && (
         <button
           type="button"
           className="auto-camera-toggle"

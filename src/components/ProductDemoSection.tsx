@@ -120,6 +120,10 @@ export default function ProductDemoSection({
                   setContextLost(true);
                   setViewMode('2d');
                 }}
+                onUse2D={() => {
+                  setContextLost(true);
+                  setViewMode('2d');
+                }}
               >
                 <Suspense fallback={<div className="three-loading">Загрузка 3D digital twin…</div>}>
                   <SorterDigitalTwin

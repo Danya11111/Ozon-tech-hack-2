@@ -1,6 +1,6 @@
-import * as THREE from 'three';
 import type { Category } from '../../domain/types';
 import { ROUTE_COLORS, TWIN_LAYOUT } from './itemMotion';
+import RollCageMesh from './RollCageMesh';
 
 interface Props {
   activeCategory?: Category;
@@ -48,7 +48,7 @@ function ZoneBox({
   );
 }
 
-/** Roll-cage with wireframe edges for C/D zones */
+/** Roll-cage for C/D zones — shared instanced mesh (exterior 1200×800×800 incl. wheels), open top */
 function RollCage({
   position,
   size,
@@ -62,46 +62,11 @@ function RollCage({
 }) {
   return (
     <group position={position}>
-      {/* Cage body (transparent) */}
-      <mesh>
-        <boxGeometry args={size} />
-        <meshStandardMaterial
-          color={color}
-          transparent
-          opacity={active ? 0.4 : 0.15}
-          emissive={color}
-          emissiveIntensity={active ? 0.6 : 0.1}
-        />
-      </mesh>
-      
-      {/* Cage wireframe edges (visible frame) */}
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(...size)]} />
-        <lineBasicMaterial color={color} linewidth={active ? 3 : 1} opacity={active ? 1 : 0.5} transparent />
-      </lineSegments>
-      
-      {/* Vertical posts (corners) for visual emphasis - thicker */}
-      {[
-        [-size[0] / 2, 0, -size[2] / 2],
-        [size[0] / 2, 0, -size[2] / 2],
-        [-size[0] / 2, 0, size[2] / 2],
-        [size[0] / 2, 0, size[2] / 2],
-      ].map((offset, i) => (
-        <mesh key={i} position={offset as [number, number, number]}>
-          <boxGeometry args={[0.06, size[1], 0.06]} />
-          <meshStandardMaterial 
-            color={color} 
-            metalness={0.4} 
-            roughness={0.6}
-            emissive={active ? color : '#000000'}
-            emissiveIntensity={active ? 0.3 : 0}
-          />
-        </mesh>
-      ))}
-      
+      <RollCageMesh color={color} active={active} />
+
       {/* Floor highlight for active cage */}
       {active && (
-        <mesh position={[0, -size[1] / 2 + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[size[0] * 0.9, size[2] * 0.9]} />
           <meshStandardMaterial
             color={color}
@@ -139,17 +104,17 @@ export default function SortingZones3D({ activeCategory, activeRoute }: Props) {
         active={active === 'B'}
       />
 
-      {/* Roll-cage C 1200×800×800 mm — orange with wireframe */}
+      {/* Roll-cage C 1200×800×800 mm — orange, ground-origin shared mesh */}
       <RollCage
-        position={[TWIN_LAYOUT.gateX + 0.4, cage.y / 2, TWIN_LAYOUT.zoneCZ]}
+        position={[TWIN_LAYOUT.gateX + 0.4, 0, TWIN_LAYOUT.zoneCZ]}
         size={[cage.x, cage.y, cage.z]}
         color={ROUTE_COLORS.C}
         active={active === 'C'}
       />
 
-      {/* Roll-cage D 1200×800×800 mm — purple with wireframe */}
+      {/* Roll-cage D 1200×800×800 mm — purple, ground-origin shared mesh */}
       <RollCage
-        position={[TWIN_LAYOUT.gateX + 0.4, cage.y / 2, TWIN_LAYOUT.zoneDZ]}
+        position={[TWIN_LAYOUT.gateX + 0.4, 0, TWIN_LAYOUT.zoneDZ]}
         size={[cage.x, cage.y, cage.z]}
         color={ROUTE_COLORS.D}
         active={active === 'D'}

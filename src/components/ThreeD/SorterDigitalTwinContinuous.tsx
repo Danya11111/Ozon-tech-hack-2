@@ -10,7 +10,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls, Html, Line } from '@react-three/drei';
-import { Suspense, useRef, useMemo, useState, useEffect } from 'react';
+import { Suspense, lazy, useRef, useMemo, useState, useEffect } from 'react';
 import type { Mesh, Group } from 'three';
 import * as THREE from 'three';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
@@ -24,7 +24,7 @@ import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
 import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
 import { INDUSTRIAL_PALETTE } from '../../domain/industrialTheme';
-import { detectQualityMode, getQualitySettings, type QualityMode } from '../../domain/qualityMode';
+import { detectQualityMode, getQualitySettings, adaptQuality, type QualityMode } from '../../domain/qualityMode';
 import {
   getCameraConfig,
   smoothCameraTransition,
@@ -57,14 +57,26 @@ import {
 } from '../../domain/physicalLayout';
 import PerfCollector from './PerfCollector';
 import PerfOverlay from './PerfOverlay';
+import RollCageMesh from './RollCageMesh';
+import { getPreloadAssets } from '../../data/modelAssets';
+import { preloadRealItemModel } from './RealItemModel';
+import type { Stage0Config } from '../../domain/stage0';
+import { shotToPhaseCategory, describeAdaptiveSwitch } from '../../domain/stage0';
+import type { Stage1Config } from '../../domain/stage1';
+
+/** Lazy chunk: post-processing spike is downloaded only when stage0 post=1. */
+const PostProcessingSpike = lazy(() => import('./PostProcessingSpike'));
 
 export interface SorterDigitalTwinContinuousProps {
   playback: ContinuousPlaybackState;
   simplified?: boolean;
   onContextLost?: () => void;
+  onContextRestored?: () => void;
   autoCameraEnabled?: boolean;
   viewportType?: ViewportType;
   qualityMode?: QualityMode;
+  stage0?: Stage0Config;
+  stage1?: Stage1Config;
 }
 
 /** 
@@ -122,19 +134,24 @@ const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
 const CONVEYOR_CENTER_X = (CONVEYOR_START_X + CONVEYOR_END_X) / 2;
 
 /** Cinematic camera controller - smoothly transitions between camera angles */
-function CinematicCameraController({ 
-  playback, 
-  enabled, 
-  viewportType = 'desktop' 
-}: { 
-  playback: ContinuousPlaybackState; 
+function CinematicCameraController({
+  playback,
+  enabled,
+  viewportType = 'desktop',
+  overridePhase = null,
+  overrideCategory = null,
+}: {
+  playback: ContinuousPlaybackState;
   enabled: boolean;
   viewportType: ViewportType;
+  /** Manual shot override (stage0) — camera runs even while paused. */
+  overridePhase?: CasePhase | null;
+  overrideCategory?: Category | null;
 }) {
   const { camera } = useThree();
   const cameraStateRef = useRef<CameraConfig>(getInitialCameraConfig(viewportType));
   const isRunning = playback.status === 'running';
-  
+
   // Get item position for camera following
   const itemPosition = useMemo(() => {
     if (playback.status === 'idle') return null;
@@ -149,14 +166,15 @@ function CinematicCameraController({
     });
     return pose.position;
   }, [playback]);
-  
+
   useFrame(() => {
-    if (!enabled || !isRunning) return;
-    
-    // Get target camera config for current phase
+    if (!enabled) return;
+    if (!isRunning && !overridePhase) return;
+
+    // Get target camera config for current phase (or manual shot override)
     const targetConfig = getCameraConfig(
-      playback.currentPhase,
-      playback.targetCategory,
+      overridePhase ?? playback.currentPhase,
+      overrideCategory ?? playback.targetCategory,
       itemPosition,
       viewportType
     );
@@ -443,27 +461,28 @@ function PointCloud({ active, itemPosition, scale, isRound }: {
 }
 
 /** Actuator/pusher animation during routing */
-function ActuatorPusher({ active, category }: { active: boolean; category: Category | null }) {
+function ActuatorPusher({ active, category, shadows = false }: { active: boolean; category: Category | null; shadows?: boolean }) {
   const pusherRef = useRef<Mesh>(null);
   const extendRef = useRef(0);
-  
+
   useFrame((_, delta) => {
     if (pusherRef.current) {
       const target = active && (category === 'C' || category === 'D') ? 0.15 : 0;
       extendRef.current += (target - extendRef.current) * delta * 5;
-      
+
       const direction = category === 'C' ? 1 : -1;
       pusherRef.current.position.z = direction * extendRef.current;
     }
   });
-  
+
   const gateX = ZONES.GATE.x;
   const color = category === 'C' ? COLORS.routeC : category === 'D' ? COLORS.routeD : COLORS.gateFrame;
-  
+
   return (
-    <mesh 
+    <mesh
       ref={pusherRef}
       position={[gateX + 0.3, BELT_Y + 0.08, 0]}
+      castShadow={shadows}
     >
       <boxGeometry args={[0.15, 0.08, 0.06]} />
       <meshStandardMaterial 
@@ -505,7 +524,7 @@ function SupportLeg({ x }: { x: number }) {
  * Conveyor belt - realistic roller conveyor
  * Belt top surface at 0.7m (BELT_TOP_Y)
  */
-function ConveyorBelt({ pulseActive, elapsedMs, simplified }: { pulseActive: boolean; elapsedMs: number; simplified: boolean }) {
+function ConveyorBelt({ pulseActive, elapsedMs, simplified, shadows = false }: { pulseActive: boolean; elapsedMs: number; simplified: boolean; shadows?: boolean }) {
   const spacing = simplified ? ROLLER_SPACING_M * 2 : ROLLER_SPACING_M;
   const rollerCount = Math.floor(CONVEYOR_LENGTH / spacing);
   const stripeOffsets = simplified ? [-2, 0, 2] : [-3, -1, 0.5, 2];
@@ -529,10 +548,10 @@ function ConveyorBelt({ pulseActive, elapsedMs, simplified }: { pulseActive: boo
   return (
     <group>
       {/* Main belt surface - matte PVC/tarpaulin look at 0.7m */}
-      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]}>
+      <mesh position={[CONVEYOR_CENTER_X, BELT_Y - BELT_THICKNESS_M / 2, 0]} receiveShadow={shadows}>
         <boxGeometry args={[CONVEYOR_LENGTH, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
-        <meshStandardMaterial 
-          color={COLORS.belt} 
+        <meshStandardMaterial
+          color={COLORS.belt}
           roughness={0.85}
           metalness={0.05}
         />
@@ -554,11 +573,11 @@ function ConveyorBelt({ pulseActive, elapsedMs, simplified }: { pulseActive: boo
       </mesh>
       
       {/* Frame rails - industrial metal */}
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]}>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]} castShadow={shadows}>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
         <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]}>
+      <mesh position={[CONVEYOR_CENTER_X, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]} castShadow={shadows}>
         <boxGeometry args={[CONVEYOR_LENGTH, 0.05, 0.04]} />
         <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
       </mesh>
@@ -728,17 +747,16 @@ function BReceiverBin({ active }: { active: boolean }) {
   );
 }
 
-/** Roll cage for C/D zones - realistic wireframe cage with wheels */
-function RollCage({ position, label, color, active }: {
+/** Roll cage for C/D zones — shared instanced mesh (exterior 1200×800×800 incl. wheels) */
+function RollCage({ position, label, color, active, shadows = false }: {
   position: [number, number, number];
   label: 'C' | 'D';
   color: string;
   active: boolean;
+  shadows?: boolean;
 }) {
-  const { width, depth, height, wheelRadius, frameThickness } = ROLL_CAGE;
-  const ft = frameThickness;
-  const emissiveIntensity = active ? 0.4 : 0;
-  
+  const { width, depth, height } = ROLL_CAGE;
+
   return (
     <group position={position}>
       {/* Floor marker */}
@@ -747,78 +765,10 @@ function RollCage({ position, label, color, active }: {
         <meshStandardMaterial color={color} transparent opacity={active ? 0.25 : 0.08} />
       </mesh>
 
-      {/* Solid interior floor where items rest */}
-      <mesh position={[0, CAGE_FLOOR_Y - 0.005, 0]}>
-        <boxGeometry args={[width - frameThickness, 0.01, depth - frameThickness]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.3} roughness={0.7} />
-      </mesh>
-      
-      {/* Cage frame - bottom rectangle */}
-      <mesh position={[0, wheelRadius * 2 + ft / 2, depth / 2 - ft / 2]}>
-        <boxGeometry args={[width, ft, ft]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[0, wheelRadius * 2 + ft / 2, -depth / 2 + ft / 2]}>
-        <boxGeometry args={[width, ft, ft]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[width / 2 - ft / 2, wheelRadius * 2 + ft / 2, 0]}>
-        <boxGeometry args={[ft, ft, depth - ft * 2]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[-width / 2 + ft / 2, wheelRadius * 2 + ft / 2, 0]}>
-        <boxGeometry args={[ft, ft, depth - ft * 2]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      
-      {/* Cage frame - top rectangle */}
-      <mesh position={[0, wheelRadius * 2 + height - ft / 2, depth / 2 - ft / 2]}>
-        <boxGeometry args={[width, ft, ft]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[0, wheelRadius * 2 + height - ft / 2, -depth / 2 + ft / 2]}>
-        <boxGeometry args={[width, ft, ft]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[width / 2 - ft / 2, wheelRadius * 2 + height - ft / 2, 0]}>
-        <boxGeometry args={[ft, ft, depth - ft * 2]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      <mesh position={[-width / 2 + ft / 2, wheelRadius * 2 + height - ft / 2, 0]}>
-        <boxGeometry args={[ft, ft, depth - ft * 2]} />
-        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-      </mesh>
-      
-      {/* Vertical posts (corners) */}
-      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-        <mesh key={i} position={[sx * (width / 2 - ft / 2), wheelRadius * 2 + height / 2, sz * (depth / 2 - ft / 2)]}>
-          <boxGeometry args={[ft, height - ft, ft]} />
-          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} emissive={color} emissiveIntensity={emissiveIntensity} />
-        </mesh>
-      ))}
-      
-      {/* Caster wheels */}
-      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-        <mesh key={`wheel-${i}`} position={[sx * (width / 2 - 0.08), wheelRadius, sz * (depth / 2 - 0.08)]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[wheelRadius, wheelRadius, 0.03, 12]} />
-          <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
-        </mesh>
-      ))}
-      
-      {/* Wire mesh sides (simplified - just vertical lines) */}
-      {[-1, 1].map((sz) => (
-        <group key={`side-${sz}`}>
-          {[0.2, 0.4, 0.6, 0.8].map((t, i) => (
-            <mesh key={i} position={[-width / 2 + width * t, wheelRadius * 2 + height / 2, sz * (depth / 2 - 0.01)]}>
-              <boxGeometry args={[0.008, height - ft * 2, 0.008]} />
-              <meshStandardMaterial color={color} transparent opacity={0.6} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      
+      <RollCageMesh color={color} active={active} shadows={shadows} />
+
       {/* Label */}
-      <Html position={[0, wheelRadius * 2 + height + 0.15, 0]} center>
+      <Html position={[0, height + 0.15, 0]} center>
         <div style={{
           color: active ? color : '#64748b',
           fontSize: '18px',
@@ -832,6 +782,7 @@ function RollCage({ position, label, color, active }: {
     </group>
   );
 }
+
 
 /** Chute/deflector for routing items to C/D */
 function RouteChute({ gateX, targetZ, color, active }: {
@@ -1108,29 +1059,29 @@ function ShapeOutline({ position, scale, visible, isRound, category }: {
 }
 
 /** Gate/accumulator zone - positioned at belt height */
-function GateZone({ category }: { category: Category | null }) {
-  const gateColor = category === 'B' ? COLORS.routeB 
-    : category === 'C' ? COLORS.routeC 
-    : category === 'D' ? COLORS.routeD 
+function GateZone({ category, shadows = false }: { category: Category | null; shadows?: boolean }) {
+  const gateColor = category === 'B' ? COLORS.routeB
+    : category === 'C' ? COLORS.routeC
+    : category === 'D' ? COLORS.routeD
     : COLORS.gateFrame;
-  
+
   const gateX = ZONES.GATE.x;
   const postSpacing = CONVEYOR_WIDTH_M / 2 + 0.08;
   const postHeight = 0.4;
-  
+
   return (
     <group position={[gateX, 0, 0]}>
       {/* Gate posts from floor */}
-      <mesh position={[0, BELT_Y + postHeight / 2, postSpacing]}>
+      <mesh position={[0, BELT_Y + postHeight / 2, postSpacing]} castShadow={shadows}>
         <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[0, BELT_Y + postHeight / 2, -postSpacing]}>
+      <mesh position={[0, BELT_Y + postHeight / 2, -postSpacing]} castShadow={shadows}>
         <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
       </mesh>
       {/* Gate bar */}
-      <mesh position={[0, BELT_Y + postHeight, 0]}>
+      <mesh position={[0, BELT_Y + postHeight, 0]} castShadow={shadows}>
         <boxGeometry args={[0.05, 0.05, postSpacing * 2]} />
         <meshStandardMaterial color={gateColor} />
       </mesh>
@@ -1189,21 +1140,34 @@ function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
 }
 
 /** Main continuous scene - light warehouse style with correct physical dimensions */
-function ContinuousScene({ 
-  playback, 
+function ContinuousScene({
+  playback,
   simplified,
   autoCameraEnabled,
-  viewportType 
-}: { 
-  playback: ContinuousPlaybackState; 
+  viewportType,
+  stage0,
+  stage1,
+  maxVisibleItems = MAX_VISIBLE_ITEMS,
+}: {
+  playback: ContinuousPlaybackState;
   simplified: boolean;
   autoCameraEnabled: boolean;
   viewportType: ViewportType;
+  stage0?: Stage0Config;
+  stage1?: Stage1Config;
+  maxVisibleItems?: number;
 }) {
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
   const liteScene = simplified || !ENABLE_DEMO_EFFECTS;
   const effectsEnabled = ENABLE_DEMO_EFFECTS && !simplified;
+
+  // Stage 0 prototype flags (inert when stage0 is absent — default route unchanged)
+  const proto = stage0?.enabled ?? false;
+  const protoShadows = proto && stage0!.shadows;
+  const protoCamera = proto && stage0!.camera;
+  const shotOverride = protoCamera && stage0!.shot ? shotToPhaseCategory(stage0!.shot) : null;
+  const darkBg = proto && stage0!.darkBackground;
   
   const cameraHighlight = shouldHighlightCamera(phase);
   const showScan = shouldShowScanEffect(phase);
@@ -1220,7 +1184,7 @@ function ContinuousScene({
   // Use cumulative playlist durations (cases may differ: jam / e-stop).
   const { totalElapsedMs, currentCase, currentCaseIndex, caseElapsedMs, positionJitter } = playback;
   const casesSpawned = currentCaseIndex + 1;
-  const startIndex = Math.max(0, casesSpawned - MAX_VISIBLE_ITEMS);
+  const startIndex = Math.max(0, casesSpawned - maxVisibleItems);
 
   const sceneItems = useMemo(() => {
     const items = [];
@@ -1247,6 +1211,19 @@ function ContinuousScene({
   const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
   const isRound = itemData.roundness >= 0.7;
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
+
+  // Stage 1 real-model verification overlay (debug only, read-only)
+  const verifySku = stage1?.enabled && stage1.verify === 'real-models'
+    ? (stage1.sku ?? itemId)
+    : null;
+
+  // Preload the default playlist's real assets once per scene mount
+  // (deduped by loader cache; rare SKUs stay lazy — Stage 1 §19 budget).
+  useEffect(() => {
+    for (const asset of getPreloadAssets()) {
+      if (asset.runtimePath) preloadRealItemModel(asset.runtimePath);
+    }
+  }, []);
   const itemScale = Math.max(dims.width, dims.depth, dims.height);
   
   // Get item position for measurement visualization using physical model
@@ -1271,19 +1248,49 @@ function ContinuousScene({
     : 'x';
   const itemColor = category ? COLORS[`route${category}` as keyof typeof COLORS] : COLORS.sensorAccent;
   
-  // Cinematic camera active only when heavy effects enabled
-  const cinematicActive = effectsEnabled && autoCameraEnabled && playback.status === 'running';
+  // Cinematic camera: heavy effects (legacy flag) OR stage0 prototype camera.
+  // Manual shot override keeps the camera driving even while paused.
+  const cinematicActive = (effectsEnabled || protoCamera) && autoCameraEnabled
+    && (playback.status === 'running' || shotOverride !== null);
 
   return (
     <>
-      {/* Light background */}
-      <color attach="background" args={[COLORS.background]} />
-      
-      {/* Soft natural lighting — no shadow maps (Canvas shadows=false for perf) */}
-      <ambientLight intensity={0.7} />
-      <hemisphereLight args={['#f8fafc', '#d0dae8', 0.5]} />
-      <directionalLight position={[8, 12, 6]} intensity={0.9} />
-      <directionalLight position={[-5, 8, -4]} intensity={0.35} />
+      {/* Background: light warehouse by default; dark cinematic in prototype mode */}
+      <color attach="background" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : COLORS.background]} />
+
+      {proto ? (
+        <>
+          {/* Cinematic rig: very low ambient, strong key, soft fill, cool rim */}
+          <ambientLight intensity={stage0!.ambient} />
+          <hemisphereLight args={['#223148', '#0b1220', 0.3]} />
+          <directionalLight
+            position={[6, 9, 4]}
+            intensity={1.6}
+            castShadow={protoShadows}
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
+            shadow-camera-left={-7}
+            shadow-camera-right={7}
+            shadow-camera-top={7}
+            shadow-camera-bottom={-7}
+            shadow-camera-near={1}
+            shadow-camera-far={25}
+            shadow-bias={-0.0004}
+          />
+          {/* Fill — keeps shadowed side readable */}
+          {stage0!.fill && <directionalLight position={[-5, 6, -3]} intensity={0.35} />}
+          {/* Rim — cheap back light for edge separation */}
+          {stage0!.rim && <directionalLight position={[2, 5, -8]} intensity={0.7} color="#bcd7ff" />}
+        </>
+      ) : (
+        <>
+          {/* Soft natural lighting — no shadow maps (Canvas shadows=false for perf) */}
+          <ambientLight intensity={0.7} />
+          <hemisphereLight args={['#f8fafc', '#d0dae8', 0.5]} />
+          <directionalLight position={[8, 12, 6]} intensity={0.9} />
+          <directionalLight position={[-5, 8, -4]} intensity={0.35} />
+        </>
+      )}
 
       {/* Grid */}
       <Grid
@@ -1300,13 +1307,13 @@ function ContinuousScene({
       />
 
       {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={protoShadows}>
         <planeGeometry args={[16, 12]} />
         <meshStandardMaterial color={COLORS.floor} roughness={0.9} metalness={0} />
       </mesh>
 
       {/* Conveyor - belt top at 0.7m */}
-      <ConveyorBelt pulseActive={showPulse} elapsedMs={totalElapsedMs} simplified={liteScene} />
+      <ConveyorBelt pulseActive={showPulse} elapsedMs={totalElapsedMs} simplified={liteScene} shadows={protoShadows} />
 
       {/* Zone A - spawn point */}
       <ZoneMarker 
@@ -1320,19 +1327,21 @@ function ContinuousScene({
       <BReceiverBin active={activeRoute === 'B'} />
       
       {/* Zone C - roll cage for oversized items */}
-      <RollCage 
-        position={[ZONES.C.x, 0, ZONES.C.z]} 
-        label="C" 
-        color={COLORS.routeC} 
+      <RollCage
+        position={[ZONES.C.x, 0, ZONES.C.z]}
+        label="C"
+        color={COLORS.routeC}
         active={activeRoute === 'C'}
+        shadows={protoShadows}
       />
-      
+
       {/* Zone D - roll cage for round items */}
-      <RollCage 
-        position={[ZONES.D.x, 0, ZONES.D.z]} 
-        label="D" 
-        color={COLORS.routeD} 
+      <RollCage
+        position={[ZONES.D.x, 0, ZONES.D.z]}
+        label="D"
+        color={COLORS.routeD}
         active={activeRoute === 'D'}
+        shadows={protoShadows}
       />
       
       {/* Chutes for routing to C/D */}
@@ -1375,22 +1384,24 @@ function ContinuousScene({
       {effectsEnabled && <ScanLine active={showScan} />}
 
       {/* Gate/diverter */}
-      <GateZone category={category} />
-      
+      <GateZone category={category} shadows={protoShadows} />
+
       {/* Actuator pusher for routing */}
-      <ActuatorPusher active={showActuator} category={category} />
+      <ActuatorPusher active={showActuator} category={category} shadows={protoShadows} />
 
       {/* Route arrows on belt surface */}
       <RouteArrows activeRoute={activeRoute} />
 
       {/* Physically simulated items */}
       {sceneItems.map(item => (
-        <PhysicalPlaybackItem 
+        <PhysicalPlaybackItem
           key={item.id}
           caseData={item.caseData}
           elapsedMs={item.elapsedMs}
           slotIndex={item.slotIndex}
+          verifySku={verifySku}
           jitter={item.slotIndex === currentCaseIndex ? positionJitter : undefined}
+          castShadow={protoShadows}
         />
       ))}
       
@@ -1419,12 +1430,14 @@ function ContinuousScene({
         />
       )}
 
-      {/* Cinematic camera controller — opt-in only */}
-      {effectsEnabled && (
+      {/* Cinematic camera controller — opt-in (legacy effects flag or stage0 prototype) */}
+      {(effectsEnabled || protoCamera) && (
         <CinematicCameraController
           playback={playback}
           enabled={cinematicActive}
           viewportType={viewportType}
+          overridePhase={shotOverride?.phase ?? null}
+          overrideCategory={shotOverride?.category ?? null}
         />
       )}
 
@@ -1443,53 +1456,134 @@ function ContinuousScene({
   );
 }
 
+/**
+ * Stage 0 adaptive quality: rolling-average FPS, checks at most once per 4 s,
+ * cooldown between switches, max 3 automatic steps. Only the DPR lever is
+ * applied live (via R3F setDpr — no React state churn per frame); shadow/AA
+ * changes require remount and are reported as not-live-switchable.
+ */
+function AdaptiveQualityController({ initialMode }: { initialMode: QualityMode }) {
+  const setDpr = useThree((s) => s.setDpr);
+  const stateRef = useRef({
+    mode: initialMode as QualityMode,
+    frames: 0,
+    windowStart: 0,
+    lastSwitchAt: 0,
+    switches: 0,
+  });
+
+  useFrame(({ clock }) => {
+    const st = stateRef.current;
+    st.frames += 1;
+    const now = clock.elapsedTime;
+    if (st.windowStart === 0) {
+      st.windowStart = now;
+      st.lastSwitchAt = now;
+      return;
+    }
+    const windowLen = now - st.windowStart;
+    if (windowLen < 4) return; // evaluate at most once per 4 s
+
+    const avgFps = st.frames / windowLen;
+    st.frames = 0;
+    st.windowStart = now;
+
+    const previous = st.mode;
+    const next = adaptQuality(previous, avgFps);
+    if (next === previous) return;
+    if (st.switches >= 3) return; // cap automatic switches
+    if (now - st.lastSwitchAt < 8) return; // cooldown / hysteresis
+
+    st.mode = next;
+    st.switches += 1;
+    st.lastSwitchAt = now;
+    setDpr(Math.min(window.devicePixelRatio || 1, getQualitySettings(next).dprMax));
+    if (typeof window !== 'undefined') {
+      const message = describeAdaptiveSwitch(previous, next, avgFps);
+      console.info(`[stage0] ${message}`);
+      const w = window as unknown as { __STAGE0_ADAPT__?: string[] };
+      w.__STAGE0_ADAPT__ ??= [];
+      w.__STAGE0_ADAPT__.push(message);
+    }
+  });
+
+  return null;
+}
+
 export default function SorterDigitalTwinContinuous({
   playback,
   simplified = false,
   onContextLost,
+  onContextRestored,
   autoCameraEnabled = true,
   viewportType = 'desktop',
   qualityMode,
+  stage0,
+  stage1,
 }: SorterDigitalTwinContinuousProps) {
   const mode = qualityMode ?? detectQualityMode(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const quality = getQualitySettings(mode);
   const useSimplified = simplified || mode === 'low';
   const antialias = quality.antialias && !useSimplified;
+  const proto = stage0?.enabled ?? false;
+  const protoShadows = proto && stage0!.shadows;
+  const shadowsEnabled = proto ? protoShadows : quality.shadows;
   const perfEnabled =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('perf') === '1';
+    (typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('perf') === '1') ||
+    (proto && stage0!.perf);
   return (
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
           camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
           dpr={[1, quality.dprMax]}
-          shadows={quality.shadows}
+          shadows={shadowsEnabled ? 'soft' : false}
           gl={{ antialias, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {
+            if (proto) {
+              gl.outputColorSpace = THREE.SRGBColorSpace;
+              gl.toneMapping = stage0!.toneMapping ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+              gl.toneMappingExposure = 1.0;
+              gl.shadowMap.type = THREE.PCFSoftShadowMap;
+            }
             const canvas = gl.domElement;
             const handleLost = (event: Event) => {
               event.preventDefault();
               if (!canvas.isConnected) return;
               onContextLost?.();
             };
+            const handleRestored = () => {
+              if (!canvas.isConnected) return;
+              onContextRestored?.();
+            };
             canvas.addEventListener('webglcontextlost', handleLost, false);
+            canvas.addEventListener('webglcontextrestored', handleRestored, false);
           }}
         >
           <Suspense fallback={null}>
-            <ContinuousScene 
-              playback={playback} 
+            <ContinuousScene
+              playback={playback}
               simplified={useSimplified}
               autoCameraEnabled={autoCameraEnabled}
               viewportType={viewportType}
+              stage0={stage0}
+              stage1={stage1}
+              maxVisibleItems={quality.maxVisibleItems}
             />
             {perfEnabled ? (
               <PerfCollector
                 enabled
                 mode={mode}
-                shadows={quality.shadows}
+                shadows={shadowsEnabled}
                 antialias={antialias}
               />
+            ) : null}
+            {proto && stage0!.adaptive ? <AdaptiveQualityController initialMode={mode} /> : null}
+            {proto && stage0!.post ? (
+              <Suspense fallback={null}>
+                <PostProcessingSpike />
+              </Suspense>
             ) : null}
           </Suspense>
         </Canvas>
