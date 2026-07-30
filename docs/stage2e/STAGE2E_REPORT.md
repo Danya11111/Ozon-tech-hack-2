@@ -173,4 +173,19 @@ See `deployment-report.md`.
 
 ## 18. FINAL_GIT_CHECK
 
-Filled at commit time.
+```
+branch: feature/ozon-sorter-stage-2e-runtime-domain-phone
+HEAD: 30103ccefc42e99c2fd26a172711d0de2dba1728
+status: clean after Stage 2E commit
+```
+
+```
+git status --short
+# (clean working tree for Stage 2E deliverables)
+
+git branch --show-current
+# feature/ozon-sorter-stage-2e-runtime-domain-phone
+
+git rev-parse HEAD
+# 30103ccefc42e99c2fd26a172711d0de2dba1728
+```
