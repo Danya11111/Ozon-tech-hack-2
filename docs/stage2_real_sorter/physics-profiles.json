@@ -1,0 +1,228 @@
+{
+  "units": "SI (meters, kilograms, seconds)",
+  "colliderNotes": "simplified colliders (cuboid/capsule/cylinder); colliderAxis x = long axis lying across the belt (Z-rotated 90deg)",
+  "default": {
+    "sku": "default",
+    "approximateMassKg": 1,
+    "friction": 0.8,
+    "restitution": 0.2,
+    "linearDamping": 0.2,
+    "angularDamping": 0.4,
+    "collider": "cuboid",
+    "cuboidHalfExtents": [
+      0.15,
+      0.1,
+      0.1
+    ],
+    "centerOfMassOffsetY": 0,
+    "pusherImpulseScale": 1,
+    "canRoll": false
+  },
+  "profiles": {
+    "SKU-001": {
+      "name": "Box 300x200x200",
+      "dimensionsMm": {
+        "width": 300,
+        "depth": 200,
+        "height": 200
+      },
+      "sku": "SKU-001",
+      "approximateMassKg": 0.8,
+      "friction": 0.55,
+      "restitution": 0.15,
+      "linearDamping": 0.2,
+      "angularDamping": 0.4,
+      "collider": "cuboid",
+      "cuboidHalfExtents": [
+        0.15,
+        0.1,
+        0.1
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 1,
+      "canRoll": false
+    },
+    "SKU-002": {
+      "name": "Lunchbox 201x152x62",
+      "dimensionsMm": {
+        "width": 201,
+        "depth": 152,
+        "height": 62
+      },
+      "sku": "SKU-002",
+      "approximateMassKg": 0.6,
+      "friction": 0.5,
+      "restitution": 0.2,
+      "linearDamping": 0.2,
+      "angularDamping": 0.4,
+      "collider": "cuboid",
+      "cuboidHalfExtents": [
+        0.14,
+        0.06,
+        0.09
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 1.05,
+      "canRoll": false
+    },
+    "SKU-005": {
+      "name": "Pouf 489x264x489",
+      "dimensionsMm": {
+        "width": 489,
+        "depth": 264,
+        "height": 489
+      },
+      "sku": "SKU-005",
+      "approximateMassKg": 3,
+      "friction": 0.45,
+      "restitution": 0.1,
+      "linearDamping": 0.3,
+      "angularDamping": 0.5,
+      "collider": "cylinder",
+      "colliderAxis": "y",
+      "capsule": [
+        0.2445,
+        0.132
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 0.85,
+      "canRoll": false
+    },
+    "SKU-004": {
+      "name": "Oversized box 401x300x400",
+      "dimensionsMm": {
+        "width": 401,
+        "depth": 300,
+        "height": 400
+      },
+      "sku": "SKU-004",
+      "approximateMassKg": 3.2,
+      "friction": 0.4,
+      "restitution": 0.1,
+      "linearDamping": 0.25,
+      "angularDamping": 0.5,
+      "collider": "cuboid",
+      "cuboidHalfExtents": [
+        0.45,
+        0.25,
+        0.1
+      ],
+      "centerOfMassOffsetY": -0.05,
+      "pusherImpulseScale": 0.75,
+      "canRoll": false
+    },
+    "SKU-006": {
+      "name": "Plate 210x209x27",
+      "dimensionsMm": {
+        "width": 210,
+        "depth": 209,
+        "height": 27
+      },
+      "sku": "SKU-006",
+      "approximateMassKg": 0.55,
+      "friction": 0.45,
+      "restitution": 0.25,
+      "linearDamping": 0.15,
+      "angularDamping": 0.25,
+      "collider": "cuboid",
+      "cuboidHalfExtents": [
+        0.13,
+        0.015,
+        0.13
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 1.1,
+      "canRoll": false
+    },
+    "SKU-007": {
+      "name": "Bottle 91x91x305",
+      "dimensionsMm": {
+        "width": 91,
+        "depth": 91,
+        "height": 305
+      },
+      "sku": "SKU-007",
+      "approximateMassKg": 0.45,
+      "friction": 0.5,
+      "restitution": 0.35,
+      "linearDamping": 0.1,
+      "angularDamping": 0.15,
+      "collider": "capsule",
+      "capsule": [
+        0.045,
+        0.095
+      ],
+      "centerOfMassOffsetY": -0.04,
+      "pusherImpulseScale": 1.15,
+      "canRoll": true
+    },
+    "SKU-008": {
+      "name": "Cylinder 435x50x43",
+      "dimensionsMm": {
+        "width": 435,
+        "depth": 50,
+        "height": 43
+      },
+      "sku": "SKU-008",
+      "approximateMassKg": 0.6,
+      "friction": 0.45,
+      "restitution": 0.2,
+      "linearDamping": 0.08,
+      "angularDamping": 0.12,
+      "collider": "cylinder",
+      "colliderAxis": "x",
+      "capsule": [
+        0.0215,
+        0.2175
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 0.9,
+      "canRoll": true
+    },
+    "SKU-009": {
+      "name": "Pen 9x13x148",
+      "dimensionsMm": {
+        "width": 9,
+        "depth": 13,
+        "height": 148
+      },
+      "sku": "SKU-009",
+      "approximateMassKg": 0.02,
+      "friction": 0.4,
+      "restitution": 0.25,
+      "linearDamping": 0.1,
+      "angularDamping": 0.8,
+      "collider": "capsule",
+      "capsule": [
+        0.006,
+        0.066
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 1.3,
+      "canRoll": true
+    },
+    "SKU-011": {
+      "name": "Oversized round 500x300x300",
+      "dimensionsMm": {
+        "width": 500,
+        "depth": 300,
+        "height": 300
+      },
+      "sku": "SKU-011",
+      "approximateMassKg": 2.8,
+      "friction": 0.6,
+      "restitution": 0.1,
+      "linearDamping": 0.4,
+      "angularDamping": 0.6,
+      "collider": "cylinder",
+      "colliderAxis": "y",
+      "capsule": [
+        0.225,
+        0.15
+      ],
+      "centerOfMassOffsetY": 0,
+      "pusherImpulseScale": 0.85,
+      "canRoll": false
+    }
+  }
+}

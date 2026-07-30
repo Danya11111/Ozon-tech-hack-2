@@ -54,9 +54,9 @@ const VIEWPORT_ADJUSTMENTS: Record<ViewportType, { heightMult: number; distMult:
  */
 const BASE_CAMERA_CONFIGS: Record<CameraMode, Omit<CameraConfig, 'mode'>> = {
   overview: {
-    position: [5.0, 3.5, 5.5],
-    target: [0, BELT_TOP_Y, 0],
-    fov: 50,
+    position: [4.3, 2.9, 4.6],
+    target: [0.1, BELT_TOP_Y, 0],
+    fov: 46,
   },
   feedCloseup: {
     position: [ZONES.A.x + 1.5, 2.0, 2.0],

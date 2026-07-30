@@ -17,10 +17,10 @@ describe('qualityMode', () => {
     expect(detectQualityMode(1440, 20)).toBe('low');
   });
 
-  it('demo preset keeps effects off for stable FPS', () => {
+  it('demo preset: premium shadows on (Stage 2), expensive effects stay off for stable FPS', () => {
     const s = getQualitySettings('demo');
     expect(s.effectsEnabled).toBe(false);
-    expect(s.shadows).toBe(false);
+    expect(s.shadows).toBe(true); // Stage 2: PCFSoft contact shadows in the default premium look
     expect(s.targetFps).toBe(60);
   });
 

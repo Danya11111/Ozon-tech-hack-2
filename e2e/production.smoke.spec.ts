@@ -17,7 +17,7 @@ test.describe('production smoke @production', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/?debug=1');
     const html = await page.content();
     const bundle = html.match(/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? '';
     expect(bundle).toMatch(/^index-/);
@@ -50,7 +50,7 @@ test.describe('production smoke @production', () => {
     expect(webgl.ok).toBe(true);
 
     await expect(page.getByTestId('demo-play').or(page.getByTestId('demo-pause'))).toBeVisible();
-    await expect(page.getByTestId('demo-case-9')).toBeVisible();
+    await expect(page.getByTestId('demo-case-10')).toBeVisible();
 
     // Play / seek
     const pauseBtn = page.getByTestId('demo-pause');
@@ -59,11 +59,11 @@ test.describe('production smoke @production', () => {
     }
     await page.waitForTimeout(600);
     await page.getByTestId('demo-case-0').click();
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/10');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
 
     // Jam
     await page.getByTestId('demo-speed-2').click();
-    await page.getByTestId('demo-case-8').click();
+    await page.getByTestId('demo-case-9').click();
     await expect
       .poll(async () => {
         const status = (await page.getByTestId('demo-status').textContent()) ?? '';
@@ -73,7 +73,7 @@ test.describe('production smoke @production', () => {
       .toMatch(/FAULT|JAM/i);
 
     // E-stop
-    await page.getByTestId('demo-case-9').click();
+    await page.getByTestId('demo-case-10').click();
     await expect
       .poll(async () => {
         const status = (await page.getByTestId('demo-status').textContent()) ?? '';
@@ -88,7 +88,7 @@ test.describe('production smoke @production', () => {
       await stop.click({ force: true });
     }
     await page.getByTestId('demo-case-0').click({ force: true });
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/10');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
 
     await page.goto('/details');
     await expect(page.locator('#root')).toBeVisible();
@@ -96,7 +96,7 @@ test.describe('production smoke @production', () => {
     await expect(page.locator('#root')).toBeVisible();
 
     // Back home — version still matches
-    await page.goto('/');
+    await page.goto('/?debug=1');
     const version2 = await page.evaluate(async () => {
       const r = await fetch('/version.json', { cache: 'no-store' });
       return r.ok ? r.json() : null;

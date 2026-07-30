@@ -17,6 +17,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { getStaticColliders } from './physicsWorldLayout';
 import { getVisualPhysicsProfile, type VisualPhysicsProfile } from './visualPhysicsProfiles';
 import { getPhysicalItemPose, getDropHandoffTimeMs } from './physicalItemMotion';
+import { getPusherState, PUSHER } from './pusherMotion';
 import { receiverContains, type ReceiverZone } from './receiverVolumes';
 import { resolveItem } from '../data/resolveItem';
 import { BELT_TOP_Y } from './physicalLayout';
@@ -61,6 +62,10 @@ function colliderDescFor(profile: VisualPhysicsProfile): RAPIER.ColliderDesc {
     desc = RAPIER.ColliderDesc.cylinder(hh, r);
     desc.setDensity(profile.approximateMassKg / (Math.PI * r * r * 2 * hh));
   }
+  if (profile.colliderAxis === 'x') {
+    // Rapier capsule/cylinder axis is Y by default — rotate to lie along X.
+    desc.setRotation(quatFromEuler(0, 0, Math.PI / 2));
+  }
   desc.setFriction(profile.friction);
   desc.setRestitution(profile.restitution);
   return desc;
@@ -81,13 +86,12 @@ function handoffState(skuId: string, category: ReceiverZone) {
     faultType: undefined,
   });
   const h = item.dimensionsMm.height / 1000;
-  const dirZ = category === 'D' ? -1 : 1;
-  const linvel = category === 'B'
-    ? { x: 1.0, y: 0, z: 0 }
-    : { x: 0.55, y: 0, z: dirZ * 1.35 * profile.pusherImpulseScale };
-  const angvel = profile.canRoll
-    ? { x: category === 'B' ? 2.0 : 0.8, y: 0.4, z: 0 }
-    : { x: 0, y: 0.25, z: 0 };
+  // B: belt carry-over off the spur edge. C/D: belt carry at the junction —
+  // Z motion comes from the kinematic pusher plate CONTACT (Stage 2B §13).
+  const linvel = { x: 1.0, y: 0, z: 0 };
+  const angvel = profile.canRoll && category === 'B'
+    ? { x: 2.0, y: 0.4, z: 0 }
+    : { x: 0, y: 0, z: 0 };
   return { profile, pose, linvel, angvel, itemHeightM: h };
 }
 
@@ -100,6 +104,8 @@ export interface DropSimResult {
   settledBySleep: boolean;
   settledByTimeout: boolean;
   stepsSimulated: number;
+  /** Physics engine confirmed contact between the pusher plate and the item. */
+  pusherContactMade: boolean;
   /** Lowest belt/floor clearance observed (translation.y - itemHalfHeight). */
   minClearanceM: number;
   /** Integrated |angvel| over the drop — distinguishes rolling from teleport-like slides. */
@@ -111,7 +117,15 @@ export interface DropSimResult {
 export function simulateDrop(
   skuId: string,
   category: ReceiverZone,
-  overrides?: { linvelScale?: number },
+  overrides?: {
+    linvelScale?: number;
+    /** Fault injection: pusher executes the OPPOSITE side (mechanism fault). */
+    wrongPusher?: boolean;
+    trace?: (sample: {
+    t: number; x: number; y: number; z: number;
+    vx: number; vy: number; vz: number;
+    wx: number; wy: number; wz: number; sleeping: boolean;
+  }) => void },
 ): DropSimResult {
   const { profile, pose, linvel, angvel, itemHeightM } = handoffState(skuId, category);
   const scale = overrides?.linvelScale ?? 1;
@@ -136,11 +150,37 @@ export function simulateDrop(
       .setAngvel(angvel)
       .setLinearDamping(profile.linearDamping)
       .setAngularDamping(profile.angularDamping)
-      .setCcdEnabled(profile.approximateMassKg < 0.05); // same rule as runtime (pen)
+      .setCcdEnabled(profile.approximateMassKg < 0.05 || itemHeightM < 0.05); // pen + thin plate
     const body = world.createRigidBody(bodyDesc);
-    world.createCollider(colliderDescFor(profile), body);
+    const itemCollider = world.createCollider(colliderDescFor(profile), body);
 
-    const halfH = itemHeightM / 2;
+    // Kinematic sorting pusher (C/D routes): physically contacts the item
+    // and drives it across the belt onto the chute — mirrors the runtime body.
+    let pusherBody: RAPIER.RigidBody | null = null;
+    let pusherCollider: RAPIER.Collider | null = null;
+    const pusherCategory = overrides?.wrongPusher && category !== 'B'
+      ? (category === 'C' ? 'D' : 'C')
+      : category;
+    if (category !== 'B') {
+      const initial = getPusherState(pusherCategory, 0);
+      pusherBody = world.createRigidBody(
+        RAPIER.RigidBodyDesc.kinematicPositionBased()
+          .setTranslation(initial.x, PUSHER.centerY, initial.z)
+          .setRotation(quatFromEuler(0, initial.yaw, 0)),
+      );
+      pusherCollider = world.createCollider(
+        RAPIER.ColliderDesc.cuboid(...PUSHER.halfExtents).setFriction(0.15),
+        pusherBody,
+      );
+    }
+    let pusherContactMade = false;
+
+    // Clearance is measured against the collider's SMALLEST vertical
+    // half-extent, not itemHeightM/2 — a bottle lying on its side legitimately
+    // has its center ~r above the floor, 10× less than its standing half-height.
+    const halfH = profile.collider === 'cuboid' && profile.cuboidHalfExtents
+      ? Math.min(...profile.cuboidHalfExtents)
+      : (profile.capsule?.[0] ?? itemHeightM / 2);
     let minClearance = Infinity;
     let totalRotation = 0;
     let maxSpeed = 0;
@@ -148,11 +188,26 @@ export function simulateDrop(
     let slept = false;
     const maxSteps = Math.round(SIM_SETTLE_SECONDS / SIM_DT);
     for (let i = 0; i < maxSteps; i += 1) {
+      if (pusherBody && pusherCollider) {
+        const ps = getPusherState(pusherCategory, i * SIM_DT);
+        pusherBody.setNextKinematicTranslation({ x: ps.x, y: PUSHER.centerY, z: ps.z });
+        pusherBody.setNextKinematicRotation(quatFromEuler(0, ps.yaw, 0));
+      }
       world.step();
       steps += 1;
+      if (pusherCollider && !pusherContactMade) {
+        world.contactPairsWith(pusherCollider, (other) => {
+          if (other.handle === itemCollider.handle) pusherContactMade = true;
+        });
+      }
       const t = body.translation();
       const v = body.linvel();
       const w = body.angvel();
+      overrides?.trace?.({
+        t: i * SIM_DT, x: t.x, y: t.y, z: t.z,
+        vx: v.x, vy: v.y, vz: v.z, wx: w.x, wy: w.y, wz: w.z,
+        sleeping: body.isSleeping(),
+      });
       minClearance = Math.min(minClearance, t.y - halfH);
       totalRotation += Math.hypot(w.x, w.y, w.z) * SIM_DT;
       maxSpeed = Math.max(maxSpeed, Math.hypot(v.x, v.y, v.z));
@@ -171,6 +226,7 @@ export function simulateDrop(
       settledBySleep: slept,
       settledByTimeout: !slept,
       stepsSimulated: steps,
+      pusherContactMade,
       minClearanceM: minClearance,
       totalRotationRad: totalRotation,
       maxSpeedMps: maxSpeed,

@@ -5,12 +5,16 @@ import ThreeErrorBoundary from './ThreeD/ThreeErrorBoundary';
 import { prefer3DByDefault, useWebGLSupport } from './ThreeD/useWebGL';
 import type { SimulationState } from '../domain/types';
 import type { DemoDirectorState } from '../domain/demoDirector';
+import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
 
-const SorterDigitalTwin = lazy(() => import('./ThreeD/SorterDigitalTwin'));
+// Stage 2B §7/§20: /details reuses the SAME CAD-derived machine assembly and
+// live playback as the main page — no second procedural conveyor.
+const SorterDigitalTwinContinuous = lazy(() => import('./ThreeD/SorterDigitalTwinContinuous'));
 
 type ViewMode = '3d' | '2d';
 
 interface Props {
+  playback: ContinuousPlaybackState;
   simulation: SimulationState;
   demoStepTitle: string;
   demoDirector: DemoDirectorState;
@@ -24,6 +28,7 @@ interface Props {
 }
 
 export default function ProductDemoSection({
+  playback,
   simulation,
   demoStepTitle,
   demoDirector,
@@ -126,9 +131,10 @@ export default function ProductDemoSection({
                 }}
               >
                 <Suspense fallback={<div className="three-loading">Загрузка 3D digital twin…</div>}>
-                  <SorterDigitalTwin
-                    simulation={simulation}
+                  <SorterDigitalTwinContinuous
+                    playback={playback}
                     simplified={simplified}
+                    autoCameraEnabled
                     onContextLost={() => {
                       setContextLost(true);
                       setViewMode('2d');

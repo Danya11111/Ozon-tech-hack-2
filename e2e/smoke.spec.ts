@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ensureRunning, expectPlaybackControl } from './helpers';
 
 test.describe('smoke', () => {
   test('home opens, canvas loads, play works', async ({ page }) => {
@@ -13,10 +14,9 @@ test.describe('smoke', () => {
     await expect(canvas).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('demo-hud')).toBeVisible();
-    await expect(page.getByTestId('demo-play')).toBeVisible();
-
-    await page.getByTestId('demo-play').click();
-    await expect(page.getByTestId('demo-pause')).toBeVisible({ timeout: 10_000 });
+    // Stage 2B: demo autostarts — Pause is present immediately; Play after pause.
+    await expectPlaybackControl(page);
+    await ensureRunning(page);
     await expect(page.getByTestId('demo-status')).not.toHaveText('FINISHED');
 
     const finished = page.getByTestId('demo-finished');

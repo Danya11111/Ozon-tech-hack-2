@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ensureRunning } from './helpers';
 
 /**
  * Stage 0 — mobile fallback & WebGL context resilience.
@@ -67,9 +68,9 @@ test.describe('mobile fallback (390x844)', () => {
     // Auto-camera toggle must not claim hidden 3D works
     await expect(page.locator('.auto-camera-toggle')).toHaveCount(0);
 
-    // Play/pause drive the visible SVG scene (same playback state)
-    await page.getByTestId('demo-play').click();
-    await expect(page.getByTestId('demo-pause')).toBeVisible({ timeout: 10_000 });
+    // Play/pause drive the visible SVG scene (same playback state).
+    // Stage 2B autostart may already be running — ensureRunning is idempotent.
+    await ensureRunning(page);
     await expect(page.getByTestId('demo-status')).not.toHaveText('FINISHED');
     await page.getByTestId('demo-pause').click();
     await expect(page.getByTestId('demo-play')).toBeVisible({ timeout: 10_000 });
@@ -185,7 +186,7 @@ test.describe('stage2 mobile capability policy', () => {
     // Mobile Low mounts the real 3D canvas at low quality
     await expect(page.locator('canvas')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('main-svg-fallback')).toHaveCount(0);
-    await page.getByTestId('demo-play').click();
+    await ensureRunning(page);
     await page.waitForTimeout(4000);
     expect(pageErrors, `pageerrors: ${pageErrors.join('; ')}`).toEqual([]);
   });
@@ -227,7 +228,7 @@ test.describe('stage0 prototype mode', () => {
     await toggle.click();
     await expect(toggle).toContainText('Auto Cam: ON');
 
-    await page.getByTestId('demo-play').click();
+    await ensureRunning(page);
     await page.waitForTimeout(4000);
     expect(pageErrors, `pageerrors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);

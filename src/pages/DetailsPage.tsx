@@ -12,12 +12,14 @@ import { DEMO_STEPS } from '../data/demoSteps';
 import { SCENARIOS } from '../data/scenarios';
 import type { ScenarioId, SimulationState } from '../domain/types';
 import type { DemoDirectorState } from '../domain/demoDirector';
+import type { ContinuousPlaybackState } from '../domain/continuousPlayback';
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 interface DetailsPageProps {
+  playback: ContinuousPlaybackState;
   simulation: SimulationState;
   demoStepIndex: number;
   demoDirector: DemoDirectorState;
@@ -32,6 +34,7 @@ interface DetailsPageProps {
 }
 
 export default function DetailsPage({
+  playback,
   simulation,
   demoStepIndex,
   demoDirector,
@@ -83,6 +86,7 @@ export default function DetailsPage({
         />
 
         <ProductDemoSection
+          playback={playback}
           simulation={simulation}
           demoStepTitle={currentDemoStep.title}
           demoDirector={demoDirector}

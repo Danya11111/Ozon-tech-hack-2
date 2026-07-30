@@ -45,7 +45,11 @@ export default function MainPage({
   const webgl = useWebGLSupport();
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth));
   const [contextLost, setContextLost] = useState(false);
-  const [autoCameraEnabled, setAutoCameraEnabled] = useState(true);
+  const [autoCameraEnabled, setAutoCameraEnabled] = useState(
+    () =>
+      typeof window === 'undefined' ||
+      new URLSearchParams(window.location.search).get('camera') !== 'off',
+  );
   const [presentationMode, setPresentationMode] = useState(false);
   const [showEventLog, setShowEventLog] = useState(false);
 
@@ -129,6 +133,13 @@ export default function MainPage({
   const debugMode = useMemo(() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('debug') === '1';
+  }, []);
+
+  // Physics debug (?debug=1&physics=1): collider wireframes + frustum.
+  const physicsDebug = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('debug') === '1' && params.get('physics') === '1';
   }, []);
 
   // Stage 2 §16: mobile tier from capability signals (not viewport width).
@@ -269,6 +280,8 @@ export default function MainPage({
                   qualityMode={qualityMode}
                   stage0={stage0}
                   stage1={stage1}
+                  debugOverlays={debugMode}
+                  physicsDebug={physicsDebug}
                 />
               </Suspense>
             </ThreeErrorBoundary>

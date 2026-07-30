@@ -10,6 +10,7 @@
  *   - no console errors throughout
  */
 import { test, expect, type Page } from '@playwright/test';
+import { ensureRunning } from './helpers';
 
 const MODEL_RE = /\/models\/.*\.stl$/;
 
@@ -32,7 +33,7 @@ test.describe('Stage 1 real models', () => {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 30000 });
-    await page.locator('[data-testid="demo-play"]').first().click();
+    await ensureRunning(page);
 
     // Playlist starts with SKU-001 (box-300.stl, preloaded); let playback settle.
     await page.waitForTimeout(9000);
@@ -49,7 +50,7 @@ test.describe('Stage 1 real models', () => {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 30000 });
-    await page.locator('[data-testid="demo-play"]').first().click();
+    await ensureRunning(page);
 
     // Play through several cases incl. the bottle case; scene must stay alive.
     await page.waitForTimeout(15000);
@@ -120,7 +121,7 @@ test.describe('Stage 1 real models', () => {
     const errors = watchConsole(page);
     await page.goto('/?stage1=1&verify=real-models&sku=SKU-001', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 30000 });
-    await page.locator('[data-testid="demo-play"]').first().click();
+    await ensureRunning(page);
     await page.waitForTimeout(8000);
 
     const card = page.locator('text=STAGE1 VERIFY · SKU-001');
@@ -135,7 +136,7 @@ test.describe('Stage 1 real models', () => {
     const errors = watchConsole(page);
     await page.goto('/?stage1=1&verify=real-models&sku=SKU-011', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 30000 });
-    await page.locator('[data-testid="demo-play"]').first().click();
+    await ensureRunning(page);
 
     // SKU-011 is the 7th playlist case — seek forward deterministically.
     for (let i = 0; i < 6; i++) {

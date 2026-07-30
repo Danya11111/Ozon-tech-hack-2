@@ -119,6 +119,15 @@ function AppContent() {
     };
   }, [demoDirector.isAutoDemoRunning, demoDirector.paused, activeScenario, simulation.currentItem?.classification.category]);
 
+  // Public page autostarts the sorter loop; ?playback=paused keeps it idle
+  // (used by screenshot/debug tooling).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('playback') === 'paused') return;
+    setPlayback((prev) => (prev.status === 'idle' ? startPlayback(prev) : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Main page continuous playback loop
   useEffect(() => {
     if (playback.status !== 'running') {
@@ -278,6 +287,7 @@ function AppContent() {
         path="/details"
         element={
           <DetailsPage
+            playback={playback}
             simulation={simulation}
             demoStepIndex={demoStepIndex}
             demoDirector={demoDirector}

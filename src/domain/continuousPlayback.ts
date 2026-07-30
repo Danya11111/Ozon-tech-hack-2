@@ -41,7 +41,9 @@ export interface PhaseConfig {
  */
 export const CASE_PHASES: PhaseConfig[] = [
   { phase: 'spawn', durationMs: 300, label: 'Spawn at A' },
-  { phase: 'move_to_detection', durationMs: 2500, label: 'Moving to camera' },
+  // Stage 2B §10: 1900 ms so that feed(300)+1900+600+1000+1000+1000 = 5500 ms
+  // == A->GATE distance (5.5 m) at 1.0 m/s — continuous motion, no dwell.
+  { phase: 'move_to_detection', durationMs: 1900, label: 'Moving to camera' },
   { phase: 'detection', durationMs: 600, label: 'CV Detection' },
   { phase: 'measurement', durationMs: 1000, label: 'Laser measurement' },
   { phase: 'classification', durationMs: 1000, label: 'Classification' },

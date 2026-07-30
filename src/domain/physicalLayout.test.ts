@@ -21,7 +21,7 @@ import {
   getItemYOnBelt,
 } from './physicalLayout';
 import { ITEMS } from '../data/items';
-import { DEMO_PLAYLIST } from './demoPlaylist';
+import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from './demoPlaylist';
 
 describe('Physical Layout Constants', () => {
   it('belt top at 0.7m', () => {
@@ -123,7 +123,7 @@ describe('Playlist Items Physical Constraints', () => {
 
   it('playlist has classification and safety cases', () => {
     expect(DEMO_PLAYLIST.length).toBeGreaterThanOrEqual(8);
-    expect(DEMO_PLAYLIST).toHaveLength(10);
+    expect(DEMO_PLAYLIST).toHaveLength(PLAYLIST_LENGTH);
   });
 
   it('low confidence case still has B/C/D category', () => {

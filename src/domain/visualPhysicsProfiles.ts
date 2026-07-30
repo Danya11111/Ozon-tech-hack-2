@@ -17,9 +17,12 @@ export interface VisualPhysicsProfile {
   linearDamping: number;
   angularDamping: number;
   collider: ColliderKind;
+  /** Capsule/cylinder symmetry axis ('y' = upright, 'x' = lying across the belt). */
+  colliderAxis?: 'x' | 'y';
   /**
    * Collider half-extents [x,y,z] for cuboid; [radius, halfHeight] for
-   * capsule/cylinder. Derived from validated Stage 1 dimensions (m).
+   * capsule/cylinder. MUST match validated Stage 1 dimensionsMm so the
+   * collider bottom is flush with the visual item bottom (no spawn overlap).
    */
   cuboidHalfExtents?: [number, number, number];
   capsule?: [number, number];
@@ -44,8 +47,14 @@ const PROFILES: Record<string, VisualPhysicsProfile> = {
     cuboidHalfExtents: [0.14, 0.06, 0.09], centerOfMassOffsetY: 0,
     pusherImpulseScale: 1.05, canRoll: false,
   },
-  'SKU-004': { // oversized carton 900x200x500
-    sku: 'SKU-004', approximateMassKg: 3.2, friction: 0.6, restitution: 0.1,
+  'SKU-005': { // pouf/ottoman d489 h264 — big soft fabric cylinder, UHMW slide
+    sku: 'SKU-005', approximateMassKg: 3.0, friction: 0.45, restitution: 0.1,
+    linearDamping: 0.3, angularDamping: 0.5, collider: 'cylinder',
+    colliderAxis: 'y', capsule: [0.2445, 0.132], centerOfMassOffsetY: 0,
+    pusherImpulseScale: 0.85, canRoll: false,
+  },
+  'SKU-004': { // oversized carton 900x200x500 — UHMW-coated chute strips
+    sku: 'SKU-004', approximateMassKg: 3.2, friction: 0.4, restitution: 0.1,
     linearDamping: 0.25, angularDamping: 0.5, collider: 'cuboid',
     cuboidHalfExtents: [0.45, 0.25, 0.1], centerOfMassOffsetY: -0.05,
     pusherImpulseScale: 0.75, canRoll: false,
@@ -62,10 +71,11 @@ const PROFILES: Record<string, VisualPhysicsProfile> = {
     capsule: [0.045, 0.095], centerOfMassOffsetY: -0.04,
     pusherImpulseScale: 1.15, canRoll: true,
   },
-  'SKU-008': { // cylinder d120 h200 — rolls
-    sku: 'SKU-008', approximateMassKg: 1.4, friction: 0.45, restitution: 0.3,
+  'SKU-008': { // long cylinder 435x50x43 (dims are source of truth) — lies
+    // across the belt, axis X; rolls in Z when the pusher sweeps it
+    sku: 'SKU-008', approximateMassKg: 0.6, friction: 0.45, restitution: 0.2,
     linearDamping: 0.08, angularDamping: 0.12, collider: 'cylinder',
-    capsule: [0.06, 0.1], centerOfMassOffsetY: 0,
+    colliderAxis: 'x', capsule: [0.0215, 0.2175], centerOfMassOffsetY: 0,
     pusherImpulseScale: 0.9, canRoll: true,
   },
   'SKU-009': { // pen 12x145x12 — light, spins fast
@@ -74,10 +84,10 @@ const PROFILES: Record<string, VisualPhysicsProfile> = {
     capsule: [0.006, 0.066], centerOfMassOffsetY: 0,
     pusherImpulseScale: 1.3, canRoll: true,
   },
-  'SKU-011': { // pouf d450 h400 — big, slow rotation
-    sku: 'SKU-011', approximateMassKg: 2.8, friction: 0.6, restitution: 0.2,
+  'SKU-011': { // pouf round 500x300x300 — h/2=0.15 flush with dims
+    sku: 'SKU-011', approximateMassKg: 2.8, friction: 0.6, restitution: 0.1,
     linearDamping: 0.4, angularDamping: 0.6, collider: 'cylinder',
-    capsule: [0.225, 0.175], centerOfMassOffsetY: 0,
+    colliderAxis: 'y', capsule: [0.225, 0.15], centerOfMassOffsetY: 0,
     pusherImpulseScale: 0.85, canRoll: false,
   },
 };

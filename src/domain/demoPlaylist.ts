@@ -81,6 +81,14 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
     expectedCategory: 'C',
   },
   {
+    id: 'cylinder_d',
+    title: 'Цилиндр (вал)',
+    description: 'Цилиндр 435×50мм лежит поперёк ленты, K=0.97 ≥ 0.7 — круглое сечение → D',
+    itemId: 'SKU-008',
+    scenarioId: 'round_object',
+    expectedCategory: 'D',
+  },
+  {
     id: 'low_confidence',
     title: 'Low confidence fallback',
     description: 'CV confidence < 0.65 — warning, но rule-based решение работает',

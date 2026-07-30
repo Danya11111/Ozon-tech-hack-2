@@ -1,0 +1,83 @@
+{
+  "asset": "public/models/sorter/conveyor-web.glb",
+  "runtimePath": "/models/sorter/conveyor-web.glb",
+  "sourceCad": "3d_models/conveer.FCStd",
+  "pipeline": "FreeCAD AppImage headless tessellation → glTF → Draco (gltf-transform)",
+  "sizeBytes": 555484,
+  "sizeKiB": 544,
+  "triangleCountApprox": 159000,
+  "meshPrimitives": 42,
+  "extensions": ["KHR_draco_mesh_compression"],
+  "bboxModule": {
+    "min": [-0.06603, -0.0865, -0.298],
+    "max": [1.94401, 0.53201, 0.298]
+  },
+  "worldPlacement": {
+    "position": [-2.02, 0.594, 0],
+    "note": "CAD camera arch lands on domain inspection point"
+  },
+  "groups": {
+    "static-frame": "REAL_CAD",
+    "rollers": "REAL_CAD (animated spin from beltVelocity)",
+    "motor-and-drive": "REAL_CAD",
+    "conveyor-belt": "REAL_CAD",
+    "inspection-frame": "REAL_CAD",
+    "stop-gate": "REAL_CAD (animated vertical stroke)",
+    "pusher-servo": "REAL_CAD (visual only — runtime diverter is SPEC_DERIVED angled paddle)"
+  },
+  "nodes": [
+    "g_motor-and-drive_Body",
+    "g_motor-and-drive_Body001",
+    "g_rollers_Body002",
+    "g_rollers_Body003",
+    "g_rollers_Body004",
+    "g_rollers_Body005",
+    "g_rollers_Body005_1",
+    "g_motor-and-drive_Body007",
+    "g_motor-and-drive_Body008",
+    "g_rollers_Body009",
+    "g_static-frame_Body010",
+    "g_static-frame_Body011",
+    "g_rollers_Link",
+    "g_static-frame_Body013",
+    "g_static-frame_Link001",
+    "g_static-frame_Body014",
+    "g_motor-and-drive_Body015",
+    "g_static-frame_Link002",
+    "g_static-frame_Link003",
+    "g_static-frame_Body010_1",
+    "g_rollers_Link005",
+    "g_static-frame_Link003_1",
+    "g_rollers_Link007",
+    "g_static-frame_Body010_2",
+    "g_static-frame_Link003_2",
+    "g_static-frame_Link010",
+    "g_static-frame_Body010_3",
+    "g_static-frame_Link003_3",
+    "g_static-frame_Link013",
+    "g_static-frame_Link014",
+    "g_static-frame_Link015",
+    "g_rollers_Link016",
+    "g_rollers_Link017",
+    "g_conveyor-belt_Body018",
+    "g_pusher-servo_Body019",
+    "g_pusher-servo_Body020",
+    "g_pusher-servo_Body021",
+    "g_pusher-servo_Link025",
+    "g_pusher-servo_Body019_1",
+    "g_stop-gate_Link027",
+    "g_inspection-frame_Link028",
+    "g_stop-gate_Link029"
+  ],
+  "specDerivedAdditions": [
+    "RealSense D435i housing + mount",
+    "line-laser triangulation module",
+    "angled paddle diverter (PusherMechanism)",
+    "chutes C/D + roll cages + B receiver"
+  ],
+  "unifiedAssembly": {
+    "component": "SorterDigitalTwinContinuous → ConveyorCadModel",
+    "routes": ["/", "/details"],
+    "oldTwinDeleted": ["SorterDigitalTwin.tsx", "Conveyor3D.tsx", "Actuator3D.tsx", "SensorRig3D.tsx", "SortingZones3D.tsx"]
+  }
+}

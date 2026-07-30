@@ -152,8 +152,9 @@ describe('Stage 2 §18.11–12 — domain result authority', () => {
   });
 
   it('wrong-receiver drops are detected, never silently "fixed"', () => {
-    // Deliberately reversed pusher direction: bottle aimed away from D.
-    const bad = simulateDrop('SKU-007', 'D', { linvelScale: -1 });
+    // Mechanism fault: domain classified D, but the paddle executed a C push —
+    // the item lands in C and the mismatch MUST be detected, not corrected.
+    const bad = simulateDrop('SKU-007', 'D', { wrongPusher: true });
     expect(bad.insideExpectedReceiver).toBe(false);
     expect(receiverContains('D', bad.finalPosition)).toBe(false);
   });

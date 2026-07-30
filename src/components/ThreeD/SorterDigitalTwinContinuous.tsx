@@ -15,13 +15,15 @@ import type { Mesh, Group } from 'three';
 import * as THREE from 'three';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
-import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
+import { getPhysicalItemPose, getRoutingStartMs } from '../../domain/physicalItemMotion';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
-import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud, shouldShowActuator } from '../../domain/measurementSystem';
+import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud } from '../../domain/measurementSystem';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
 import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
 import { PhysicalPlaybackItemPhysics } from './PhysicalPlaybackItemPhysics';
+import { PusherMechanism } from './PusherMechanism';
+import { RealSenseD435i, RealSenseFrustumDebug, D435I } from './RealSenseD435i';
 import { ConveyorCadModel, CONVEYOR_CAD_SPAN_X, preloadConveyorCad } from './ConveyorCadModel';
 import { SorterPhysicsWorld } from './SorterPhysics';
 import { deriveSorterVisualState } from '../../domain/sorterVisualState';
@@ -82,6 +84,10 @@ export interface SorterDigitalTwinContinuousProps {
   qualityMode?: QualityMode;
   stage0?: Stage0Config;
   stage1?: Stage1Config;
+  /** ?debug=1 — debug overlays (measurement frustum etc.). */
+  debugOverlays?: boolean;
+  /** ?debug=1&physics=1 — collider/frustum physics diagnostics. */
+  physicsDebug?: boolean;
 }
 
 /** 
@@ -139,6 +145,28 @@ const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
 void CONVEYOR_LENGTH;
 
 /** Cinematic camera controller - smoothly transitions between camera angles */
+/**
+ * Debug-only (?debug=1&camera=off&cam=px,py,pz,tx,ty,tz): one-shot camera
+ * placement for engineering captures. Ignored without ?debug=1.
+ */
+function DebugCameraPosition() {
+  const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('debug') !== '1') return;
+    const raw = q.get('cam');
+    if (!raw) return;
+    const n = raw.split(',').map(Number);
+    if (n.length !== 6 || n.some((v) => !Number.isFinite(v))) return;
+    camera.position.set(n[0], n[1], n[2]);
+    camera.lookAt(n[3], n[4], n[5]);
+    camera.updateMatrixWorld();
+    invalidate();
+  }, [camera, invalidate]);
+  return null;
+}
+
 function CinematicCameraController({
   playback,
   enabled,
@@ -368,61 +396,6 @@ function LaserBeam({ active, itemY }: { active: boolean; itemY: number }) {
   );
 }
 
-/** Stereo camera lenses with view cones */
-function StereoCameraLenses({ active, itemPosition }: { active: boolean; itemPosition: [number, number, number] }) {
-  const baseline = STEREO_CAMERA.baseline;
-  const mountY = STEREO_CAMERA.mountY;
-  const cameraX = ZONES.CAMERA.x;
-  
-  return (
-    <group position={[cameraX, mountY, 0]}>
-      {/* Left lens */}
-      <mesh position={[0, 0, baseline / 2]}>
-        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
-        <meshStandardMaterial 
-          color={active ? '#0ea5e9' : '#1e293b'}
-          emissive={active ? '#0ea5e9' : '#000'}
-          emissiveIntensity={active ? 0.3 : 0}
-        />
-      </mesh>
-      {/* Right lens */}
-      <mesh position={[0, 0, -baseline / 2]}>
-        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
-        <meshStandardMaterial 
-          color={active ? '#0ea5e9' : '#1e293b'}
-          emissive={active ? '#0ea5e9' : '#000'}
-          emissiveIntensity={active ? 0.3 : 0}
-        />
-      </mesh>
-      {/* View cones when active */}
-      {active && (
-        <>
-          <Line
-            points={[
-              [0, 0, baseline / 2],
-              [0, itemPosition[1] - mountY, itemPosition[2]],
-            ]}
-            color="#0ea5e9"
-            lineWidth={1}
-            transparent
-            opacity={0.3}
-          />
-          <Line
-            points={[
-              [0, 0, -baseline / 2],
-              [0, itemPosition[1] - mountY, itemPosition[2]],
-            ]}
-            color="#0ea5e9"
-            lineWidth={1}
-            transparent
-            opacity={0.3}
-          />
-        </>
-      )}
-    </group>
-  );
-}
-
 /** Point cloud dots around item during stereo analysis */
 function PointCloud({ active, itemPosition, scale, isRound }: { 
   active: boolean; 
@@ -462,42 +435,6 @@ function PointCloud({ active, itemPosition, scale, isRound }: {
         </mesh>
       ))}
     </group>
-  );
-}
-
-/** Actuator/pusher animation during routing */
-function ActuatorPusher({ active, category, shadows = false }: { active: boolean; category: Category | null; shadows?: boolean }) {
-  const pusherRef = useRef<Mesh>(null);
-  const extendRef = useRef(0);
-
-  useFrame((_, delta) => {
-    if (pusherRef.current) {
-      const target = active && (category === 'C' || category === 'D') ? 0.15 : 0;
-      extendRef.current += (target - extendRef.current) * delta * 5;
-
-      const direction = category === 'C' ? 1 : -1;
-      pusherRef.current.position.z = direction * extendRef.current;
-    }
-  });
-
-  const gateX = ZONES.GATE.x;
-  const color = category === 'C' ? COLORS.routeC : category === 'D' ? COLORS.routeD : COLORS.gateFrame;
-
-  return (
-    <mesh
-      ref={pusherRef}
-      position={[gateX + 0.3, BELT_Y + 0.08, 0]}
-      castShadow={shadows}
-    >
-      <boxGeometry args={[0.15, 0.08, 0.06]} />
-      <meshStandardMaterial 
-        color={color}
-        emissive={active ? color : '#000'}
-        emissiveIntensity={active ? 0.3 : 0}
-        metalness={0.5}
-        roughness={0.4}
-      />
-    </mesh>
   );
 }
 
@@ -830,7 +767,7 @@ function RouteChute({ gateX, targetZ, color, active }: {
     <group>
       {/* Chute surface — steep gravity chute toward the cage open front */}
       <mesh
-        position={[CHUTE_X, CHUTE_MID_Y - 0.015, midZ]}
+        position={[CHUTE_X, CHUTE_MID_Y - 0.01, midZ]}
         rotation={rot}
       >
         <boxGeometry args={[chuteWidth, 0.02, CHUTE_LENGTH]} />
@@ -843,11 +780,11 @@ function RouteChute({ gateX, targetZ, color, active }: {
         />
       </mesh>
       {/* Side rails — follow the chute pitch */}
-      <mesh position={[CHUTE_X - CHUTE_HALF_W - 0.01, CHUTE_MID_Y + 0.03, midZ]} rotation={rot}>
+      <mesh position={[CHUTE_X - CHUTE_HALF_W - 0.01, CHUTE_MID_Y + 0.035, midZ]} rotation={rot}>
         <boxGeometry args={[0.02, 0.07, CHUTE_LENGTH]} />
         <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[CHUTE_X + CHUTE_HALF_W + 0.01, CHUTE_MID_Y + 0.03, midZ]} rotation={rot}>
+      <mesh position={[CHUTE_X + CHUTE_HALF_W + 0.01, CHUTE_MID_Y + 0.035, midZ]} rotation={rot}>
         <boxGeometry args={[0.02, 0.07, CHUTE_LENGTH]} />
         <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
       </mesh>
@@ -879,19 +816,42 @@ function CameraRig({ active }: { active: boolean }) {
         <boxGeometry args={[0.05, 0.05, poleSpacing * 2 + 0.1]} />
         <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* Camera unit */}
-      <mesh position={[0, cameraY, 0]}>
-        <boxGeometry args={[0.18, 0.1, 0.12]} />
-        <meshStandardMaterial 
-          color={active ? COLORS.sensorActive : '#1e3a5f'}
-          emissive={active ? COLORS.sensorActive : '#000'}
-          emissiveIntensity={active ? 0.5 : 0}
-        />
+      {/* Mount arm from cross beam down to the camera bracket */}
+      <mesh position={[0, (rigHeight + cameraY) / 2, 0]}>
+        <boxGeometry args={[0.04, rigHeight - cameraY + 0.04, 0.04]} />
+        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* Camera lens */}
-      <mesh position={[0, cameraY - 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.035, 0.035, 0.02, 16]} />
-        <meshStandardMaterial color="#0f172a" />
+      {/* Camera bracket plate (attaches to the tripod boss) */}
+      <mesh position={[0, cameraY + 0.022, 0]}>
+        <boxGeometry args={[0.05, 0.006, 0.12]} />
+        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.6} roughness={0.35} />
+      </mesh>
+      {/* Intel RealSense D435i (SPEC_DERIVED, official datasheet dimensions) */}
+      <group position={[0, cameraY, 0]}>
+        <RealSenseD435i />
+        {/* Status LED while measuring */}
+        <mesh position={[D435I.depth / 2 + 0.002, 0.004, 0]}>
+          <boxGeometry args={[0.002, 0.004, 0.006]} />
+          <meshStandardMaterial
+            color={active ? '#22c55e' : '#14532d'}
+            emissive={active ? '#22c55e' : '#000'}
+            emissiveIntensity={active ? 1.2 : 0}
+          />
+        </mesh>
+      </group>
+      {/* Line-laser triangulation module at 1.15 m (separate from camera
+          optical center 1.35 m — project doc height) */}
+      <mesh position={[0.12, 1.15, 0]} rotation={[0, 0, -0.35]}>
+        <boxGeometry args={[0.05, 0.04, 0.09]} />
+        <meshStandardMaterial color="#2b3138" metalness={0.7} roughness={0.4} />
+      </mesh>
+      <mesh position={[0.135, 1.128, 0]} rotation={[0, 0, -0.35]}>
+        <boxGeometry args={[0.012, 0.008, 0.05]} />
+        <meshStandardMaterial
+          color={active ? '#ef4444' : '#7f1d1d'}
+          emissive={active ? '#ef4444' : '#000'}
+          emissiveIntensity={active ? 0.9 : 0}
+        />
       </mesh>
       {/* Laser emitters on support poles */}
       <mesh position={[0, BELT_Y + 0.15, poleSpacing - 0.05]}>
@@ -1179,6 +1139,8 @@ function ContinuousScene({
   stage1,
   maxVisibleItems = MAX_VISIBLE_ITEMS,
   shadowsEnabled = false,
+  debugOverlays = false,
+  physicsDebug = false,
 }: {
   playback: ContinuousPlaybackState;
   simplified: boolean;
@@ -1189,6 +1151,8 @@ function ContinuousScene({
   maxVisibleItems?: number;
   /** Stage 2 visual pass: PCF shadows + studio environment on capable quality modes. */
   shadowsEnabled?: boolean;
+  debugOverlays?: boolean;
+  physicsDebug?: boolean;
 }) {
   const category = playback.targetCategory;
   const phase = playback.currentPhase;
@@ -1214,7 +1178,6 @@ function ContinuousScene({
   const showLaser = shouldShowLaserBeam(phase);
   const showPulse = shouldShowStepperPulse(phase);
   const showCloud = shouldShowPointCloud(phase);
-  const showActuator = shouldShowActuator(phase);
   
   // Compute physical items based on elapsed time. Cap the number of
   // simultaneously rendered items to keep the scene lightweight.
@@ -1322,13 +1285,14 @@ function ContinuousScene({
         </>
       ) : (
         <>
-          {/* Stage 2 default: premium industrial rig — low ambient, key with
-              PCF shadows, soft fill, cool rim (Stage 0 proven values) */}
-          <ambientLight intensity={0.28} />
-          <hemisphereLight args={['#2a3c58', '#141c2a', 0.8]} />
+          {/* Stage 2 default: premium industrial rig — readable ambient, key with
+              PCF shadows, soft fill, cool rim (Stage 0 proven values, brightened
+              in 2B so brackets/rollers read as volumes from every angle) */}
+          <ambientLight intensity={0.5} />
+          <hemisphereLight args={['#39506e', '#1a2434', 1.1]} />
           <directionalLight
             position={[6, 9, 4]}
-            intensity={2.2}
+            intensity={2.6}
             castShadow={protoShadows}
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
@@ -1340,8 +1304,10 @@ function ContinuousScene({
             shadow-camera-far={25}
             shadow-bias={-0.0004}
           />
-          <directionalLight position={[-5, 6, -3]} intensity={0.35} />
-          <directionalLight position={[2, 5, -8]} intensity={0.7} color="#bcd7ff" />
+          <directionalLight position={[-5, 6, -3]} intensity={0.65} />
+          <directionalLight position={[2, 5, -8]} intensity={0.9} color="#bcd7ff" />
+          {/* low front fill so the +Z face (camera side) never goes black */}
+          <directionalLight position={[1, 3, 8]} intensity={0.5} color="#cfdcf2" />
           {/* Procedural studio environment (no external HDRI — offline-safe) */}
           {protoShadows && (
             <Environment resolution={128} frames={1}>
@@ -1432,12 +1398,12 @@ function ContinuousScene({
         active={activeRoute === 'D'}
       />
 
-      {/* Camera rig - overhead above belt */}
+      {/* Camera rig - overhead above belt, carries the D435i + line laser */}
       <CameraRig active={cameraHighlight} />
-      
-      {/* Stereo camera lenses */}
-      <StereoCameraLenses active={cameraHighlight} itemPosition={itemPos} />
-      
+
+      {/* §9.4 debug: optical axis / FOV / measurement zone (debug only) */}
+      {(physicsDebug || debugOverlays) && <RealSenseFrustumDebug />}
+
       {/* Laser beam for height measurement */}
       <LaserBeam active={showLaser} itemY={itemPos[1]} />
       
@@ -1460,15 +1426,19 @@ function ContinuousScene({
       {/* Gate/diverter */}
       <GateZone category={category} shadows={protoShadows} />
 
-      {/* Actuator pusher for routing */}
-      <ActuatorPusher active={showActuator} category={category} shadows={protoShadows} />
-
       {/* Route arrows on belt surface */}
       <RouteArrows activeRoute={activeRoute} />
 
       {/* Items: kinematic on the belt (domain truth), rigid-body physics
-          after the drop handoff, verified against the domain receiver */}
+          after the drop handoff, verified against the domain receiver.
+          The angled paddle diverter lives in the same physics world and
+          physically contacts the items (Stage 2B §13). */}
       <SorterPhysicsWorld running={playback.status === 'running'} speed={playback.speed}>
+        <PusherMechanism
+          category={category}
+          routingElapsedMs={caseElapsedMs - getRoutingStartMs()}
+          castShadow={protoShadows}
+        />
         {sceneItems.map(item => (
           <PhysicalPlaybackItemPhysics
             key={item.id}
@@ -1515,6 +1485,8 @@ function ContinuousScene({
         overridePhase={shotOverride?.phase ?? null}
         overrideCategory={shotOverride?.category ?? null}
       />
+
+      {!cinematicActive && <DebugCameraPosition />}
 
       {/* OrbitControls - enabled when not in cinematic mode */}
       <OrbitControls
@@ -1595,6 +1567,8 @@ export default function SorterDigitalTwinContinuous({
   qualityMode,
   stage0,
   stage1,
+  debugOverlays = false,
+  physicsDebug = false,
 }: SorterDigitalTwinContinuousProps) {
   const mode = qualityMode ?? detectQualityMode(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const quality = getQualitySettings(mode);
@@ -1611,7 +1585,7 @@ export default function SorterDigitalTwinContinuous({
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
-          camera={{ position: [4.5, 3.5, 5.0], fov: 45 }}
+          camera={{ position: [4.3, 2.9, 4.6], fov: 46 }}
           dpr={[1, quality.dprMax]}
           shadows={shadowsEnabled ? 'soft' : false}
           gl={{ antialias, powerPreference: 'high-performance' }}
@@ -1648,6 +1622,8 @@ export default function SorterDigitalTwinContinuous({
               stage1={stage1}
               maxVisibleItems={quality.maxVisibleItems}
               shadowsEnabled={shadowsEnabled}
+              debugOverlays={debugOverlays}
+              physicsDebug={physicsDebug}
             />
             {perfEnabled ? (
               <PerfCollector

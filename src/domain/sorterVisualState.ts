@@ -41,8 +41,9 @@ export interface SorterVisualState {
   itemAuthority: ItemAuthority;
   /**
    * Case-time fraction within the routing phase at which authority
-   * transfers to physics (pusher contact / belt edge). B: 0.35 (end of
-   * b_transfer spur); C/D: 0.06 (pusher contact at gate exit).
+   * transfers to physics. B: 0.35 (end of b_transfer spur — loss of belt
+   * support); C/D: 0 (routing start at the junction — the angled paddle
+   * physically contacts the item and drives it onto the chute, §13).
    */
   dropHandoffFraction: number;
 }
@@ -67,7 +68,7 @@ export function deriveSorterVisualState(playback: ContinuousPlaybackState): Sort
   let itemAuthority: ItemAuthority = 'domain';
   let dropHandoffFraction = 1.1; // unreachable by default (no physics handoff)
   if (!playback.currentCase.faultType && phase === 'routing' && category) {
-          dropHandoffFraction = category === 'B' ? 0.35 : 0.12;
+    dropHandoffFraction = category === 'B' ? 0.35 : 0;
     itemAuthority = 'physics';
   }
 

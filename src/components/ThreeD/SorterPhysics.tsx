@@ -21,6 +21,20 @@ import { getStaticColliders } from '../../domain/physicsWorldLayout';
 export const PHYSICS_DT = 1 / 60;
 const MAX_SUBSTEPS = 4;
 
+/**
+ * Physics-time clock (seconds actually simulated by THIS world instance).
+ * Kinematic mechanisms must be driven by this clock — never by the domain
+ * wall clock — because under render lag the stepper burns at most
+ * MAX_SUBSTEPS per frame and physics time falls behind domain time. Driving
+ * the pusher from domain time made the paddle sweep through items in a few
+ * huge jumps (visible as items being smashed/tunneled on slow devices).
+ */
+export const physicsSimClock = { simSec: 0 };
+
+export function resetPhysicsSimClock() {
+  physicsSimClock.simSec = 0;
+}
+
 /** Drop verification record (debug/e2e introspection, no secrets). */
 export interface DropResult {
   caseId: string;
@@ -72,6 +86,7 @@ function RapierStepper({ running, speed }: { running: boolean; speed: number }) 
       } else {
         world.step();
       }
+      physicsSimClock.simSec += PHYSICS_DT;
       accumulator.current -= PHYSICS_DT;
       steps += 1;
     }

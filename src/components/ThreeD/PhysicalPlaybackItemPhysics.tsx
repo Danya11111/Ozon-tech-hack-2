@@ -28,12 +28,14 @@ import { classifyItem } from '../../domain/classifier';
 import { receiverContains } from '../../domain/receiverVolumes';
 import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { ItemVisualContent } from './PhysicalPlaybackItem';
-import { recordDropResult } from './SorterPhysics';
+import { recordDropResult, physicsSimClock } from './SorterPhysics';
 
 type Authority = 'kinematic' | 'dynamic' | 'frozen';
 
-/** Controlled settle budget after handoff (ms of case time). */
-const SETTLE_BUDGET_MS = 4500;
+/** Controlled settle budget after handoff — in PHYSICS-simulated seconds,
+ *  not domain ms: under render lag domain time races ahead of the stepper,
+ *  and a domain-ms budget would freeze items mid-flight (§14.2). */
+const SETTLE_BUDGET_SEC = 4.5;
 
 function colliderDensity(profile: ReturnType<typeof getVisualPhysicsProfile>): number {
   if (profile.collider === 'cuboid' && profile.cuboidHalfExtents) {
@@ -70,9 +72,13 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   const handoffMs = getDropHandoffTimeMs(classification.category, caseData.faultType);
 
   const bodyRef = useRef<RapierRigidBody>(null);
+  const traceEnabled = useRef(
+    typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('trace') === '1',
+  );
   const authority = useRef<Authority>('kinematic');
   const frozenPose = useRef<{ p: [number, number, number]; q: THREE.Quaternion } | null>(null);
-  const handedOffAtMs = useRef<number | null>(null);
+  const handedOffAtSimSec = useRef<number | null>(null);
   const verified = useRef(false);
 
   const pose = getPhysicalItemPose({
@@ -99,12 +105,22 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handoffMs, caseData.id]);
 
-  // Reset authority whenever a new case mounts this body.
+  // Reset authority whenever a new case mounts this body. The Rapier body is
+  // reused across cases, so a case that ended while still DYNAMIC (settle
+  // budget cut short under render lag) must be forced back to kinematic —
+  // otherwise setNextKinematicTranslation is a no-op and the next case's item
+  // is stuck invisibly mid-scene.
   useEffect(() => {
     authority.current = 'kinematic';
     frozenPose.current = null;
-    handedOffAtMs.current = null;
+    handedOffAtSimSec.current = null;
     verified.current = false;
+    const body = bodyRef.current;
+    if (body) {
+      body.setBodyType(RigidBodyType.KinematicPositionBased, false);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, false);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, false);
+    }
   }, [caseData.id]);
 
   useFrame(() => {
@@ -112,14 +128,12 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     if (!body) return;
 
     if (authority.current === 'kinematic') {
-      // Kinematic drive: domain pose is truth (belt travel, inspection dwell).
-      const p = pose.position;
-      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
-      const q = new THREE.Quaternion().setFromEuler(e);
-      body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
-      body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
-
       // Physics handoff at pusher contact / belt edge — never for fault cases.
+      // MUST be checked BEFORE the kinematic drive: under render lag a single
+      // frame can jump several seconds past handoffMs, and pose(elapsedMs) is
+      // then already deep inside the receiver. Applying setNextKinematic*
+      // from that pose in the same frame as the dynamic switch teleports the
+      // body (forbidden) — the next-step kinematic target still applies.
       if (handoffMs != null && handoffPose && elapsedMs >= handoffMs) {
         const hp = handoffPose.position;
         body.setTranslation({ x: hp[0], y: hp[1], z: hp[2] }, true);
@@ -127,27 +141,48 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
         const hq = new THREE.Quaternion().setFromEuler(he);
         body.setRotation({ x: hq.x, y: hq.y, z: hq.z, w: hq.w }, true);
         body.setBodyType(RigidBodyType.Dynamic, true);
-        // Deterministic initial velocity: belt carry-over + pusher impulse.
-        const dirZ = category === 'D' ? -1 : 1;
-        const v = category === 'B'
-          ? { x: 1.0, y: 0, z: 0 }
-          : { x: 0.55, y: 0, z: dirZ * 1.35 * profile.pusherImpulseScale };
-        body.setLinvel(v, true);
-        if (profile.canRoll) {
-          body.setAngvel({ x: category === 'B' ? 2.0 : 0.8, y: 0.4, z: 0 }, true);
+        // Deterministic initial velocity: belt carry-over only — for C/D the
+        // Z motion comes from the kinematic paddle CONTACT (Stage 2B §13).
+        body.setLinvel({ x: 1.0, y: 0, z: 0 }, true);
+        if (profile.canRoll && category === 'B') {
+          body.setAngvel({ x: 2.0, y: 0.4, z: 0 }, true);
         } else {
-          body.setAngvel({ x: 0, y: 0.25, z: 0 }, true);
+          body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         }
         authority.current = 'dynamic';
-        handedOffAtMs.current = elapsedMs;
+        handedOffAtSimSec.current = physicsSimClock.simSec;
+        return;
       }
+
+      // Kinematic drive: domain pose is truth (belt travel, inspection dwell).
+      const p = pose.position;
+      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
+      const q = new THREE.Quaternion().setFromEuler(e);
+      body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
+      body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
       return;
     }
 
     if (authority.current === 'dynamic') {
       const slept = body.isSleeping();
-      const timedOut = handedOffAtMs.current != null && elapsedMs - handedOffAtMs.current > SETTLE_BUDGET_MS;
-      if ((slept || timedOut) && !verified.current) {
+      const lv = body.linvel();
+      const av = body.angvel();
+      const slow = Math.hypot(lv.x, lv.y, lv.z) < 0.2 && Math.hypot(av.x, av.y, av.z) < 1.0;
+      if (traceEnabled.current) {
+        const t = body.translation();
+        const w = window as unknown as { __ITEM_TRACE?: unknown[] };
+        w.__ITEM_TRACE = w.__ITEM_TRACE ?? [];
+        const arr = w.__ITEM_TRACE as { e: number; x: number; y: number; z: number; lv: number; slept: boolean }[];
+        if (arr.length === 0 || arr[arr.length - 1].e < elapsedMs - 200) {
+          arr.push({ e: Math.round(elapsedMs), x: +t.x.toFixed(3), y: +t.y.toFixed(3), z: +t.z.toFixed(3), lv: +Math.hypot(lv.x, lv.y, lv.z).toFixed(2), slept });
+          if (arr.length > 120) arr.shift();
+        }
+      }
+      const timedOut = handedOffAtSimSec.current != null
+        && physicsSimClock.simSec - handedOffAtSimSec.current > SETTLE_BUDGET_SEC;
+      // §14.2: freeze only after actual rest (sleep) or a timeout WITH low
+      // velocities — never freeze a body that is still moving/flying.
+      if ((slept || (timedOut && slow)) && !verified.current) {
         verified.current = true;
         const t = body.translation();
         const p: [number, number, number] = [t.x, t.y, t.z];
@@ -181,7 +216,8 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   if (elapsedMs < 0) return null;
 
   const density = colliderDensity(profile);
-  const ccd = itemId === 'SKU-009'; // pen: small + fast → continuous collision
+  // CCD for small/fast items (pen) and thin items (plate) — mirrors the sim.
+  const ccd = profile.approximateMassKg < 0.05 || itemData.dimensionsMm.height < 50;
 
   return (
     <RigidBody
@@ -200,10 +236,18 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
         <CuboidCollider args={profile.cuboidHalfExtents} density={density} />
       )}
       {profile.collider === 'capsule' && profile.capsule && (
-        <CapsuleCollider args={[profile.capsule[1], profile.capsule[0]]} density={density} />
+        <CapsuleCollider
+          args={[profile.capsule[1], profile.capsule[0]]}
+          density={density}
+          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+        />
       )}
       {profile.collider === 'cylinder' && profile.capsule && (
-        <CylinderCollider args={[profile.capsule[1], profile.capsule[0]]} density={density} />
+        <CylinderCollider
+          args={[profile.capsule[1], profile.capsule[0]]}
+          density={density}
+          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+        />
       )}
       <ItemVisualContent
         caseData={caseData}

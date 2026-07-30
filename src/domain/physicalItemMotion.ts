@@ -16,6 +16,8 @@ import {
   type SurfaceName,
   type Vec3,
 } from './conveyorNetwork';
+import { ZONES, CONVEYOR_SPEED_MPS } from './physicalLayout';
+import { SCAN_START_X, SCAN_END_X } from './measurementZone';
 
 export type SurfaceType = SurfaceName;
 export type MotionPhase = 'feed' | 'inspection' | 'decision' | 'routing' | 'settled' | 'fault' | 'recover';
@@ -93,9 +95,12 @@ function applyJitter(pos: Vec3, rotY: number, jitter?: PoseInput['jitter']): { p
 /**
  * Stage 2 — case time (ms within case) at which the item is handed from
  * kinematic authority to rigid-body physics:
- *  - B: fraction 0.35 of the B travel span (end of b_transfer spur, belt edge);
- *  - C/D: fraction 0.12 of the C/D routing span — item fully past the belt
- *    edge and ON the gravity chute (tall items must clear the belt slab);
+ *  - B: fraction 0.35 of the B travel span (end of b_transfer spur — the
+ *    item physically loses belt support at the real spur edge);
+ *  - C/D: routing start — the item is at the junction (belt center over the
+ *    gate), where the cross-belt pusher engages it. The pusher kinematic
+ *    body then physically CONTACTS the item and drives it onto the chute
+ *    (Stage 2B §13: no timer-only teleport into the chute);
  *  - fault cases: null (no physics handoff — domain fault pose is truth).
  */
 export function getDropHandoffTimeMs(
@@ -110,8 +115,13 @@ export function getDropHandoffTimeMs(
     const exitStart = starts['exit'];
     return routingStart + 0.35 * (exitStart - routingStart);
   }
-  const clearStart = starts['clear_gap'];
-  return routingStart + 0.12 * (clearStart - routingStart);
+  return routingStart;
+}
+
+/** Case-time (ms) at which the routing phase begins (drives the paddle timeline). */
+export function getRoutingStartMs(): number {
+  const { starts } = phaseStartsFrom(CASE_PHASES);
+  return starts['routing'];
 }
 
 /** Jam / E-stop motion: freeze at junction, then recover (no settle into bin). */
@@ -186,8 +196,6 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
 
   const { starts, total } = phaseStartsFrom(CASE_PHASES);
   const feedStart = starts['move_to_detection'];
-  const inspectStart = starts['detection'];
-  const junctionStart = starts['measurement'];
   const routingStart = starts['routing'];
   const clearStart = starts['clear_gap'];
 
@@ -200,17 +208,24 @@ export function getPhysicalItemPose(input: PoseInput): PhysicalItemPose {
   if (elapsedMs <= feedStart) {
     const r = poseOnSurface('main_belt', 0, itemHeightM);
     pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
-  } else if (elapsedMs <= inspectStart) {
-    const t = (elapsedMs - feedStart) / (inspectStart - feedStart);
-    const r = poseOnSurface('main_belt', t, itemHeightM);
-    pos = r.pos; rotY = r.rotY; surface = 'main_belt'; phase = 'feed';
-  } else if (elapsedMs <= junctionStart) {
-    const r = poseOnSurface('inspection_station', 0, itemHeightM);
-    pos = r.pos; rotY = r.rotY; surface = 'inspection_station'; phase = 'inspection';
   } else if (elapsedMs <= routingStart) {
-    const t = (elapsedMs - junctionStart) / (routingStart - junctionStart);
-    const r = poseOnSurface('routing_junction', t, itemHeightM);
-    pos = r.pos; rotY = r.rotY; surface = 'routing_junction'; phase = 'decision';
+    // Stage 2B §10–12: CONTINUOUS belt travel at constant conveyor speed —
+    // no dwell under the camera. Phase timing (move_to_detection 1900 ms +
+    // detection 600 + measurement 1000 + classification 1000 + command_sent
+    // 1000 = 5500 ms) exactly matches A->GATE distance at 1.0 m/s, so the
+    // item arrives at the mechanism engagement point exactly at routing start.
+    const travelS = (elapsedMs - feedStart) / 1000;
+    const x = Math.min(SURFACES.main_belt.start[0] + CONVEYOR_SPEED_MPS * travelS, ZONES.GATE.x);
+    if (x <= ZONES.CAMERA.x) {
+      const t = (x - SURFACES.main_belt.start[0]) / (SURFACES.main_belt.end[0] - SURFACES.main_belt.start[0]);
+      const r = poseOnSurface('main_belt', t, itemHeightM);
+      pos = r.pos; rotY = r.rotY; surface = 'main_belt';
+    } else {
+      const t = (x - ZONES.CAMERA.x) / (ZONES.GATE.x - ZONES.CAMERA.x);
+      const r = poseOnSurface('routing_junction', t, itemHeightM);
+      pos = r.pos; rotY = r.rotY; surface = 'routing_junction';
+    }
+    phase = x < SCAN_START_X ? 'feed' : x <= SCAN_END_X ? 'inspection' : 'decision';
   } else if (category === 'B') {
     const exitStart = starts['exit'];
     const travelSpan = exitStart - routingStart;

@@ -3,11 +3,14 @@ import { test, expect, type Page } from '@playwright/test';
 test.setTimeout(90_000);
 
 async function waitScene(page: Page) {
-  await page.goto('/');
+  await page.goto('/?debug=1&playback=paused');
   await expect(page.locator('canvas')).toBeVisible({ timeout: 60_000 });
   await page.evaluate(() => document.fonts.ready);
   await expect(page.getByTestId('demo-hud')).toBeVisible();
-  // Demo auto-starts as running — pin speed early
+  // seek pins case 0 and starts running — pause again for deterministic HUD snaps
+  await page.getByTestId('demo-case-0').click();
+  const pause = page.getByTestId('demo-pause');
+  if (await pause.isVisible().catch(() => false)) await pause.click();
   await page.getByTestId('demo-speed-2').click();
 }
 
@@ -22,7 +25,7 @@ async function dismissFinishedIfNeeded(page: Page) {
 async function jumpCase(page: Page, index: number) {
   await dismissFinishedIfNeeded(page);
   await page.getByTestId(`demo-case-${index}`).click();
-  await expect(page.getByTestId('demo-case-label')).toHaveText(`${index + 1}/10`, {
+  await expect(page.getByTestId('demo-case-label')).toHaveText(`${index + 1}/11`, {
     timeout: 10_000,
   });
 }
@@ -52,7 +55,7 @@ test.describe('visual regression', () => {
     if (await pause.isVisible().catch(() => false)) {
       await pause.click();
     }
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/10');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
     await snapHud(page, '01-home-idle-hud.png');
   });
 
@@ -85,7 +88,7 @@ test.describe('visual regression', () => {
 
   test('05 jam fault HUD', async ({ page }) => {
     await waitScene(page);
-    await jumpCase(page, 8);
+    await jumpCase(page, 9);
     await ensureRunning(page);
     await expect
       .poll(async () => {
@@ -100,7 +103,7 @@ test.describe('visual regression', () => {
 
   test('06 emergency stop HUD', async ({ page }) => {
     await waitScene(page);
-    await jumpCase(page, 9);
+    await jumpCase(page, 10);
     await ensureRunning(page);
     await expect
       .poll(async () => {
@@ -139,7 +142,7 @@ test.describe('visual regression', () => {
 
   test('09 recovery after jam stop', async ({ page }) => {
     await waitScene(page);
-    await jumpCase(page, 8);
+    await jumpCase(page, 9);
     await ensureRunning(page);
     await expect
       .poll(async () => {

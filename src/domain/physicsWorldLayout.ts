@@ -29,16 +29,19 @@ export interface StaticColliderDef {
 }
 
 /**
- * C/D chute pitch: line from (z=±0.35, y=0.66) to (z=±1.6, y=0.14).
- * tan = 0.52/1.25 ≈ 0.416 > μ_combined for every SKU profile -> items slide.
+ * C/D chute: top surface line from (z=±0.24, y≈0.665 — flush UNDER the belt
+ * edge so even a 12mm pen cannot fall into a lip gap) to (z=±1.6, y≈0.135,
+ * cage open front). tan ≈ 0.39 > μ_combined for every SKU -> items slide.
  */
-export const CHUTE_PITCH = Math.atan2(0.52, 1.25); // ≈ 0.394 rad
-export const CHUTE_LENGTH = Math.hypot(1.25, 0.52); // ≈ 1.354 m
+export const CHUTE_PITCH = Math.atan2(0.53, 1.36); // ≈ 0.372 rad
+export const CHUTE_LENGTH = Math.hypot(1.36, 0.53); // ≈ 1.460 m
 export const CHUTE_MID_Y = 0.40;
-export const CHUTE_MID_Z = 0.975;
-/** Chute plate center X (gate exit) and plate half width. */
-export const CHUTE_X = ZONES.GATE.x + 0.3;
-export const CHUTE_HALF_W = 0.25;
+export const CHUTE_MID_Z = 0.92;
+/** Junction transfer plate: SPEC_DERIVED 1000mm wide (x 1.2..2.2) — covers
+ *  the full junction diagonal plus the 435mm cylinder / 900mm carton with
+ *  margin; converging side rails. */
+export const CHUTE_X = 1.7;
+export const CHUTE_HALF_W = 0.5;
 /** B drop chute: line from (2.15, 0.70) to (2.85, 0.13), pitch ≈ 0.684 rad. */
 export const B_CHUTE_PITCH = Math.atan2(BELT_TOP_Y - (CAGE_FLOOR_Y + 0.05), 0.7);
 
@@ -50,22 +53,22 @@ function chuteColliders(targetZ: number, label: 'C' | 'D'): StaticColliderDef[] 
     {
       id: `chute-${label}-floor`,
       halfExtents: [CHUTE_HALF_W, 0.01, CHUTE_LENGTH / 2],
-      // top surface: y≈0.655 at belt edge (z 0.35) -> 0.135 at cage edge (z 1.6)
-      position: [CHUTE_X, CHUTE_MID_Y - 0.015, midZ],
+      // top surface: y≈0.665 flush at belt edge (z 0.24) -> 0.135 at cage edge
+      position: [CHUTE_X, CHUTE_MID_Y - 0.01, midZ],
       rotation: rot,
       friction: 0.2, // smooth coated steel — gravity chute (VISUAL_PHYSICS_ESTIMATE)
     },
     {
       id: `chute-${label}-rail-left`,
       halfExtents: [0.01, 0.035, CHUTE_LENGTH / 2],
-      position: [CHUTE_X - CHUTE_HALF_W - 0.01, CHUTE_MID_Y + 0.03, midZ],
+      position: [CHUTE_X - CHUTE_HALF_W - 0.01, CHUTE_MID_Y + 0.035, midZ],
       rotation: rot,
       friction: 0.3,
     },
     {
       id: `chute-${label}-rail-right`,
       halfExtents: [0.01, 0.035, CHUTE_LENGTH / 2],
-      position: [CHUTE_X + CHUTE_HALF_W + 0.01, CHUTE_MID_Y + 0.03, midZ],
+      position: [CHUTE_X + CHUTE_HALF_W + 0.01, CHUTE_MID_Y + 0.035, midZ],
       rotation: rot,
       friction: 0.3,
     },
@@ -119,8 +122,8 @@ export function getStaticColliders(): StaticColliderDef[] {
     // Belt safety slab — items never pass through the belt surface.
     // Ends at the B spur end (2.15): beyond it the B drop chute takes over.
     { id: 'belt-slab', halfExtents: [(2.15 + 4.2) / 2, 0.012, CONVEYOR_WIDTH_M / 2], position: [(2.15 - 4.2) / 2, BELT_TOP_Y - 0.014, 0], rotation: [0, 0, 0], friction: 0.7 },
-    // B transfer spur
-    { id: 'b-spur', halfExtents: [0.325, 0.02, (CONVEYOR_WIDTH_M - 0.06) / 2], position: [1.825, BELT_TOP_Y - 0.02, 0], rotation: [0, 0, 0], friction: 0.4 },
+    // B transfer spur — top FLUSH with the belt slab (no 2mm trip step)
+    { id: 'b-spur', halfExtents: [0.325, 0.02, (CONVEYOR_WIDTH_M - 0.06) / 2], position: [1.825, BELT_TOP_Y - 0.022, 0], rotation: [0, 0, 0], friction: 0.4 },
     ...chuteColliders(ZONES.C.z, 'C'),
     ...chuteColliders(ZONES.D.z, 'D'),
     ...receiverColliders(),
