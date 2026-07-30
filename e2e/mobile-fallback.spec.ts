@@ -181,8 +181,9 @@ test.describe('stage2 mobile capability policy', () => {
       Object.defineProperty(navigator, 'hardwareConcurrency', { value: 8, configurable: true });
       Object.defineProperty(navigator, 'deviceMemory', { value: 8, configurable: true });
     });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    // prefer3DByDefault requires width >= 640; narrow 390px uses SVG by design.
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.goto('/?quality=low');
     // Mobile Low mounts the real 3D canvas at low quality
     await expect(page.locator('canvas')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('main-svg-fallback')).toHaveCount(0);

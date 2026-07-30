@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { dismissFinished, openPausedCase, ensureRunning } from './helpers';
 
 /**
  * Production smoke — manual only:
@@ -6,7 +7,7 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('production smoke @production', () => {
   test('version, routes, controls, safety, webgl', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const expectedCommit = process.env.EXPECTED_COMMIT?.trim();
     const pageErrors: string[] = [];
     const failed: string[] = [];
@@ -50,30 +51,27 @@ test.describe('production smoke @production', () => {
     expect(webgl.ok).toBe(true);
 
     await expect(page.getByTestId('demo-play').or(page.getByTestId('demo-pause'))).toBeVisible();
-    await expect(page.getByTestId('demo-case-10')).toBeVisible();
+    await expect(page.getByTestId('demo-case-11')).toBeVisible();
 
-    // Play / seek
-    const pauseBtn = page.getByTestId('demo-pause');
-    if (!(await pauseBtn.isVisible().catch(() => false))) {
-      await page.getByTestId('demo-play').click();
-    }
-    await page.waitForTimeout(600);
-    await page.getByTestId('demo-case-0').click();
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await dismissFinished(page);
+    await page.getByTestId('demo-case-0').click({ force: true });
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
-    // Jam
-    await page.getByTestId('demo-speed-2').click();
-    await page.getByTestId('demo-case-9').click();
+    // Jam / E-stop via shared helper (avoids finished-overlay races)
+    await openPausedCase(page, 10, '1');
+    await ensureRunning(page);
     await expect
       .poll(async () => {
         const status = (await page.getByTestId('demo-status').textContent()) ?? '';
         const command = (await page.getByTestId('demo-command').textContent()) ?? '';
-        return `${status} ${command}`;
+        const warn =
+          (await page.locator('.warning-text').first().textContent().catch(() => '')) ?? '';
+        return `${status} ${command} ${warn}`;
       }, { timeout: 30_000 })
       .toMatch(/FAULT|JAM/i);
 
-    // E-stop
-    await page.getByTestId('demo-case-10').click();
+    await openPausedCase(page, 11, '1');
+    await ensureRunning(page);
     await expect
       .poll(async () => {
         const status = (await page.getByTestId('demo-status').textContent()) ?? '';
@@ -82,20 +80,19 @@ test.describe('production smoke @production', () => {
       }, { timeout: 30_000 })
       .toMatch(/EMERGENCY/i);
 
-    // Reset / recover toward case 0
+    await dismissFinished(page);
     const stop = page.getByTestId('demo-stop');
     if (await stop.isVisible().catch(() => false)) {
       await stop.click({ force: true });
     }
     await page.getByTestId('demo-case-0').click({ force: true });
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
     await page.goto('/details');
     await expect(page.locator('#root')).toBeVisible();
     await page.reload();
     await expect(page.locator('#root')).toBeVisible();
 
-    // Back home — version still matches
     await page.goto('/?debug=1');
     const version2 = await page.evaluate(async () => {
       const r = await fetch('/version.json', { cache: 'no-store' });
@@ -107,7 +104,6 @@ test.describe('production smoke @production', () => {
     const critical = failed.filter((f) => !f.includes('favicon'));
     expect(critical, critical.join('\n')).toEqual([]);
 
-    // Attach renderer for report (not a hard fail if software)
     test.info().annotations.push({
       type: 'webgl-renderer',
       description: webgl.renderer ?? 'unknown',

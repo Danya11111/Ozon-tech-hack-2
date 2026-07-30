@@ -5,8 +5,8 @@ test.describe('safety', () => {
   test.setTimeout(90_000);
 
   test('jam case shows FAULT in status or command', async ({ page }) => {
-    await openPausedCase(page, 9, '1');
-    await expect(page.getByTestId('demo-case-label')).toHaveText('10/11');
+    await openPausedCase(page, 10, '1');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('11/12');
     await ensureRunning(page);
 
     await expect
@@ -22,8 +22,8 @@ test.describe('safety', () => {
   });
 
   test('emergency case shows EMERGENCY in status or command', async ({ page }) => {
-    await openPausedCase(page, 10, '1');
-    await expect(page.getByTestId('demo-case-label')).toHaveText('11/11');
+    await openPausedCase(page, 11, '1');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('12/12');
     await ensureRunning(page);
 
     await expect

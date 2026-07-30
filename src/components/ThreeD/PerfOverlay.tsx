@@ -8,6 +8,7 @@ import {
   type PerfSnapshot,
   emptyPerfSnapshot,
 } from '../../domain/perfMetrics';
+import type { PhysicsPerfSnapshot } from '../../domain/physicsPerf';
 
 const POLL_MS = 500;
 
@@ -21,6 +22,7 @@ export default function PerfOverlay({ enabled }: PerfOverlayProps) {
     () => enabled === true || (enabled !== false && isPerfQueryEnabled()),
   );
   const [snap, setSnap] = useState<PerfSnapshot>(() => emptyPerfSnapshot());
+  const [phys, setPhys] = useState<PhysicsPerfSnapshot | null>(null);
   const [inPresentation, setInPresentation] = useState(false);
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export default function PerfOverlay({ enabled }: PerfOverlayProps) {
     const poll = () => {
       const s = window.__PERF_SNAPSHOT__;
       if (s) setSnap(s);
+      const p = window.__PHYSICS_PERF__;
+      if (p) setPhys(p);
       setInPresentation(!!document.querySelector('.presentation-mode'));
     };
 
@@ -80,6 +84,15 @@ export default function PerfOverlay({ enabled }: PerfOverlayProps) {
         p95 {snap.p95FrameTimeMs.toFixed(1)}ms
         <span className="perf-muted"> / p99 {snap.p99FrameTimeMs.toFixed(1)}ms</span>
       </div>
+      {phys && phys.count > 0 ? (
+        <div data-testid="physics-perf-line">
+          phys p95 {phys.p95Ms.toFixed(2)}ms
+          <span className="perf-muted">
+            {' '}
+            · avg {phys.avgMs.toFixed(2)} · n={phys.count}
+          </span>
+        </div>
+      ) : null}
       <div>
         draws {snap.drawCalls}
         <span className="perf-muted"> · tris {snap.triangles}</span>

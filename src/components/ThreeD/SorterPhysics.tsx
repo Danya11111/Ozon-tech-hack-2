@@ -12,23 +12,30 @@
  * Physics freezes when the domain clock is paused (documented simulation
  * assumption — belt, gate and items halt together; EMERGENCY_STOP creates no
  * new impulses).
+ *
+ * Stage 2E: Rapier step timing via PhysicsPerfSampler (?perf=1 | ?physicsPerf=1).
+ * Render time is NOT included in physics p95.
  */
 import { useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Physics, RigidBody, CuboidCollider, useRapier } from '@react-three/rapier';
 import { getStaticColliders } from '../../domain/physicsWorldLayout';
 import { PHYSICS_TIMESTEP_SEC } from '../../domain/physicsTimestep';
+import {
+  PhysicsPerfSampler,
+  isPhysicsPerfQueryEnabled,
+  type PhysicsPerfSnapshot,
+} from '../../domain/physicsPerf';
 
 export const PHYSICS_DT = PHYSICS_TIMESTEP_SEC;
-const MAX_SUBSTEPS = 4;
+export const PHYSICS_MAX_SUBSTEPS = 4;
+const MAX_SUBSTEPS = PHYSICS_MAX_SUBSTEPS;
 
 /**
  * Physics-time clock (seconds actually simulated by THIS world instance).
  * Kinematic mechanisms must be driven by this clock — never by the domain
  * wall clock — because under render lag the stepper burns at most
- * MAX_SUBSTEPS per frame and physics time falls behind domain time. Driving
- * the pusher from domain time made the paddle sweep through items in a few
- * huge jumps (visible as items being smashed/tunneled on slow devices).
+ * MAX_SUBSTEPS per frame and physics time falls behind domain time.
  */
 export const physicsSimClock = { simSec: 0 };
 
@@ -48,7 +55,11 @@ export interface DropResult {
 }
 
 declare global {
-  interface Window { __DROP_RESULTS?: DropResult[] }
+  interface Window {
+    __DROP_RESULTS?: DropResult[];
+    __PHYSICS_PERF__?: PhysicsPerfSnapshot;
+    __PHYSICS_PERF_RESET__?: () => void;
+  }
 }
 
 export function recordDropResult(result: DropResult) {
@@ -57,39 +68,76 @@ export function recordDropResult(result: DropResult) {
   }
 }
 
+function readWorldMeta(world: {
+  bodies?: { len: () => number };
+  colliders?: { len: () => number };
+}): { activeBodies: number; sleepingBodies: number; colliders: number; contactPairs: number } {
+  try {
+    // @react-three/rapier wraps Rapier world; body counts via forEach when available
+    const w = world as unknown as {
+      forEachRigidBody?: (cb: (b: { isSleeping: () => boolean; numColliders: () => number }) => void) => void;
+      bodies?: { len: () => number };
+      colliders?: { len: () => number };
+    };
+    let active = 0;
+    let sleeping = 0;
+    let colliders = 0;
+    if (typeof w.forEachRigidBody === 'function') {
+      w.forEachRigidBody((b) => {
+        if (b.isSleeping()) sleeping += 1;
+        else active += 1;
+        try {
+          colliders += b.numColliders();
+        } catch {
+          /* ignore */
+        }
+      });
+    } else {
+      active = w.bodies?.len?.() ?? 0;
+      colliders = w.colliders?.len?.() ?? 0;
+    }
+    return { activeBodies: active, sleepingBodies: sleeping, colliders, contactPairs: 0 };
+  } catch {
+    return { activeBodies: 0, sleepingBodies: 0, colliders: 0, contactPairs: 0 };
+  }
+}
+
 /** Steps the Rapier world with a fixed dt, scaled by domain playback speed. */
 function RapierStepper({ running, speed }: { running: boolean; speed: number }) {
   const { world } = useRapier();
   const accumulator = useRef(0);
-  const perfEnabled = useRef(
-    typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('perf') === '1',
-  );
-  const samples = useRef<number[]>([]);
+  const sampler = useRef(new PhysicsPerfSampler(PHYSICS_DT, MAX_SUBSTEPS));
+  const perfOn = useRef(false);
+
+  // Latch query once (and expose reset) — no React state.
+  if (typeof window !== 'undefined' && !perfOn.current) {
+    perfOn.current = isPhysicsPerfQueryEnabled();
+    if (perfOn.current) {
+      window.__PHYSICS_PERF_RESET__ = () => sampler.current.reset();
+    }
+  }
+
   useFrame((_, delta) => {
     if (!running) return;
     accumulator.current += Math.min(delta, 0.1) * speed;
     let steps = 0;
+    let framePhysicsMs = 0;
     while (accumulator.current >= PHYSICS_DT && steps < MAX_SUBSTEPS) {
-      if (perfEnabled.current) {
+      if (perfOn.current) {
         const t0 = performance.now();
         world.step();
-        const ms = performance.now() - t0;
-        samples.current.push(ms);
-        if (samples.current.length > 600) samples.current.shift();
-        const sorted = [...samples.current].sort((a, b) => a - b);
-        (window as unknown as { __PHYSICS_PERF__?: unknown }).__PHYSICS_PERF__ = {
-          count: samples.current.length,
-          avgMs: samples.current.reduce((s, v) => s + v, 0) / samples.current.length,
-          p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0,
-          maxMs: sorted[sorted.length - 1] ?? 0,
-        };
+        framePhysicsMs += performance.now() - t0;
       } else {
         world.step();
       }
       physicsSimClock.simSec += PHYSICS_DT;
       accumulator.current -= PHYSICS_DT;
       steps += 1;
+    }
+    if (perfOn.current && steps > 0) {
+      // Record per-frame physics cost (sum of substeps this frame), not render.
+      sampler.current.pushStepMs(framePhysicsMs, steps);
+      window.__PHYSICS_PERF__ = sampler.current.snapshot(readWorldMeta(world));
     }
     if (steps === MAX_SUBSTEPS) accumulator.current = 0;
   });

@@ -22,8 +22,8 @@ import { resolveItem } from '../data/resolveItem';
 
 describe('demoPlaylist', () => {
   it('has classification + safety cases', () => {
-    expect(PLAYLIST_LENGTH).toBe(11);
-    expect(DEMO_PLAYLIST.length).toBe(11);
+    expect(PLAYLIST_LENGTH).toBe(12);
+    expect(DEMO_PLAYLIST.length).toBe(12);
   });
 
   it('has no duplicate case ids', () => {

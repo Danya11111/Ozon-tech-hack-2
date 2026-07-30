@@ -1,0 +1,74 @@
+{
+  "generatedAt": "2026-07-30T13:23:17.688Z",
+  "runtimeHash": "2ee3ad6fa2e90f4b",
+  "headlessHash": "2ee3ad6fa2e90f4b",
+  "parity": true,
+  "summary": "7/7 \u00d7 10/10",
+  "pass": true,
+  "note": "Route B has no pusher \u2014 contact criterion N/A; C/D require pusherContactMade",
+  "routes": [
+    {
+      "sku": "SKU-001",
+      "zone": "B",
+      "name": "box",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": false
+    },
+    {
+      "sku": "SKU-009",
+      "zone": "C",
+      "name": "pen",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    },
+    {
+      "sku": "SKU-005",
+      "zone": "C",
+      "name": "pouf",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    },
+    {
+      "sku": "SKU-004",
+      "zone": "C",
+      "name": "oversized",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    },
+    {
+      "sku": "SKU-007",
+      "zone": "D",
+      "name": "bottle",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    },
+    {
+      "sku": "SKU-006",
+      "zone": "D",
+      "name": "plate",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    },
+    {
+      "sku": "SKU-008",
+      "zone": "D",
+      "name": "cylinder",
+      "pass": 10,
+      "total": 10,
+      "ok": true,
+      "contactRequired": true
+    }
+  ]
+}

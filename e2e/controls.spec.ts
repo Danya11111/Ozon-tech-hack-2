@@ -9,23 +9,23 @@ test.describe('controls', () => {
   });
 
   test('seek next/prev and jump cases, speed, presentation', async ({ page }) => {
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
     await page.getByTestId('demo-next').click();
     await ensurePaused(page);
-    await expect(page.getByTestId('demo-case-label')).toHaveText('2/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('2/12');
 
     await page.getByTestId('demo-prev').click();
     await ensurePaused(page);
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
     await page.getByTestId('demo-case-8').click();
     await ensurePaused(page);
-    await expect(page.getByTestId('demo-case-label')).toHaveText('9/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('9/12');
 
     await page.getByTestId('demo-case-0').click();
     await ensurePaused(page);
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
     for (const speed of ['0.5', '1', '1.5', '2'] as const) {
       await page.getByTestId(`demo-speed-${speed}`).click();

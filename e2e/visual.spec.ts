@@ -25,7 +25,7 @@ async function dismissFinishedIfNeeded(page: Page) {
 async function jumpCase(page: Page, index: number) {
   await dismissFinishedIfNeeded(page);
   await page.getByTestId(`demo-case-${index}`).click();
-  await expect(page.getByTestId('demo-case-label')).toHaveText(`${index + 1}/11`, {
+  await expect(page.getByTestId('demo-case-label')).toHaveText(`${index + 1}/12`, {
     timeout: 10_000,
   });
 }
@@ -55,7 +55,7 @@ test.describe('visual regression', () => {
     if (await pause.isVisible().catch(() => false)) {
       await pause.click();
     }
-    await expect(page.getByTestId('demo-case-label')).toHaveText('1/11');
+    await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
     await snapHud(page, '01-home-idle-hud.png');
   });
 

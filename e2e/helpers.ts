@@ -51,5 +51,5 @@ export async function openPausedCase(page: Page, caseIndex: number, speed: '0.5'
   await page.getByTestId(`demo-case-${caseIndex}`).click();
   await dismissFinished(page);
   await ensurePaused(page);
-  await expect(page.getByTestId('demo-case-label')).toHaveText(`${caseIndex + 1}/11`);
+  await expect(page.getByTestId('demo-case-label')).toHaveText(`${caseIndex + 1}/12`);
 }

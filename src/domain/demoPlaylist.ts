@@ -57,6 +57,14 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
     expectedCategory: 'C',
   },
   {
+    id: 'pouf_c',
+    title: 'Пуфик (мягкий)',
+    description: 'Stage 2E runtime visual — soft item → C (min/soft policy)',
+    itemId: 'SKU-005',
+    scenarioId: 'boundary_dimensions',
+    expectedCategory: 'C',
+  },
+  {
     id: 'plate_d',
     title: 'Тарелка',
     description: 'Габариты OK, но K=0.95 ≥ 0.7 — круглое сечение → D',
