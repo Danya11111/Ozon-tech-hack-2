@@ -42,14 +42,9 @@ import {
   BELT_TOP_Y,
   BELT_THICKNESS_M,
   CONVEYOR_WIDTH_M,
-  ROLLER_RADIUS_M,
-  ROLLER_SPACING_M,
   FRAME_HEIGHT_M,
   SIDE_GUARD_HEIGHT_M,
   LEG_WIDTH_M,
-  MOTOR_WIDTH_M,
-  MOTOR_HEIGHT_M,
-  MOTOR_DEPTH_M,
   DRIVE_ROLLER_RADIUS_M,
   ZONES,
   CAMERA_RIG,
@@ -61,6 +56,11 @@ import {
   CAGE_FLOOR_Y,
   CONVEYOR_SPEED_MPS,
 } from '../../domain/physicalLayout';
+import {
+  CAD_ROLLER_PITCH_M,
+  CAD_ROLLER_RADIUS_M,
+  CAD_SUPPORT_SPACING_M,
+} from '../../domain/cadAssemblyParams';
 import { CHUTE_PITCH, CHUTE_LENGTH, CHUTE_MID_Y, CHUTE_MID_Z, CHUTE_X, CHUTE_HALF_W } from '../../domain/physicsWorldLayout';
 import PerfCollector from './PerfCollector';
 import PerfOverlay from './PerfOverlay';
@@ -133,8 +133,8 @@ function getItemMaterial(itemId: string) {
 // Physical layout constants
 const BELT_Y = BELT_TOP_Y;                    // 0.7m - top of belt where items ride
 const BELT_UNDERSIDE_Y = BELT_TOP_Y - BELT_THICKNESS_M; // 0.685m
-const ROLLER_Y = BELT_UNDERSIDE_Y - ROLLER_RADIUS_M;    // ~0.645m - roller center
-const FRAME_TOP_Y = ROLLER_Y - ROLLER_RADIUS_M - 0.02;  // Top of frame structure
+const ROLLER_Y = BELT_UNDERSIDE_Y - CAD_ROLLER_RADIUS_M;
+const FRAME_TOP_Y = ROLLER_Y - CAD_ROLLER_RADIUS_M - 0.02;
 const CONVEYOR_START_X = -4.2;
 const CONVEYOR_END_X = B_RECEIVER.transferEndX + 0.15; // main belt ends at short B spur tip
 /** Max items rendered simultaneously (perf cap). */
@@ -267,12 +267,19 @@ function MotionTrail({
   );
 }
 
-/** Static roller cylinder — no per-frame rotation (belt stripes show movement). */
+/** Static roller — CAD pitch/radius for modular extensions (no non-uniform scale of CAD module). */
 function StaticRoller({ position }: { position: [number, number, number] }) {
   return (
     <mesh position={position} rotation={[0, 0, Math.PI / 2]}>
-      <cylinderGeometry args={[ROLLER_RADIUS_M, ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 8]} />
-      <meshStandardMaterial color={COLORS.rollers} metalness={0.4} roughness={0.5} />
+      <cylinderGeometry args={[CAD_ROLLER_RADIUS_M, CAD_ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 16]} />
+      <meshStandardMaterial
+        color={COLORS.rollers}
+        metalness={0.85}
+        roughness={0.32}
+        transparent={false}
+        opacity={1}
+        depthWrite
+      />
     </mesh>
   );
 }
@@ -302,56 +309,7 @@ function BeltStripe({ baseOffset, elapsedMs }: { baseOffset: number; elapsedMs: 
   );
 }
 
-/** Stepper motor drive unit with pulse indicator */
-function StepperMotor({ position, pulseActive }: { position: [number, number, number]; pulseActive: boolean }) {
-  const pulseRef = useRef<Mesh>(null);
-  const rotationRef = useRef(0);
-  
-  useFrame((_, delta) => {
-    if (pulseRef.current && pulseActive) {
-      rotationRef.current += delta * 8;
-      pulseRef.current.rotation.z = rotationRef.current;
-    }
-  });
-  
-  return (
-    <group position={position}>
-      {/* Motor body */}
-      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 + MOTOR_DEPTH_M / 2 + 0.02]}>
-        <boxGeometry args={[MOTOR_WIDTH_M, MOTOR_HEIGHT_M, MOTOR_DEPTH_M]} />
-        <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.3} />
-      </mesh>
-      {/* Motor shaft - rotates when active */}
-      <mesh 
-        ref={pulseRef}
-        position={[0, 0, CONVEYOR_WIDTH_M / 2 + 0.01]} 
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <cylinderGeometry args={[0.015, 0.015, 0.03, 8]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.2} />
-      </mesh>
-      {/* Drive pulley */}
-      <mesh position={[0, 0, CONVEYOR_WIDTH_M / 2 - 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.035, 0.035, 0.025, 12]} />
-        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
-      </mesh>
-      {/* Belt to drive roller */}
-      <mesh position={[0, DRIVE_ROLLER_RADIUS_M / 2, CONVEYOR_WIDTH_M / 2 - 0.02]}>
-        <boxGeometry args={[0.01, DRIVE_ROLLER_RADIUS_M + 0.02, 0.015]} />
-        <meshStandardMaterial color="#1e293b" />
-      </mesh>
-      {/* Pulse indicator LED */}
-      <mesh position={[0, MOTOR_HEIGHT_M / 2 - 0.01, CONVEYOR_WIDTH_M / 2 + MOTOR_DEPTH_M + 0.025]}>
-        <sphereGeometry args={[0.008, 8, 8]} />
-        <meshStandardMaterial 
-          color={pulseActive ? '#22d3ee' : '#475569'}
-          emissive={pulseActive ? '#22d3ee' : '#000'}
-          emissiveIntensity={pulseActive ? 0.8 : 0}
-        />
-      </mesh>
-    </group>
-  );
-}
+/** StepperMotor removed in Stage 2C — CAD motor-and-drive/NEMA17 is the sole drive unit. */
 
 /** Laser beam from rangefinder to item — static opacity, no useFrame. */
 function LaserBeam({ active, itemY }: { active: boolean; itemY: number }) {
@@ -467,26 +425,27 @@ function SupportLeg({ x }: { x: number }) {
  * Belt top surface at 0.7m (BELT_TOP_Y)
  */
 /**
- * Belt extension segment (SPEC_DERIVED) — entry/exit sections flanking the
- * CAD conveyor module. Same 500 mm width / 700 mm belt top as the real unit.
+ * Belt extension segment (SPEC_DERIVED modular) — entry/exit flanking the CAD
+ * module. Uses CAD roller pitch (500 mm) and radius (25 mm); never scales the GLB.
  */
 function BeltSection({ startX, endX, simplified, shadows }: { startX: number; endX: number; simplified: boolean; shadows: boolean }) {
-  const spacing = simplified ? ROLLER_SPACING_M * 2 : ROLLER_SPACING_M;
+  const spacing = simplified ? CAD_ROLLER_PITCH_M * 2 : CAD_ROLLER_PITCH_M;
   const length = endX - startX;
   const centerX = (startX + endX) / 2;
   const rollerCount = Math.max(1, Math.floor(length / spacing));
+  const rollerY = BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01;
 
   const rollerPositions = useMemo(() => {
     const positions: [number, number, number][] = [];
     for (let i = 0; i < rollerCount; i++) {
-      positions.push([startX + spacing / 2 + i * spacing, ROLLER_Y, 0]);
+      positions.push([startX + spacing / 2 + i * spacing, rollerY, 0]);
     }
     return positions;
-  }, [rollerCount, spacing, startX]);
+  }, [rollerCount, spacing, startX, rollerY]);
 
   const legPositions = useMemo(() => {
     const positions: number[] = [];
-    for (let x = startX + 0.5; x < endX - 0.3; x += 2.0) {
+    for (let x = startX + 0.5; x < endX - 0.3; x += CAD_SUPPORT_SPACING_M) {
       positions.push(x);
     }
     return positions;
@@ -496,23 +455,23 @@ function BeltSection({ startX, endX, simplified, shadows }: { startX: number; en
     <group>
       <mesh position={[centerX, BELT_Y - BELT_THICKNESS_M / 2, 0]} receiveShadow={shadows}>
         <boxGeometry args={[length, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
-        <meshStandardMaterial color={COLORS.belt} roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial color={COLORS.belt} roughness={0.85} metalness={0.05} transparent={false} opacity={1} depthWrite />
       </mesh>
       <mesh position={[centerX, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]}>
         <boxGeometry args={[length, SIDE_GUARD_HEIGHT_M, 0.025]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.55} roughness={0.45} transparent={false} opacity={1} depthWrite />
       </mesh>
       <mesh position={[centerX, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]}>
         <boxGeometry args={[length, SIDE_GUARD_HEIGHT_M, 0.025]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.55} roughness={0.45} transparent={false} opacity={1} depthWrite />
       </mesh>
       <mesh position={[centerX, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]} castShadow={shadows}>
         <boxGeometry args={[length, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.55} roughness={0.4} transparent={false} opacity={1} depthWrite />
       </mesh>
       <mesh position={[centerX, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]} castShadow={shadows}>
         <boxGeometry args={[length, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.55} roughness={0.4} transparent={false} opacity={1} depthWrite />
       </mesh>
       {rollerPositions.map((pos, i) => (
         <StaticRoller key={i} position={pos} />
@@ -525,17 +484,16 @@ function BeltSection({ startX, endX, simplified, shadows }: { startX: number; en
 }
 
 /**
- * Conveyor: CAD module (REAL_CAD) + entry/exit belt extensions (SPEC_DERIVED).
- * Gate/roller/belt motion is driven by the domain visual-state adapter.
+ * SorterCadAssembly (inline): sole conveyor geometry source —
+ * REAL_CAD module + modular SPEC_DERIVED entry/exit at CAD pitch.
+ * No procedural motor (CAD NEMA17 only).
  */
-function ConveyorBelt({ pulseActive, elapsedMs, simplified, shadows = false, gateOpen = false, beltVelocityMps = 0, rollerOmega = 0 }: { pulseActive: boolean; elapsedMs: number; simplified: boolean; shadows?: boolean; gateOpen?: boolean; beltVelocityMps?: number; rollerOmega?: number }) {
+function ConveyorBelt({ pulseActive: _pulseActive, elapsedMs, simplified, shadows = false, gateOpen = false, beltVelocityMps = 0, rollerOmega = 0 }: { pulseActive: boolean; elapsedMs: number; simplified: boolean; shadows?: boolean; gateOpen?: boolean; beltVelocityMps?: number; rollerOmega?: number }) {
   const stripeOffsets = simplified ? [-2, 0, 2] : [-3, -1, 0.5, 2];
   const [cadStart, cadEnd] = CONVEYOR_CAD_SPAN_X;
 
   return (
-    <group>
-      {/* CAD-derived conveyor module (real machine: frame, belt, rollers,
-          drive, metering gates, servo diverters, camera arch) */}
+    <group name="SorterCadAssembly" userData={{ role: 'single-cad-conveyor' }}>
       <Suspense fallback={null}>
         <ConveyorCadModel
           gateOpen={gateOpen}
@@ -545,39 +503,30 @@ function ConveyorBelt({ pulseActive, elapsedMs, simplified, shadows = false, gat
         />
       </Suspense>
 
-      {/* Entry extension: zone A feed into the CAD module */}
       <BeltSection startX={CONVEYOR_START_X} endX={cadStart} simplified={simplified} shadows={shadows} />
-      {/* Exit extension: CAD module discharge to the B spur */}
       <BeltSection startX={cadEnd} endX={CONVEYOR_END_X} simplified={simplified} shadows={shadows} />
 
-      {/* Belt stripes — deterministic movement synced to item (offset = time * 1 m/s) */}
       {stripeOffsets.map((offset, i) => (
         <BeltStripe key={i} baseOffset={offset} elapsedMs={elapsedMs} />
       ))}
 
-      {/* Drive roller at end (larger) */}
-      <mesh position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <mesh position={[CONVEYOR_END_X - 0.1, BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M, DRIVE_ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 16]} />
-        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} transparent={false} opacity={1} depthWrite />
       </mesh>
 
-      {/* Tension roller at start (larger) */}
-      <mesh position={[CONVEYOR_START_X + 0.1, ROLLER_Y, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <mesh position={[CONVEYOR_START_X + 0.1, BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M * 0.9, DRIVE_ROLLER_RADIUS_M * 0.9, CONVEYOR_WIDTH_M - 0.02, 16]} />
-        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} transparent={false} opacity={1} depthWrite />
       </mesh>
 
-      {/* Stepper motor at drive end */}
-      <StepperMotor position={[CONVEYOR_END_X - 0.1, ROLLER_Y, 0]} pulseActive={pulseActive} />
-
-      {/* End caps / guards */}
       <mesh position={[CONVEYOR_START_X, BELT_Y - 0.05, 0]}>
         <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} transparent={false} opacity={1} depthWrite />
       </mesh>
       <mesh position={[CONVEYOR_END_X, BELT_Y - 0.05, 0]}>
         <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} />
+        <meshStandardMaterial color={COLORS.conveyorFrame} transparent={false} opacity={1} depthWrite />
       </mesh>
     </group>
   );

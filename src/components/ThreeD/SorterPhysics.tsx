@@ -17,8 +17,9 @@ import { useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Physics, RigidBody, CuboidCollider, useRapier } from '@react-three/rapier';
 import { getStaticColliders } from '../../domain/physicsWorldLayout';
+import { PHYSICS_TIMESTEP_SEC } from '../../domain/physicsTimestep';
 
-export const PHYSICS_DT = 1 / 60;
+export const PHYSICS_DT = PHYSICS_TIMESTEP_SEC;
 const MAX_SUBSTEPS = 4;
 
 /**

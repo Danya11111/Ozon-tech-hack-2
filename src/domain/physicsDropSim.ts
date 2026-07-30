@@ -21,8 +21,9 @@ import { getPusherState, PUSHER } from './pusherMotion';
 import { receiverContains, type ReceiverZone } from './receiverVolumes';
 import { resolveItem } from '../data/resolveItem';
 import { BELT_TOP_Y } from './physicalLayout';
+import { PHYSICS_TIMESTEP_SEC } from './physicsTimestep';
 
-export const SIM_DT = 1 / 60;
+export const SIM_DT = PHYSICS_TIMESTEP_SEC;
 export const SIM_SETTLE_SECONDS = 6.0;
 
 let rapierReady = false;

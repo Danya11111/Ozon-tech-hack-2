@@ -35,7 +35,16 @@ function materialFor(slot: string): THREE.MeshStandardMaterial {
       'dark-mechanical': { color: '#3a4148', metalness: 0.6, roughness: 0.5 },
       'safety-yellow': { color: '#f5b301', metalness: 0.2, roughness: 0.55 },
     };
-    MATERIALS[slot] = new THREE.MeshStandardMaterial(defs[slot] ?? defs['painted-metal']);
+    const def = defs[slot] ?? defs['painted-metal'];
+    // Stage 2C §9.1 — opaque machine metals: no accidental alpha / DoubleSide bleed.
+    MATERIALS[slot] = new THREE.MeshStandardMaterial({
+      ...def,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
+      depthTest: true,
+      side: THREE.FrontSide,
+    });
   }
   return MATERIALS[slot];
 }
@@ -102,6 +111,11 @@ export function ConveyorCadModel({
       mesh.material = materialFor(slotFor(name));
       mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
+      // Force opaque even if a future GLB embeds transparent materials.
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      mat.transparent = false;
+      mat.opacity = 1;
+      mat.depthWrite = true;
       if (name.startsWith('stop-gate/') || name.startsWith('rollers/Ролик') || name.startsWith('rollers/Вал')) {
         toPivot.push(mesh);
       }

@@ -1,0 +1,1 @@
+{"profile":"D-final","status":"PARTIAL","budget":{"avgFpsMin":45,"p95MsMax":28,"drawCallsMax":250,"trisMax":500000},"measured":null,"note":"Formal multi-run GPU profile deferred; unit/e2e/build green"}

@@ -241,7 +241,16 @@ export default function MainPage({
   const caseProgress = getCaseProgress(playback);
 
   const measurementData = useMemo(() => getMeasurementData(playback), [playback]);
+  // Stage 2C §6: large white MEASUREMENT panel is debug-only.
+  // Default / — never mount. ?debug=1 — compact. ?debug=1&measurement=full — full panel.
+  const measurementMode = useMemo(() => {
+    if (typeof window === 'undefined') return 'off' as const;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debug') !== '1') return 'off' as const;
+    return params.get('measurement') === 'full' ? 'full' as const : 'compact' as const;
+  }, []);
   const showMeasurement =
+    measurementMode !== 'off' &&
     !presentationMode &&
     shouldShowMeasurement(playback.currentPhase) &&
     (isRunning || isPaused) &&
@@ -306,8 +315,28 @@ export default function MainPage({
         )}
       </div>
 
-      {width >= 768 && (
+      {width >= 768 && measurementMode === 'full' && (
         <CVInspectionOverlay data={measurementData} visible={showMeasurement} />
+      )}
+      {width >= 768 && measurementMode === 'compact' && showMeasurement && (
+        <div className="cv-overlay cv-overlay-compact" data-testid="measurement-compact">
+          <div className="cv-header">
+            <span className="cv-title">MEAS</span>
+            <span className="cv-status active">{Math.round((measurementData.confidence ?? 0) * 100)}%</span>
+          </div>
+          <div className="cv-body">
+            <div className="cv-row cv-compact">
+              <span className="cv-label">L×W×H</span>
+              <span className="cv-value cv-mono">
+                {measurementData.measuredLengthMm}×{measurementData.measuredWidthMm}×{measurementData.measuredHeightMm}
+              </span>
+            </div>
+            <div className="cv-row cv-compact">
+              <span className="cv-label">K</span>
+              <span className="cv-value cv-mono">{measurementData.roundnessK.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {!presentationMode && (!stage0.enabled || stage0.hud) && (

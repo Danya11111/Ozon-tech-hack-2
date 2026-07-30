@@ -2046,9 +2046,12 @@ button:disabled {
 .main-page {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
+  height: 100vh; /* fallback */
+  min-height: 100dvh;
   overflow: hidden;
   background: var(--bg);
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .main-demo-viewport {
@@ -2057,11 +2060,26 @@ button:disabled {
   z-index: 1;
 }
 
-.main-demo-viewport .digital-twin-wrap {
+/* Stage 2C §7 — canvas-holder must fill viewport; % height of auto parent was collapsing Canvas. */
+.main-demo-viewport .canvas-holder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
+  min-height: 100%;
+}
+
+.main-demo-viewport .digital-twin-wrap {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
 }
 
 .main-demo-viewport .digital-twin-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
   height: 100% !important;
   min-height: 100% !important;
   border: none;
@@ -2544,7 +2562,7 @@ button:disabled {
   left: 16px;
   z-index: 15;
   width: 220px;
-  max-height: calc(100vh - 220px);
+  max-height: calc(100dvh - 220px);
   overflow-y: auto;
   border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 10px;
@@ -2553,6 +2571,16 @@ button:disabled {
   box-shadow: 0 2px 16px rgba(37, 99, 235, 0.12);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 10px;
+  pointer-events: auto;
+}
+
+.cv-overlay-compact {
+  width: 160px;
+  top: 88px;
+  left: auto;
+  right: 16px;
+  max-height: 120px;
+  pointer-events: none;
 }
 
 .cv-header {

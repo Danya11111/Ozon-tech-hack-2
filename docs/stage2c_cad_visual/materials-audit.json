@@ -1,0 +1,16 @@
+{
+  "slots": [
+    "painted-metal",
+    "brushed-metal",
+    "rubber-belt",
+    "dark-mechanical",
+    "safety-yellow"
+  ],
+  "opaqueForced": true,
+  "transparencyAllowed": [
+    "RealSense glass only (SPEC_DERIVED)",
+    "laser beam debug"
+  ],
+  "surfaceOnlyNodes": [],
+  "note": "FCStd bodies are PartDesign solids; no CAD_SURFACE_ONLY solidify applied"
+}

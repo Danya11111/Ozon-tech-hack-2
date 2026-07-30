@@ -1,0 +1,47 @@
+{
+  "glb": "public/models/sorter/conveyor-web.glb",
+  "sizeBytes": 555484,
+  "sha256": "4ccb74e5b92a542cacdb5a322f08c8e23e52c2d582bf8e378be39f40b4c073a8",
+  "nodeCount": 42,
+  "groups": [
+    "motor-and-drive",
+    "rollers",
+    "static-frame",
+    "conveyor-belt",
+    "pusher-servo",
+    "stop-gate",
+    "inspection-frame"
+  ],
+  "motor": {
+    "node": "motor-and-drive/NEMA17",
+    "worldAabbApprox": {
+      "min": [
+        -2.062,
+        0.564,
+        0.212
+      ],
+      "max": [
+        -2.02,
+        0.606,
+        0.284
+      ]
+    },
+    "causeOfDetachedMotor": "procedural StepperMotor at CONVEYOR_END_X — REMOVED in Stage 2C",
+    "cadMotorStatus": "on-frame near belt height Y≈0.585"
+  },
+  "materialsPolicy": {
+    "transparent": false,
+    "opacity": 1,
+    "depthWrite": true,
+    "side": "FrontSide"
+  },
+  "duplicatesRemoved": [
+    "StepperMotor procedural"
+  ],
+  "remainingSpecDerived": [
+    "BeltSection entry/exit extensions",
+    "PusherMechanism junction paddle",
+    "RealSense D435i",
+    "chutes/cages"
+  ]
+}
