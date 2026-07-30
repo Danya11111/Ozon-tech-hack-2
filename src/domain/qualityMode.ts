@@ -39,7 +39,7 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
   },
   high: {
     mode: 'high',
-    dprMax: 1.5,
+    dprMax: 1.25,
     antialias: true,
     shadows: true,
     maxVisibleItems: 6,
@@ -49,10 +49,11 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
   },
   demo: {
     mode: 'demo',
-    dprMax: 1.5,
+    // Stage 2D: cap DPR 1.25 (budget); raise only via ?cinematic=full / quality override
+    dprMax: 1.25,
     antialias: true,
-    shadows: true, // Stage 2: PCFSoft contact shadows in the default premium look
-    maxVisibleItems: 6,
+    shadows: true,
+    maxVisibleItems: 4,
     effectsEnabled: false,
     rollerDetail: 'full',
     targetFps: 60,

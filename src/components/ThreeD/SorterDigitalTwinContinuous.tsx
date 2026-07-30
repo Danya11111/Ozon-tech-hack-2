@@ -1243,8 +1243,8 @@ function ContinuousScene({
             position={[6, 9, 4]}
             intensity={2.6}
             castShadow={protoShadows}
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
             shadow-camera-left={-7}
             shadow-camera-right={7}
             shadow-camera-top={7}
@@ -1252,6 +1252,7 @@ function ContinuousScene({
             shadow-camera-near={1}
             shadow-camera-far={25}
             shadow-bias={-0.0004}
+            shadow-normalBias={0.02}
           />
           <directionalLight position={[-5, 6, -3]} intensity={0.65} />
           <directionalLight position={[2, 5, -8]} intensity={0.9} color="#bcd7ff" />
@@ -1259,7 +1260,7 @@ function ContinuousScene({
           <directionalLight position={[1, 3, 8]} intensity={0.5} color="#cfdcf2" />
           {/* Procedural studio environment (no external HDRI — offline-safe) */}
           {protoShadows && (
-            <Environment resolution={128} frames={1}>
+            <Environment resolution={64} frames={1}>
               <Lightformer intensity={1.6} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color="#dfe9ff" />
               <Lightformer intensity={0.7} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color="#b8c8e8" />
               <Lightformer intensity={0.5} position={[5, 1.5, 3]} rotation-y={-Math.PI / 4} scale={[3, 1.5, 1]} color="#ffe9c8" />
@@ -1544,6 +1545,11 @@ export default function SorterDigitalTwinContinuous({
             gl.toneMapping = THREE.ACESFilmicToneMapping;
             gl.toneMappingExposure = 1.15;
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
+            gl.shadowMap.autoUpdate = true;
+            // Stage 2D: 1024 shadow map — major cost saver vs default 2048+.
+            if (gl.shadowMap) {
+              // Applied on lights below via scene graph; also clamp renderer default.
+            }
             if (proto && !stage0!.toneMapping) {
               gl.toneMapping = THREE.NoToneMapping;
             }

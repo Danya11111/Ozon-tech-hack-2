@@ -1,0 +1,5 @@
+{
+  "spotCheck": "/?perf=1&playback=paused",
+  "errors": [],
+  "note": "No automated console scrape matrix; spot-check during perf runs"
+}

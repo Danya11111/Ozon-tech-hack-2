@@ -1,0 +1,8 @@
+{
+  "generatedAt": "2026-07-30T12:48:51.344Z",
+  "runtime": "7ee15ad3e879a44a",
+  "headless": "7ee15ad3e879a44a",
+  "equal": true,
+  "timestepEqual": true,
+  "note": "canonical PHYSICS_TIMESTEP_SEC parity"
+}

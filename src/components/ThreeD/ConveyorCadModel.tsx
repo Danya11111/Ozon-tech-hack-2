@@ -109,7 +109,15 @@ export function ConveyorCadModel({
       if (!mesh.isMesh) return;
       const name = mesh.name || mesh.parent?.name || '';
       mesh.material = materialFor(slotFor(name));
-      mesh.castShadow = shadows;
+      // Stage 2D: shadow casters limited to large structure (not every roller/bolt).
+      const cast =
+        shadows &&
+        (name.startsWith('static-frame/') ||
+          name.startsWith('conveyor-belt/') ||
+          name.startsWith('stop-gate/') ||
+          name.startsWith('inspection-frame/') ||
+          name.startsWith('motor-and-drive/'));
+      mesh.castShadow = cast;
       mesh.receiveShadow = shadows;
       // Force opaque even if a future GLB embeds transparent materials.
       const mat = mesh.material as THREE.MeshStandardMaterial;

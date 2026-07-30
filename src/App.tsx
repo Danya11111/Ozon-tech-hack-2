@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from './pages/MainPage';
 import DetailsPage from './pages/DetailsPage';
+import DeviceTestPage from './pages/DeviceTestPage';
 import { DEMO_STEPS } from './data/demoSteps';
 import { SCENARIOS } from './data/scenarios';
 import { createSimulation, stepSimulationToNextState, setRunning } from './domain/simulation';
@@ -302,6 +303,7 @@ function AppContent() {
           />
         }
       />
+      <Route path="/device-test" element={<DeviceTestPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
