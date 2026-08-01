@@ -23,7 +23,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'round_object',
     name: 'Round object',
-    description: 'Габариты проходят, но roundness >= 0.7, маршрут в D.',
+    description: 'Габариты проходят, но roundness K > 0.8, маршрут в D.',
     goal: 'Показать проверку круглого сечения после габаритов.',
     expectedCategorySummary: 'D for every item',
     demonstrates: 'Rule-based shape issue routing без реального ML на MVP-этапе.',
@@ -43,8 +43,8 @@ export const SCENARIOS: Scenario[] = [
     name: 'Boundary dimensions',
     description: 'Товары около min/max границ показывают устойчивость правил.',
     goal: 'Проверить строгие границы min/max.',
-    expectedCategorySummary: 'Boundary box -> B, Pen -> C',
-    demonstrates: '450 x 320 x 320 проходит, width 9 мм не проходит min width.',
+    expectedCategorySummary: 'Near-max 449×319×319 -> B, Pen -> C',
+    demonstrates: 'Строгие границы: 449×319×319 проходит, 450×320×320 и width 9 мм — нет.',
     items: ['SKU-010', 'SKU-009', 'SKU-002'].map(getItem),
   },
   {

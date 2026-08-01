@@ -1,5 +1,6 @@
 /**
- * Stage 2C — unit tests for CAD assembly params + runtime/headless physics hash.
+ * Stage 2C — CAD assembly params + runtime/headless physics hash.
+ * Updated for active conveyor-clean.glb + CAD diverter vane extents.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -15,6 +16,8 @@ import {
   buildPhysicsConfigSnapshot,
 } from './physicsConfigHash';
 import { SIM_DT } from './physicsDropSim';
+import { GATE_VANE } from './pusherMotion';
+import conveyorSource from '../components/ThreeD/ConveyorCadModel.tsx?raw';
 
 describe('Stage 2C CAD assembly params', () => {
   it('preserves official belt width and height', () => {
@@ -27,6 +30,15 @@ describe('Stage 2C CAD assembly params', () => {
     const aabb = CAD_TRANSFORM_MANIFEST.motorWorldAabbApprox;
     expect(aabb.min[1]).toBeGreaterThan(0.4);
     expect(aabb.max[1]).toBeLessThan(0.8);
+  });
+
+  it('runtime loads conveyor-clean.glb and does not mount generated mechanism assets', () => {
+    expect(conveyorSource).toMatch(
+      /CONVEYOR_CAD_URL\s*=\s*['"]\/models\/sorter\/conveyor-clean\.glb['"]/,
+    );
+    expect(conveyorSource).not.toMatch(/mechanism-final\.glb/);
+    expect(conveyorSource).not.toMatch(/mechanism-mount-final\.glb/);
+    expect(conveyorSource).not.toMatch(/conveyor-web\.glb/);
   });
 });
 
@@ -43,10 +55,10 @@ describe('Stage 2C runtime/headless physics parity', () => {
     expect(parity.runtime).toMatch(/^[a-f0-9]{16}$/);
   });
 
-  it('snapshot includes static colliders and pusher geometry', () => {
+  it('snapshot includes static colliders and current CAD vane geometry', () => {
     const snap = buildPhysicsConfigSnapshot(PHYSICS_TIMESTEP_SEC);
     expect(snap.staticColliderCount).toBeGreaterThan(5);
-    expect(snap.pusherHalfExtents[0]).toBe(0.5);
+    expect(snap.pusherHalfExtents).toEqual([...GATE_VANE.halfExtents]);
     expect(snap.gravity).toEqual([0, -9.81, 0]);
   });
 });

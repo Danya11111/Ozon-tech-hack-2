@@ -61,9 +61,12 @@ Props из `SimulationState`: item, machineState, scenario, classification, sens
 - [x] State machine двигает товар предсказуемо
 - [x] ROUTE_TO_* виден цветом и стрелкой
 - [x] 2D fallback работает
-- [x] min dimensions 10×10×2, max 450×320×320, roundness K ≥ 0.7, conveyor 1.00 m/s
+- [x] min dimensions > 10×10×10, max < 450×320×320, roundness K > 0.8, conveyor 1.00 m/s
 - [x] Нет horizontal scroll
 
 ## Decision log
 
-Physics (`@react-three/rapier`) **не установлен**: для хакатона важнее предсказуемый route, чем dynamic collisions. Motion layer — `itemMotion.ts` (`PHYSICS_ENGINE_ENABLED = false`).
+> **HISTORICAL / SUPERSEDED (stage note):** early feasibility assumed no physics engine.  
+> **Current:** `@react-three/rapier` is used on the drop segment; belt pose remains domain-driven.
+
+Physics (`@react-three/rapier`) **установлен** для drop/handoff. Motion on belt — domain state machine.

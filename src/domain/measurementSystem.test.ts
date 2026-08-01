@@ -48,20 +48,20 @@ describe('measurementSystem', () => {
       for (let i = 0; i < 100; i++) {
         state = updatePlayback(state, 100);
         const data = getMeasurementData(state);
-        if (data.roundnessK >= 0.7) {
+        if (data.roundnessK > 0.8) {
           expect(data.shapeResult).toBe('round');
           return;
         }
       }
     });
     
-    it('returns box shape for medium roundness (0.3-0.7)', () => {
+    it('returns box shape for medium roundness (0.3–0.8 inclusive)', () => {
       let state = createPlaybackState();
       state = startPlayback(state);
       
-      // Check shape logic based on roundness
+      // Check shape logic based on official K > 0.8 roundness rule
       const data = getMeasurementData(state);
-      if (data.roundnessK >= 0.7) {
+      if (data.roundnessK > 0.8) {
         expect(data.shapeResult).toBe('round');
       } else if (data.roundnessK >= 0.3) {
         expect(data.shapeResult).toBe('box');

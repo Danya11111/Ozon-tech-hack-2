@@ -6,7 +6,7 @@ import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { classifyItem } from '../../domain/classifier';
 import { getRenderedItemDimensions } from '../../domain/physicalLayout';
 import * as THREE from 'three';
-import RealItemModel from './RealItemModel';
+import RealItemModel, { isProductAssetReady } from './RealItemModel';
 import { ItemVerificationOverlay } from './RealModelVerification';
 
 const COLORS = {
@@ -66,6 +66,7 @@ export function ItemVisualContent({
   isSettled,
   castShadow = false,
   verifySku = null,
+  onVisualReady,
 }: {
   caseData: PlaylistCase;
   phase: string;
@@ -73,6 +74,8 @@ export function ItemVisualContent({
   isSettled: boolean;
   castShadow?: boolean;
   verifySku?: string | null;
+  /** Fires once the visible mesh (real or procedural) is ready to show. */
+  onVisualReady?: () => void;
 }) {
   const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
   const classification = useMemo(() => classifyItem(itemData), [itemData]);
@@ -106,6 +109,13 @@ export function ItemVisualContent({
     : dims.height;
   const pivotOffsetY = -modelHeightM / 2;
 
+  // Procedural / already-cached assets are ready immediately.
+  useEffect(() => {
+    if (!useReal || !asset?.runtimePath || isProductAssetReady(asset.runtimePath)) {
+      onVisualReady?.();
+    }
+  }, [useReal, asset?.runtimePath, caseData.id, onVisualReady]);
+
   const fallback = (
     <FallbackPrimitive
       type={fallbackType}
@@ -138,6 +148,7 @@ export function ItemVisualContent({
             }}
             castShadow={castShadow}
             fallback={fallback}
+            onReady={onVisualReady}
           />
         </group>
       ) : (

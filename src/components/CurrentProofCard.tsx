@@ -1,4 +1,4 @@
-import { DIMENSION_LIMITS } from '../domain/classifier';
+import { OFFICIAL_RULE_LABELS } from '../domain/classifier';
 import { NOMINAL_CONVEYOR_SPEED_MPS } from '../domain/simulation';
 import type { SimulationState } from '../domain/types';
 
@@ -24,8 +24,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
           <h3>Готово к демонстрации</h3>
           <p>Нажмите Start demo — товар пройдёт Detection → Classification → Command → Routing.</p>
           <p className="proof-limits">
-            Limits: min {DIMENSION_LIMITS.min.width}×{DIMENSION_LIMITS.min.depth}×{DIMENSION_LIMITS.min.height} mm ·
-            max {DIMENSION_LIMITS.max.width}×{DIMENSION_LIMITS.max.depth}×{DIMENSION_LIMITS.max.height} mm ·
+            Limits: {OFFICIAL_RULE_LABELS.boundsSummary} · {OFFICIAL_RULE_LABELS.roundnessDisplay} ·
             conveyor {NOMINAL_CONVEYOR_SPEED_MPS.toFixed(2)} m/s
           </p>
         </div>
@@ -61,7 +60,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
               : result?.dimensionsPass === false
                 ? 'dimensions failed (oversized or undersized)'
                 : result?.roundnessPass === false
-                  ? `dimensions pass, but K = ${item?.roundness.toFixed(2)} ≥ 0.7`
+                  ? `dimensions pass, but K = ${item?.roundness.toFixed(2)} > 0.8`
                   : 'dimensions pass and round section is not detected'}
           </em>
         </div>
@@ -82,7 +81,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
           <strong className={result?.roundnessPass === false && result?.dimensionsPass ? 'fail-text' : 'pass-text'}>
             {item?.roundness.toFixed(2)}
           </strong>
-          <em>{result?.roundnessPass ? 'PASS' : 'DETECTED (≥0.7)'}</em>
+          <em>{result?.roundnessPass ? 'PASS' : 'DETECTED (>0.8)'}</em>
         </div>
         <div className="proof-item">
           <span className="proof-label">Category</span>
@@ -100,9 +99,9 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
 
       <div className="proof-details">
         <div className="detail-row">
-          <span>Min limits</span>
+          <span>Official limits</span>
           <strong>
-            {DIMENSION_LIMITS.min.width}×{DIMENSION_LIMITS.min.depth}×{DIMENSION_LIMITS.min.height} мм
+            {OFFICIAL_RULE_LABELS.minDisplay} · {OFFICIAL_RULE_LABELS.maxDisplay}
           </strong>
         </div>
         <div className="detail-row">
@@ -118,7 +117,7 @@ export default function CurrentProofCard({ simulation }: { simulation: Simulatio
           <p className="warning-note">C-priority: негабарит + круглый → только C (габариты важнее формы)</p>
         ) : null}
         {lowConfidence ? (
-          <p className="warning-note">Низкая уверенность CV — rule-based fallback, класс только B/C/D</p>
+          <p className="warning-note">Низкая уверенность измерения — rule-based fallback, класс только B/C/D</p>
         ) : null}
         {simulation.machineState === 'FAULT' ? <p className="error-note">FAULT: конвейер остановлен</p> : null}
         {simulation.machineState === 'EMERGENCY_STOP' ? (

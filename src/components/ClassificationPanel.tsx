@@ -1,4 +1,4 @@
-import { DIMENSION_LIMITS } from '../domain/classifier';
+import { DIMENSION_LIMITS, OFFICIAL_RULE_LABELS } from '../domain/classifier';
 import type { SimulationState } from '../domain/types';
 
 function Verdict({ pass, skipped = false }: { pass?: boolean; skipped?: boolean }) {
@@ -28,12 +28,12 @@ export default function ClassificationPanel({ simulation }: { simulation: Simula
       <div className="rule-stack">
         <div className="rule-card">
           <div><strong>Step 1: Dimensions check</strong><Verdict pass={result?.dimensionsPass} /></div>
-          <p>Allowed: W {DIMENSION_LIMITS.min.width}-{DIMENSION_LIMITS.max.width} mm, D {DIMENSION_LIMITS.min.depth}-{DIMENSION_LIMITS.max.depth} mm, H {DIMENSION_LIMITS.min.height}-{DIMENSION_LIMITS.max.height} mm.</p>
+          <p>Allowed: {OFFICIAL_RULE_LABELS.boundsSummary} (exclusive official bounds).</p>
           <p>Actual: {dimensions ? `${dimensions.width} x ${dimensions.depth} x ${dimensions.height} mm` : 'waiting for item'}</p>
         </div>
         <div className="rule-card">
           <div><strong>Step 2: Roundness check</strong><Verdict pass={result?.roundnessPass} skipped={result ? !result.dimensionsPass : false} /></div>
-          <p>Roundness threshold for D: value &gt;= {DIMENSION_LIMITS.roundnessThreshold}.</p>
+          <p>Roundness for D: {OFFICIAL_RULE_LABELS.roundnessDisplay} (threshold {DIMENSION_LIMITS.roundnessThreshold}).</p>
           <p>Actual roundness: {item ? item.roundness.toFixed(2) : 'waiting for item'}</p>
         </div>
         <div className="rule-card">

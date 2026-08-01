@@ -1,14 +1,15 @@
 ISO-10303-21;
 HEADER;
-FILE_DESCRIPTION(('SPEC_DERIVED_CAD angled paddle diverter — OZON Tech Sorter'),'2;1');
-FILE_NAME('sorter_mechanism.step','2026-07-30',('stage2d'),('ozone-tech_owl_prime_170'),
-  'manual/trimesh-derived','FreeCAD-compatible exchange','');
+FILE_DESCRIPTION(('DERIVED_CAD_FINAL angled paddle diverter — OZON Tech Sorter'),'2;1');
+FILE_NAME('sorter_mechanism.step','2026-07-30',('stage2d-final'),('ozone-tech_owl_prime_170'),
+  'node-gltf-transform-derived','FreeCAD-compatible exchange','');
 FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
 ENDSEC;
 DATA;
-/* SPEC_DERIVED_CAD — NOT author FreeCAD. Dimensions from domain PUSHER + Stage2B mechanism-map. */
-/* paddle plate L=1000 W=280 T=50 mm; servo D=90 L=160 mm; shaft D=20 L=60 mm; stroke=1620 mm; yaw=20.4 deg */
+/* DERIVED_CAD_FINAL — engineered from domain PUSHER + conveyor-clean belt geometry. */
+/* paddle L=1000 H=280 T=50 mm; leading 4 mm; servo D=90 L=160; stroke=1620; yaw=20.4 deg */
+/* local: X width, Y height, Z thickness (−Z contact) — matches Rapier collider */
 #1 = APPLICATION_CONTEXT('automotive design');
-#2 = PRODUCT('sorter_mechanism','Angled paddle diverter SPEC_DERIVED_CAD','',(#1));
+#2 = PRODUCT('sorter_mechanism','Angled paddle diverter DERIVED_CAD_FINAL','',(#1));
 ENDSEC;
 END-ISO-10303-21;

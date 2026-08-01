@@ -128,11 +128,11 @@ test.describe('visual regression', () => {
     });
   });
 
-  test('08 details engineering page', async ({ page }) => {
-    await page.goto('/details');
-    await expect(page.locator('#root')).toBeVisible();
-    await page.waitForTimeout(1500);
-    await expect(page).toHaveScreenshot('08-details-page.png', {
+  test('08 documentation page', async ({ page }) => {
+    await page.goto('/documentation');
+    await expect(page.getByTestId('documentation-page')).toBeVisible();
+    await page.waitForTimeout(800);
+    await expect(page).toHaveScreenshot('08-documentation-page.png', {
       threshold: 0.4,
       maxDiffPixelRatio: 0.12,
       fullPage: true,

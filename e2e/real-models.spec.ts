@@ -60,30 +60,11 @@ test.describe('Stage 1 real models', () => {
     expect(errors.filter((e) => e.startsWith('pageerror'))).toEqual([]);
   });
 
-  test('/details renders the item at true physical scale (no 2.5x multiplier)', async ({ page }) => {
-    const errors = watchConsole(page);
-    const modelRequests: string[] = [];
-    page.on('request', (req) => {
-      if (MODEL_RE.test(req.url())) modelRequests.push(req.url());
-    });
-
+  test('removed /details route redirects to simulation (true scale covered on /)', async ({ page }) => {
     await page.goto('/details', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/$/);
     await page.waitForSelector('canvas', { timeout: 30000 });
-    // The details demo is user-started; the item exists only after start.
-    await page.getByRole('button', { name: /start demo/i }).first().click();
-    await page.waitForTimeout(6000);
-
-    // Item on the belt: bottom must sit at belt height (0.7m), not float.
-    const itemBottom = await page.evaluate(() => {
-      // Deterministic check via the motion contract: itemPosition3D y == beltY.
-      // We assert the rendered group Y through the scene graph is inaccessible
-      // here, so we verify the domain contract source instead.
-      return true;
-    });
-    expect(itemBottom).toBe(true);
-    // Real model must load on /details too (SKU-001 is the default demo item).
-    expect(modelRequests.some((u) => MODEL_RE.test(u))).toBe(true);
-    expect(errors.filter((e) => !e.includes('favicon'))).toEqual([]);
+    expect(await page.locator('canvas').count()).toBeGreaterThan(0);
   });
 
   test('mobile SVG fallback does not download real-model assets', async ({ browser }) => {

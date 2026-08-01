@@ -6,7 +6,7 @@ Open https://arhipovdan.ru/ (или http://127.0.0.1:3100/).
 
 ## 30-Second Pitch
 
-«Мы сделали инженерную симуляцию сортировочной ячейки OZON с 3D digital twin. Полный цикл: detection → classification → command → routing. Товар физически уходит в B/C/D. Physics engine не используем — motion по state machine, демо предсказуемо.»
+«Мы сделали инженерную симуляцию сортировочной ячейки OZON с 3D digital twin. Полный цикл: тестовые измерения → classification → command → routing. Товар уходит в B/C/D в цифровом стенде. На ленте — state machine; на drop-участке — Rapier.»
 
 ## 7-Minute Structure
 
@@ -16,7 +16,7 @@ Open https://arhipovdan.ru/ (или http://127.0.0.1:3100/).
 - **0:20–0:45** Полный контур: Detection → Classification → Command → Actuator → Route.
 - **0:45–1:30** Категория B: габариты проходят, нет круга, зелёный маршрут в основной сортировщик.
 - **1:30–2:15** Категория C: негабаритный товар, оранжевый маршрут в roll-cage C.
-- **2:15–3:00** Категория D: габариты проходят, но круг в сечении (K ≥ 0.7), фиолетовый маршрут в roll-cage D.
+- **2:15–3:00** Категория D: габариты проходят, но круг в сечении (K > 0.8), фиолетовый маршрут в roll-cage D.
 - **3:00–3:45** C-priority: негабаритный + круглый → всё равно C (приоритет габаритов).
 - **3:45–4:30** Low confidence и fault: rule-based fallback, FAULT состояние, EMERGENCY_STOP.
 - **4:30–5:30** Engineering Details: timeline, PID, sensors, event log, 3D capability check.

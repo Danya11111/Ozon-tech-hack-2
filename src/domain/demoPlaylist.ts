@@ -51,7 +51,7 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
   {
     id: 'small_item_c',
     title: 'Ручка (слишком маленькая)',
-    description: 'Width 9mm < min 10mm — не проходит min dimensions → C',
+    description: 'Width 9mm не > 10mm — не проходит min dimensions → C',
     itemId: 'SKU-009',
     scenarioId: 'boundary_dimensions',
     expectedCategory: 'C',
@@ -67,7 +67,7 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
   {
     id: 'plate_d',
     title: 'Тарелка',
-    description: 'Габариты OK, но K=0.95 ≥ 0.7 — круглое сечение → D',
+    description: 'Габариты OK, но K=0.95 > 0.8 — круглое сечение → D',
     itemId: 'SKU-006',
     scenarioId: 'round_object',
     expectedCategory: 'D',
@@ -91,7 +91,7 @@ export const DEMO_PLAYLIST: PlaylistCase[] = [
   {
     id: 'cylinder_d',
     title: 'Цилиндр (вал)',
-    description: 'Цилиндр 435×50мм лежит поперёк ленты, K=0.97 ≥ 0.7 — круглое сечение → D',
+    description: 'Цилиндр 435×50мм лежит поперёк ленты, K=0.88 > 0.8 — круглое сечение → D',
     itemId: 'SKU-008',
     scenarioId: 'round_object',
     expectedCategory: 'D',

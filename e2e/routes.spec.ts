@@ -1,19 +1,33 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('routes', () => {
-  test('/details opens, refresh stays, back to home', async ({ page }) => {
-    await page.goto('/details');
-    await expect(page).toHaveURL(/\/details\/?$/);
-    await expect(page.getByRole('link', { name: /back to full-screen demo/i })).toBeVisible({
-      timeout: 30_000,
-    });
+  test('two-page UI: simulation, documentation, unknown redirect', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('app-nav')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('nav-simulation')).toHaveClass(/active/);
+
+    await page.getByTestId('nav-documentation').click();
+    await expect(page).toHaveURL(/\/documentation\/?$/);
+    await expect(page.getByTestId('documentation-page')).toBeVisible();
+    await expect(page.getByTestId('docs-production-status')).toContainText('DATA_ACQUISITION_PACK_READY');
+    await expect(page.getByTestId('nav-documentation')).toHaveClass(/active/);
 
     await page.reload();
-    await expect(page).toHaveURL(/\/details\/?$/);
-    await expect(page.getByRole('link', { name: /back to full-screen demo/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/documentation\/?$/);
+    await expect(page.getByTestId('documentation-page')).toBeVisible();
 
-    await page.getByRole('link', { name: /back to full-screen demo/i }).click();
+    await page.getByTestId('nav-simulation').click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByTestId('demo-hud')).toBeVisible({ timeout: 60_000 });
+
+    await page.goto('/details');
+    await expect(page).toHaveURL(/\/$/);
+
+    await page.goto('/device-test');
+    await expect(page).toHaveURL(/\/$/);
+
+    await page.goto('/old-route');
+    await expect(page).toHaveURL(/\/$/);
   });
 });

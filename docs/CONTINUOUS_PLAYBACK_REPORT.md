@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED:** This document records an earlier project stage. Canonical Track 3 rules are exclusive bounds **> 10×10×10** and **< 450×320×320** mm, roundness **K > 0.8** (`doc-1783095831` pp.5–8; `src/domain/classifier.ts`). Values 10×10×2 / K≥0.7 below are obsolete.
+
 # Continuous Playback Report
 
 **Date:** 2026-07-09  

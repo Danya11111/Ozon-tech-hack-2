@@ -42,7 +42,7 @@ The proof card shows dimensions, roundness and reason. Tests cover key boundary 
 
 ## 11. How Are Dimensions And Circular Section Handled?
 
-Dimensions are checked first against min/max: 10×10×2 mm to 450×320×320 mm. If they pass, roundness K = r_in / r_out is checked against threshold 0.7. Conveyor target speed is 1.00 m/s.
+Dimensions are checked first with exclusive official bounds: strictly greater than 10×10×10 mm and strictly less than 450×320×320 mm. If they pass, roundness K = r_in / R_out is checked: circular only when K > 0.8 (K = 0.8 is not round). Conveyor target speed is 1.00 m/s.
 
 ## 12. Why Does C Have Priority Over D?
 

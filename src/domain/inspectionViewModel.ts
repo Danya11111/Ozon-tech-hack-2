@@ -1,10 +1,12 @@
 /**
  * Inspection View Model — adapts playback state to CV inspection overlay data.
+ * Measurement values are fixture-driven (mock perception contract).
  */
 
 import type { ContinuousPlaybackState, CasePhase } from './continuousPlayback';
 import type { Category } from './types';
 import { ITEMS } from '../data/items';
+import { dimensionsPassOfficial, isCircularCrossSection } from './classifier';
 
 export type DetectedShape = 'box' | 'cylinder' | 'round' | 'irregular' | 'unknown';
 
@@ -58,44 +60,33 @@ const VISIBLE_PHASES: CasePhase[] = [
 function normalizeShape(shape: string, roundness: number): DetectedShape {
   const lower = shape.toLowerCase();
   if (lower.includes('cylinder') || lower.includes('bottle')) return 'cylinder';
-  if (lower.includes('round') || lower.includes('plate') || roundness >= 0.7) return 'round';
+  if (lower.includes('round') || lower.includes('plate') || isCircularCrossSection(roundness)) return 'round';
   if (lower.includes('box') || lower.includes('rectangular')) return 'box';
   if (lower.includes('irregular') || lower.includes('soft')) return 'irregular';
   return 'unknown';
 }
 
-function checkDimensionsFail(dims: { width: number; depth: number; height: number }): boolean {
-  const MIN = { width: 10, depth: 10, height: 10 };
-  const MAX = { width: 450, depth: 320, height: 320 };
-  
-  return (
-    dims.width < MIN.width || dims.depth < MIN.depth || dims.height < MIN.height ||
-    dims.width > MAX.width || dims.depth > MAX.depth || dims.height > MAX.height
-  );
-}
-
 export function getInspectionData(playback: ContinuousPlaybackState): InspectionData {
   const currentCase = playback.currentCase;
   const phase = playback.currentPhase;
-  
-  // Get item data
+
   const itemId = currentCase.itemId.replace('-LC', '');
-  const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
-  
+  const itemData = ITEMS.find((i) => i.id === itemId) ?? ITEMS[0];
+
   const isLowConfidence = currentCase.id === 'low_confidence';
   const confidence = isLowConfidence ? 0.58 : itemData.confidence;
-  
+
   const dimensions = itemData.dimensionsMm;
   const roundness = itemData.roundness;
   const shape = normalizeShape(itemData.shape, roundness);
-  
-  const dimensionsFail = checkDimensionsFail(dimensions);
-  const roundnessFail = roundness >= 0.7;
+
+  const dimensionsFail = !dimensionsPassOfficial(dimensions);
+  const roundnessFail = isCircularCrossSection(roundness);
   const cPriority = currentCase.id === 'c_priority';
-  
+
   const category = playback.targetCategory;
   const command = playback.command;
-  
+
   return {
     visible: VISIBLE_PHASES.includes(phase),
     phase,

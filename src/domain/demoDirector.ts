@@ -146,7 +146,7 @@ export function getDemoStepConfig(step: DemoStep, category?: Category): DemoStep
       step: DemoStep.roundness_check,
       durationMs: 700,
       label: 'Проверка круглости',
-      description: 'Roundness K ≥ 0.7 or not',
+      description: 'Roundness K > 0.8 or not',
       cameraPreset: CAMERA_PRESETS.gateCloseup,
       activeLabels: ['Накопитель', 'Stop-gate'],
     },

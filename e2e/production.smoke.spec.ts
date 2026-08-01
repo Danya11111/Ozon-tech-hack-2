@@ -88,10 +88,14 @@ test.describe('production smoke @production', () => {
     await page.getByTestId('demo-case-0').click({ force: true });
     await expect(page.getByTestId('demo-case-label')).toHaveText('1/12');
 
-    await page.goto('/details');
-    await expect(page.locator('#root')).toBeVisible();
+    await page.goto('/documentation');
+    await expect(page).toHaveURL(/\/documentation\/?$/);
+    await expect(page.getByTestId('documentation-page')).toBeVisible();
     await page.reload();
-    await expect(page.locator('#root')).toBeVisible();
+    await expect(page.getByTestId('documentation-page')).toBeVisible();
+
+    await page.goto('/details');
+    await expect(page).toHaveURL(/\/$/);
 
     await page.goto('/?debug=1');
     const version2 = await page.evaluate(async () => {

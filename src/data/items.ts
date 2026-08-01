@@ -84,8 +84,8 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'SKU-010',
-    name: 'Boundary box 450x320x320',
-    dimensionsMm: { width: 450, depth: 320, height: 320 },
+    name: 'Near-max box 449x319x319',
+    dimensionsMm: { width: 449, depth: 319, height: 319 },
     roundness: 0.2,
     confidence: 0.9,
     shape: 'boundary box',

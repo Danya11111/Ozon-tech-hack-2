@@ -1,7 +1,7 @@
 import { Html } from '@react-three/drei';
 import type { Category, MachineState, SimulatedItem } from '../../domain/types';
 import { ROUTE_COLORS, TWIN_LAYOUT } from './itemMotion';
-import { DIMENSION_LIMITS } from '../../domain/classifier';
+import { OFFICIAL_RULE_LABELS } from '../../domain/classifier';
 
 interface Props {
   machineState: MachineState;
@@ -195,7 +195,7 @@ export default function SceneLabels3D({
           {/* Conveyor info */}
           <Badge
             position={[-3.2, beltY + 0.85, 1.4]}
-            text={`Conveyor ${conveyorTargetMps.toFixed(2)} m/s · min ${DIMENSION_LIMITS.min.width}×${DIMENSION_LIMITS.min.depth}×${DIMENSION_LIMITS.min.height} mm`}
+            text={`Conveyor ${conveyorTargetMps.toFixed(2)} m/s · ${OFFICIAL_RULE_LABELS.minDisplay}`}
             color="#91a4b8"
           />
         </>

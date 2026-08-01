@@ -5,6 +5,7 @@
 
 import type { MeasurementData } from '../domain/measurementSystem';
 import { getStageLabel } from '../domain/measurementSystem';
+import { DIMENSION_LIMITS, isCircularCrossSection } from '../domain/classifier';
 
 interface CVInspectionOverlayProps {
   data: MeasurementData;
@@ -136,9 +137,11 @@ export default function CVInspectionOverlay({ data, visible }: CVInspectionOverl
         </div>
         <div className="cv-row">
           <span className="cv-label">Roundness</span>
-          <span className={`cv-value ${roundnessK >= 0.7 ? 'warning' : ''}`}>
+          <span className={`cv-value ${isCircularCrossSection(roundnessK) ? 'warning' : ''}`}>
             K = {roundnessK.toFixed(2)} ({roundnessPercent}%)
-            {roundnessK >= 0.7 && <span className="cv-flag"> ≥0.7</span>}
+            {isCircularCrossSection(roundnessK) && (
+              <span className="cv-flag"> &gt;{DIMENSION_LIMITS.roundnessThreshold}</span>
+            )}
           </span>
         </div>
 

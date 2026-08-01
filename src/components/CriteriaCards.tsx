@@ -1,4 +1,5 @@
 import type { ScenarioId } from '../domain/types';
+import { OFFICIAL_RULE_LABELS } from '../domain/classifier';
 
 interface CriteriaCard {
   id: string;
@@ -29,7 +30,7 @@ const PRODUCT_CRITERIA: CriteriaCard[] = [
   {
     id: 'round-section',
     title: 'Круг в сечении',
-    evidence: 'Roundness ≥ 0.7 направляет товар в зону D.',
+    evidence: `${OFFICIAL_RULE_LABELS.roundnessDisplay} направляет товар в зону D.`,
     status: 'covered',
     linkedScenario: 'round_object',
     linkedLabel: 'Круглый объект',

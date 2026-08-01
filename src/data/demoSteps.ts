@@ -43,7 +43,7 @@ export const DEMO_STEPS: DemoStep[] = [
     scenarioId: 'round_object',
     preferredAction: 'step',
     focusArea: 'scene',
-    explanation: 'Roundness >= 0.7 after valid dimensions sends the item to D for repack/shape issue handling.',
+    explanation: 'Roundness K > 0.8 after valid dimensions sends the item to D for repack/shape issue handling.',
     whatToWatch: 'Roundness FAIL for B, category D and the upper route/pusher D command.',
     juryValue: 'Shows how the circle-section rule becomes a physical route.',
     relatedCriteria: ['classification-rules', 'geometry-variety', 'physical-routing'],

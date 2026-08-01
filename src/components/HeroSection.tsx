@@ -1,3 +1,5 @@
+import { OFFICIAL_RULE_LABELS } from '../domain/classifier';
+
 interface HeroSectionProps {
   onStartDemo: () => void;
   onShowScenarios: () => void;
@@ -17,14 +19,14 @@ export default function HeroSection({
           Интеллектуальная система предварительной сортировки товаров
         </h1>
         <p className="hero-subtitle">
-          3D-симуляция ПАК показывает полный цикл: товар поступает из A, определяется CV-модулем, классифицируется в B/C/D и физически маршрутизируется исполнительной частью.
+          Цифровой стенд показывает полный цикл: тестовые измерения → rule-based классификация B/C/D → команда ROUTE_TO_* → маршрутизация в digital twin.
         </p>
 
         <div className="hero-badges" aria-label="Параметры системы">
           <span className="hero-badge">Конвейер 1 м/с</span>
-          <span className="hero-badge">Min 10×10×2 мм</span>
-          <span className="hero-badge">Max 450×320×320 мм</span>
-          <span className="hero-badge">K ≥ 0.7 → D</span>
+          <span className="hero-badge">{OFFICIAL_RULE_LABELS.minDisplay}</span>
+          <span className="hero-badge">{OFFICIAL_RULE_LABELS.maxDisplay}</span>
+          <span className="hero-badge">{OFFICIAL_RULE_LABELS.roundnessDisplay} → D</span>
           <span className="hero-badge">C priority</span>
         </div>
 

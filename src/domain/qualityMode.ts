@@ -39,7 +39,7 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
   },
   high: {
     mode: 'high',
-    dprMax: 1.25,
+    dprMax: 1.5,
     antialias: true,
     shadows: true,
     maxVisibleItems: 6,
@@ -49,8 +49,8 @@ const PRESETS: Record<QualityMode, QualitySettings> = {
   },
   demo: {
     mode: 'demo',
-    // Stage 2D: cap DPR 1.25 (budget); raise only via ?cinematic=full / quality override
-    dprMax: 1.25,
+    // Desktop polish: 1.5 DPR keeps edges sharp without a heavy post stack.
+    dprMax: 1.5,
     antialias: true,
     shadows: true,
     maxVisibleItems: 4,

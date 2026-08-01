@@ -10,7 +10,7 @@
  *     against the DOMAIN-decided receiver volume and the body is frozen
  *     (kinematic) — no drift, clean replay, no teleportation at any point.
  */
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import {
@@ -29,6 +29,8 @@ import { receiverContains } from '../../domain/receiverVolumes';
 import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { ItemVisualContent } from './PhysicalPlaybackItem';
 import { recordDropResult, physicsSimClock } from './SorterPhysics';
+import { getModelAsset } from '../../data/modelAssets';
+import { isProductAssetReady } from './RealItemModel';
 
 type Authority = 'kinematic' | 'dynamic' | 'frozen';
 
@@ -80,6 +82,14 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   const frozenPose = useRef<{ p: [number, number, number]; q: THREE.Quaternion } | null>(null);
   const handedOffAtSimSec = useRef<number | null>(null);
   const verified = useRef(false);
+  const asset = getModelAsset(itemId);
+  const needsRealAsset = Boolean(asset?.defaultRealAsset && asset?.runtimePath);
+  const [spawned, setSpawned] = useState(
+    () => !needsRealAsset || isProductAssetReady(asset?.runtimePath),
+  );
+  const onVisualReady = useCallback(() => {
+    setSpawned(true);
+  }, []);
 
   const pose = getPhysicalItemPose({
     caseId: caseData.id,
@@ -115,17 +125,37 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     frozenPose.current = null;
     handedOffAtSimSec.current = null;
     verified.current = false;
+    const ready = !needsRealAsset || isProductAssetReady(asset?.runtimePath);
+    setSpawned(ready);
     const body = bodyRef.current;
     if (body) {
       body.setBodyType(RigidBodyType.KinematicPositionBased, false);
-      body.setLinvel({ x: 0, y: 0, z: 0 }, false);
-      body.setAngvel({ x: 0, y: 0, z: 0 }, false);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      const p = pose.position;
+      body.setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
+      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
+      const q = new THREE.Quaternion().setFromEuler(e);
+      body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on case id only
   }, [caseData.id]);
 
   useFrame(() => {
     const body = bodyRef.current;
     if (!body) return;
+
+    // PREPARING: hold at spawn pose, zero velocity, keep invisible until visual ready.
+    if (!spawned) {
+      const p = pose.position;
+      body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
+      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
+      const q = new THREE.Quaternion().setFromEuler(e);
+      body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      return;
+    }
 
     if (authority.current === 'kinematic') {
       // Physics handoff at pusher contact / belt edge — never for fault cases.
@@ -232,31 +262,35 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       enabledRotations={[true, true, true]}
       position={pose.position}
     >
-      {profile.collider === 'cuboid' && profile.cuboidHalfExtents && (
+      {/* Colliders only after visual ready — avoids stale/orphan contact. */}
+      {spawned && profile.collider === 'cuboid' && profile.cuboidHalfExtents && (
         <CuboidCollider args={profile.cuboidHalfExtents} density={density} />
       )}
-      {profile.collider === 'capsule' && profile.capsule && (
+      {spawned && profile.collider === 'capsule' && profile.capsule && (
         <CapsuleCollider
           args={[profile.capsule[1], profile.capsule[0]]}
           density={density}
           rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      {profile.collider === 'cylinder' && profile.capsule && (
+      {spawned && profile.collider === 'cylinder' && profile.capsule && (
         <CylinderCollider
           args={[profile.capsule[1], profile.capsule[0]]}
           density={density}
           rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      <ItemVisualContent
-        caseData={caseData}
-        phase={pose.phase}
-        surface={pose.surface}
-        isSettled={authority.current === 'frozen' ? true : pose.isSettled}
-        castShadow={castShadow}
-        verifySku={verifySku}
-      />
+      <group visible={spawned}>
+        <ItemVisualContent
+          caseData={caseData}
+          phase={pose.phase}
+          surface={pose.surface}
+          isSettled={authority.current === 'frozen' ? true : pose.isSettled}
+          castShadow={castShadow && spawned}
+          verifySku={verifySku}
+          onVisualReady={onVisualReady}
+        />
+      </group>
     </RigidBody>
   );
 });

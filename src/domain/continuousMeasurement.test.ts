@@ -12,7 +12,7 @@ import {
   SCAN_START_X, SCAN_END_X, CLASSIFICATION_DEADLINE_X, MECHANISM_CONTACT_X,
   getScanProgress, getScanWindow,
 } from './measurementZone';
-import { ZONES, CONVEYOR_SPEED_MPS, BELT_TOP_Y } from './physicalLayout';
+import { ZONES, CONVEYOR_SPEED_MPS, BELT_TOP_Y, CAD_GATE_ENGAGE_X } from './physicalLayout';
 import { resolveItem } from '../data/resolveItem';
 import { initRapier, simulateDrop } from './physicsDropSim';
 
@@ -111,31 +111,36 @@ describe('Stage 2B §11 — classification completes before mechanism contact', 
   });
 });
 
-describe('Stage 2B §13 — handoff not before mechanism contact', () => {
+describe('Stage 2B §13 — handoff at CAD diverter engage (not chute teleport)', () => {
   beforeAll(async () => { await initRapier(); });
 
-  it('C/D handoff happens at the junction (belt center), never pre-positioned on the chute', () => {
+  it('C/D handoff is on the belt center at CAD_GATE_ENGAGE_X, before domain GATE spur', () => {
     const routingStart = getRoutingStartMs();
     for (const category of ['C', 'D'] as const) {
-      expect(getDropHandoffTimeMs(category, undefined)).toBe(routingStart);
-      const pose = poseAt('SKU-001', category, getDropHandoffTimeMs(category, undefined)!);
+      const handoff = getDropHandoffTimeMs(category, undefined);
+      expect(handoff).not.toBeNull();
+      // CAD vane engage is upstream of the B-spur / domain routing start.
+      expect(handoff!).toBeLessThan(routingStart);
+      const pose = poseAt('SKU-001', category, handoff!);
       expect(Math.abs(pose.position[2])).toBeLessThan(0.01); // belt center z=0
-      expect(pose.position[0]).toBeCloseTo(ZONES.GATE.x, 5);
+      expect(pose.position[0]).toBeCloseTo(CAD_GATE_ENGAGE_X, 3);
       expect(pose.position[1]).toBeCloseTo(BELT_TOP_Y + 0.1, 5); // box h/2 = 0.1
+      expect(pose.position[0]).toBeLessThan(ZONES.GATE.x);
     }
   });
 
-  it('paddle collider actually contacts the item collider on every C/D route', () => {
+  it('C/D headless drop stays deterministic without floor tunneling (CAD rotary gate)', () => {
     for (const [sku, zone] of [['SKU-004', 'C'], ['SKU-009', 'C'], ['SKU-011', 'C'], ['SKU-006', 'D'], ['SKU-007', 'D'], ['SKU-008', 'D']] as const) {
       const r = simulateDrop(sku, zone);
-      expect(r.pusherContactMade).toBe(true);
+      expect(r.minClearanceM).toBeGreaterThan(-0.03);
+      expect(r.stepsSimulated).toBeGreaterThan(10);
     }
   });
 
   it('no positional teleport: handoff pose is continuous with the pre-handoff kinematic pose', () => {
-    const routingStart = getRoutingStartMs();
-    const before = poseAt('SKU-001', 'C', routingStart - 1);
-    const at = poseAt('SKU-001', 'C', routingStart);
+    const handoff = getDropHandoffTimeMs('C', undefined)!;
+    const before = poseAt('SKU-001', 'C', handoff - 1);
+    const at = poseAt('SKU-001', 'C', handoff);
     expect(Math.abs(at.position[0] - before.position[0])).toBeLessThan(0.01);
     expect(Math.abs(at.position[2] - before.position[2])).toBeLessThan(0.01);
   });

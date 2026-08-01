@@ -33,6 +33,56 @@ interface InnerProps {
   material: RealItemMaterial;
   castShadow?: boolean;
   receiveShadow?: boolean;
+  onReady?: () => void;
+}
+
+const readyUrls = new Set<string>();
+const inflight = new Map<string, Promise<void>>();
+
+export function isProductAssetReady(runtimePath: string | null | undefined): boolean {
+  if (!runtimePath) return true;
+  return readyUrls.has(runtimePath);
+}
+
+export function markProductAssetReady(runtimePath: string): void {
+  readyUrls.add(runtimePath);
+}
+
+/**
+ * Preload a runtime STL into the shared loader cache and resolve when ready.
+ * Deduped by URL — concurrent callers share one Promise.
+ */
+export function preloadRealItemModelAsync(runtimePath: string): Promise<void> {
+  if (readyUrls.has(runtimePath)) return Promise.resolve();
+  const existing = inflight.get(runtimePath);
+  if (existing) return existing;
+
+  // Warm R3F useLoader cache (deduped).
+  useLoader.preload(STLLoader, runtimePath);
+
+  const promise = new Promise<void>((resolve, reject) => {
+    const loader = new STLLoader();
+    loader.load(
+      runtimePath,
+      () => {
+        readyUrls.add(runtimePath);
+        inflight.delete(runtimePath);
+        resolve();
+      },
+      undefined,
+      (err) => {
+        inflight.delete(runtimePath);
+        reject(err);
+      },
+    );
+  });
+  inflight.set(runtimePath, promise);
+  return promise;
+}
+
+/** Preload a runtime asset into the shared loader cache (deduped by URL). */
+export function preloadRealItemModel(runtimePath: string): void {
+  void preloadRealItemModelAsync(runtimePath);
 }
 
 /**
@@ -56,10 +106,14 @@ export function normalizeGeometryClone(source: THREE.BufferGeometry, asset: Mode
   return g;
 }
 
-function RealItemModelInner({ asset, material, castShadow, receiveShadow }: InnerProps) {
+function RealItemModelInner({ asset, material, castShadow, receiveShadow, onReady }: InnerProps) {
   const shared = useLoader(STLLoader, asset.runtimePath!) as THREE.BufferGeometry;
   const geometry = useMemo(() => normalizeGeometryClone(shared, asset), [shared, asset]);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => {
+    if (asset.runtimePath) markProductAssetReady(asset.runtimePath);
+    onReady?.();
+  }, [asset.runtimePath, geometry, onReady]);
   return (
     <mesh geometry={geometry} castShadow={castShadow} receiveShadow={receiveShadow}>
       <meshStandardMaterial
@@ -103,25 +157,37 @@ class ItemModelErrorBoundary extends Component<BoundaryProps, BoundaryState> {
 }
 
 export interface RealItemModelProps extends InnerProps {
-  /** Procedural fallback node (load failure AND suspense placeholder). */
+  /**
+   * Procedural fallback for load failure only.
+   * Suspense placeholder stays invisible so spawn is atomic (no flash-then-swap).
+   */
   fallback: ReactNode;
   onError?: (error: Error) => void;
+  /** When true, Suspense shows fallback (legacy). Default: invisible placeholder. */
+  showSuspenseFallback?: boolean;
 }
 
-export default function RealItemModel({ fallback, ...inner }: RealItemModelProps) {
+export default function RealItemModel({
+  fallback,
+  showSuspenseFallback = false,
+  onReady,
+  onError,
+  ...inner
+}: RealItemModelProps) {
   if (!inner.asset.runtimePath) {
     return <>{fallback}</>;
   }
   return (
-    <ItemModelErrorBoundary fallback={fallback} onError={inner.onError}>
-      <Suspense fallback={fallback}>
-        <RealItemModelInner {...inner} />
+    <ItemModelErrorBoundary
+      fallback={fallback}
+      onError={(err) => {
+        onReady?.();
+        onError?.(err);
+      }}
+    >
+      <Suspense fallback={showSuspenseFallback ? fallback : null}>
+        <RealItemModelInner {...inner} onReady={onReady} />
       </Suspense>
     </ItemModelErrorBoundary>
   );
-}
-
-/** Preload a runtime asset into the shared loader cache (deduped by URL). */
-export function preloadRealItemModel(runtimePath: string): void {
-  useLoader.preload(STLLoader, runtimePath);
 }

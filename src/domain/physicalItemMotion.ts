@@ -16,7 +16,7 @@ import {
   type SurfaceName,
   type Vec3,
 } from './conveyorNetwork';
-import { ZONES, CONVEYOR_SPEED_MPS } from './physicalLayout';
+import { ZONES, CONVEYOR_SPEED_MPS, CAD_GATE_ENGAGE_X } from './physicalLayout';
 import { SCAN_START_X, SCAN_END_X } from './measurementZone';
 
 export type SurfaceType = SurfaceName;
@@ -115,7 +115,11 @@ export function getDropHandoffTimeMs(
     const exitStart = starts['exit'];
     return routingStart + 0.35 * (exitStart - routingStart);
   }
-  return routingStart;
+  // C/D: become dynamic at CAD vane engage X so open gates can deflect the item.
+  // (Domain GATE.x is further downstream for the B exit spur.)
+  const feedStart = starts['move_to_detection'];
+  const travelM = CAD_GATE_ENGAGE_X - ZONES.A.x;
+  return feedStart + (travelM / CONVEYOR_SPEED_MPS) * 1000;
 }
 
 /** Case-time (ms) at which the routing phase begins (drives the paddle timeline). */

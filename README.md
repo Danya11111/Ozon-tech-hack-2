@@ -22,9 +22,8 @@ UI — **Product Demo Landing Page**:
 
 A → подающий конвейер → накопитель → CV/laser/ultrasonic → stop-gate → actuator → B/C/D.
 
-- Стек: `three` + `@react-three/fiber` + `@react-three/drei`.
-- **Physics engine не используется** — motion по state machine / keyframe (предсказуемое демо).
-- Архитектура (`itemMotion.ts`) готова к подключению physics позже.
+- Стек: `three` + `@react-three/fiber` + `@react-three/drei` + `@react-three/rapier`.
+- **Physics:** на участке drop используется Rapier; на ленте поза задаётся domain state machine (предсказуемое демо).
 - Переключатель: **3D Digital Twin** / **2D fallback**.
 - На mobile (<640px) по умолчанию 2D; 3D можно включить вручную.
 - Если WebGL недоступен — автоматический 2D fallback.
@@ -51,9 +50,9 @@ A → подающий конвейер → накопитель → CV/laser/ul
    - **E** — журнал событий
    - **0.5×–2×** — скорость
 3. HUD показывает live `classifyItem` (DIM / K / reason) — не заскриптованный override.
-4. Engineering / step demo: `/details`
+4. Engineering / documentation: `/documentation`
 
-Проверка: `npm test` (153+), `npm run build`, `./scripts/demo-health.sh`.
+Проверка: `npm test` (200+), `npm run build`, `./scripts/demo-health.sh`.
 
 **3D Verification Checklist** (для защиты):
 1. Desktop Chrome/Edge → Play Demo
@@ -88,14 +87,14 @@ A → подающий конвейер → накопитель → CV/laser/ul
 **Тестовый набор товаров:**
 Цилиндр, Шлем, Бутылка, Мешок, Тарелка, Короб 400×400×300, ЛанчБокс, Короб 300×200×200, Пуфик, Ручка, Моющее средство.
 
-**Параметры классификации (согласно постановке):**
-- Min dimensions: **10×10×2 мм**
-- Max dimensions: 450×320×320 мм
-- Roundness threshold: K ≥ **0.7**
+**Параметры классификации (официальная постановка `doc-1783095831`, стр. 5–8):**
+- Min dimensions: **строго больше 10×10×10 мм**
+- Max dimensions: **строго меньше 450×320×320 мм**
+- Roundness: **K > 0.8** (K = 0.8 не считается круглым)
 - Conveyor speed: 1.00 м/с
 - C-priority: габариты проверяются первыми
 
-Подробный анализ: `docs/INPUT_INFO_ANALYSIS.md`
+> Исторический файл `docs/INPUT_INFO_ANALYSIS.md` содержит устаревшие значения 10×10×2 / K≥0.7 — помечен как SUPERSEDED.
 
 ## Как открыть демо
 
@@ -182,11 +181,11 @@ curl -I https://www.arhipovdan.ru/
 
 - `normal_flow` — обычный поток B/C/D.
 - `oversized_item` — max dimensions нарушены, маршрут C.
-- `round_object` — габариты проходят, roundness >= 0.7, маршрут D.
+- `round_object` — габариты проходят, roundness K > 0.8, маршрут D.
 - `c_priority` — негабарит + круглый → только C (приоритет габаритов).
-- `boundary_dimensions` — проверка min/max границ.
+- `boundary_dimensions` — проверка строгих min/max границ.
 - `close_items` — предупреждение spacing/queue, последовательная обработка.
-- `low_confidence` — низкий CV confidence, rule-based fallback.
+- `low_confidence` — низкая уверенность измерения, rule-based fallback.
 - `jam` — застревание у gate, FAULT, остановка конвейера.
 - `emergency_stop` — EMERGENCY_STOP, остановка всех движений.
 
@@ -194,18 +193,18 @@ curl -I https://www.arhipovdan.ru/
 
 Классификация реализована чистой функцией `classifyItem`.
 
-1. Проверяются габариты.
+1. Проверяются габариты (строгие границы «больше» / «меньше»).
 2. Если нарушены min/max размеры, категория C.
-3. Если габариты подходят, проверяется `roundness`.
-4. Если `roundness >= 0.8`, категория D.
+3. Если габариты подходят, проверяется `roundness` K = r_in / R_out.
+4. Если `K > 0.8`, категория D.
 5. Иначе категория B.
-6. Если товар одновременно негабаритный и круглый, приоритет у C, потому что dimensions check идет первым.
+6. Если товар одновременно негабаритный и круглый, приоритет у C.
 
-Границы MVP:
+Официальные границы (Track 3):
 
-- min: width >= 10 мм, depth >= 10 мм, height >= 2 мм;
-- max: width <= 450 мм, depth <= 320 мм, height <= 320 мм;
-- roundness threshold: 0.7 (K = r_in / r_out);
+- min: width > 10 мм, depth > 10 мм, height > 10 мм;
+- max: width < 450 мм, depth < 320 мм, height < 320 мм;
+- roundness: круг при K > 0.8 (K = 0.8 не круглый);
 - conveyor target speed: 1.00 м/с (close_items: 0.75 м/с).
 
 ## Исполнительная часть

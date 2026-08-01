@@ -16,9 +16,9 @@ Before final submission:
 - [ ] Routes B / C / D are visible in 3D.
 - [ ] C-priority works for oversized + round.
 - [ ] Jam / emergency stop show red fault state.
-- [ ] Physics engine is NOT required for the demo (state-machine motion).
+- [ ] Twin demo uses domain motion + Rapier drop segment (no claim of full physics plant).
 - [ ] Engineering Details includes 3D capability check (WebGL / FPS).
-- [ ] Min dimensions are 10×10×2 mm; roundness threshold is 0.7; conveyor target is 1.00 m/s.
+- [ ] Official rules: dims > 10×10×10 and < 450×320×320; roundness K > 0.8; conveyor 1.00 m/s.
 - [ ] Storyline Stepper updates with machine state.
 - [ ] Scenario cards open cases with **Показать**.
 - [ ] Criteria cards show OZON coverage and linked scenarios.

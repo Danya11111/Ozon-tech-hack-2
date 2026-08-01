@@ -20,12 +20,19 @@ import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, sh
 import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud } from '../../domain/measurementSystem';
 import { ITEMS } from '../../data/items';
 import type { Category } from '../../domain/types';
+import { isCircularCrossSection } from '../../domain/classifier';
 import { PhysicalPlaybackItem } from './PhysicalPlaybackItem';
 import { PhysicalPlaybackItemPhysics } from './PhysicalPlaybackItemPhysics';
-import { PusherMechanism } from './PusherMechanism';
 import { RealSenseD435i, RealSenseFrustumDebug, D435I } from './RealSenseD435i';
-import { ConveyorCadModel, CONVEYOR_CAD_SPAN_X, preloadConveyorCad } from './ConveyorCadModel';
+import {
+  ConveyorCadModule,
+  CAD_MODULE_ORIGINS,
+  CAD_SORTER_WORLD_PIVOTS,
+  preloadConveyorCad,
+} from './ConveyorCadModel';
 import { SorterPhysicsWorld } from './SorterPhysics';
+import { RigidBody, CuboidCollider, type RapierRigidBody } from '@react-three/rapier';
+import { GATE_VANE } from '../../domain/pusherMotion';
 import { deriveSorterVisualState } from '../../domain/sorterVisualState';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
 import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
@@ -40,33 +47,20 @@ import {
 } from '../../domain/cinematicCamera';
 import {
   BELT_TOP_Y,
-  BELT_THICKNESS_M,
   CONVEYOR_WIDTH_M,
-  FRAME_HEIGHT_M,
-  SIDE_GUARD_HEIGHT_M,
-  LEG_WIDTH_M,
-  DRIVE_ROLLER_RADIUS_M,
   ZONES,
   CAMERA_RIG,
   LASER_HEIGHT_M,
-  STEREO_CAMERA,
   ROLL_CAGE,
   getRenderedItemDimensions,
   B_RECEIVER,
-  CAGE_FLOOR_Y,
-  CONVEYOR_SPEED_MPS,
 } from '../../domain/physicalLayout';
-import {
-  CAD_ROLLER_PITCH_M,
-  CAD_ROLLER_RADIUS_M,
-  CAD_SUPPORT_SPACING_M,
-} from '../../domain/cadAssemblyParams';
 import { CHUTE_PITCH, CHUTE_LENGTH, CHUTE_MID_Y, CHUTE_MID_Z, CHUTE_X, CHUTE_HALF_W } from '../../domain/physicsWorldLayout';
 import PerfCollector from './PerfCollector';
 import PerfOverlay from './PerfOverlay';
 import RollCageMesh from './RollCageMesh';
-import { getPreloadAssets } from '../../data/modelAssets';
-import { preloadRealItemModel } from './RealItemModel';
+import { getModelAsset } from '../../data/modelAssets';
+import { preloadRealItemModelAsync } from './RealItemModel';
 import type { Stage0Config } from '../../domain/stage0';
 import { shotToPhaseCategory, describeAdaptiveSwitch } from '../../domain/stage0';
 import type { Stage1Config } from '../../domain/stage1';
@@ -130,19 +124,11 @@ function getItemMaterial(itemId: string) {
   return ITEM_MATERIALS[itemId] ?? { color: '#d8c3a5', roughness: 0.75 };
 }
 
-// Physical layout constants
-const BELT_Y = BELT_TOP_Y;                    // 0.7m - top of belt where items ride
-const BELT_UNDERSIDE_Y = BELT_TOP_Y - BELT_THICKNESS_M; // 0.685m
-const ROLLER_Y = BELT_UNDERSIDE_Y - CAD_ROLLER_RADIUS_M;
-const FRAME_TOP_Y = ROLLER_Y - CAD_ROLLER_RADIUS_M - 0.02;
-const CONVEYOR_START_X = -4.2;
-const CONVEYOR_END_X = B_RECEIVER.transferEndX + 0.15; // main belt ends at short B spur tip
+const BELT_Y = BELT_TOP_Y;
 /** Max items rendered simultaneously (perf cap). */
 const MAX_VISIBLE_ITEMS = 6;
 /** Heavy animated overlays off by default for smooth demo. */
 const ENABLE_DEMO_EFFECTS = false;
-const CONVEYOR_LENGTH = CONVEYOR_END_X - CONVEYOR_START_X;
-void CONVEYOR_LENGTH;
 
 /** Cinematic camera controller - smoothly transitions between camera angles */
 /**
@@ -267,47 +253,6 @@ function MotionTrail({
   );
 }
 
-/** Static roller — CAD pitch/radius for modular extensions (no non-uniform scale of CAD module). */
-function StaticRoller({ position }: { position: [number, number, number] }) {
-  return (
-    <mesh position={position} rotation={[0, 0, Math.PI / 2]}>
-      <cylinderGeometry args={[CAD_ROLLER_RADIUS_M, CAD_ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 16]} />
-      <meshStandardMaterial
-        color={COLORS.rollers}
-        metalness={0.85}
-        roughness={0.32}
-        transparent={false}
-        opacity={1}
-        depthWrite
-      />
-    </mesh>
-  );
-}
-
-/**
- * Moving stripe on conveyor belt.
- * Position is DETERMINISTIC from playback time (offset = time * 1 m/s), so the
- * belt animation shares the exact tempo/direction of the item, is FPS-independent,
- * freezes on pause and resets on stop.
- */
-function BeltStripe({ baseOffset, elapsedMs }: { baseOffset: number; elapsedMs: number }) {
-  const beltLen = CONVEYOR_END_X - CONVEYOR_START_X;
-  const shift = ((elapsedMs / 1000) * CONVEYOR_SPEED_MPS) % beltLen;
-  let x = baseOffset + shift;
-  if (x > CONVEYOR_END_X) x -= beltLen;
-
-  return (
-    <mesh position={[x, BELT_Y + 0.001, 0]}>
-      <boxGeometry args={[0.08, 0.002, CONVEYOR_WIDTH_M - 0.06]} />
-      <meshStandardMaterial 
-        color={COLORS.beltStripe} 
-        transparent 
-        opacity={0.25}
-        roughness={0.9}
-      />
-    </mesh>
-  );
-}
 
 /** StepperMotor removed in Stage 2C — CAD motor-and-drive/NEMA17 is the sole drive unit. */
 
@@ -315,24 +260,30 @@ function BeltStripe({ baseOffset, elapsedMs }: { baseOffset: number; elapsedMs: 
 function LaserBeam({ active, itemY }: { active: boolean; itemY: number }) {
   if (!active) return null;
 
-  const beamLength = LASER_HEIGHT_M - itemY;
+  const mount = typeof window !== 'undefined'
+    ? (window as unknown as { __CAMERA_PORTAL_MOUNT?: { x: number; y: number; z: number } })
+      .__CAMERA_PORTAL_MOUNT
+    : null;
+  const originX = mount?.x ?? ZONES.CAMERA.x;
+  const originY = mount ? mount.y - D435I.height : LASER_HEIGHT_M;
+  const beamLength = Math.max(0.05, originY - itemY);
   const beamCenterY = itemY + beamLength / 2;
 
   return (
-    <group position={[ZONES.CAMERA.x, 0, 0]}>
+    <group position={[originX, 0, 0]}>
       <mesh position={[0, beamCenterY, 0]}>
-        <cylinderGeometry args={[0.003, 0.003, beamLength, 8]} />
+        <cylinderGeometry args={[0.0025, 0.0025, beamLength, 8]} />
         <meshStandardMaterial
           color="#22d3ee"
           emissive="#22d3ee"
-          emissiveIntensity={0.6}
+          emissiveIntensity={0.55}
           transparent
-          opacity={0.7}
+          opacity={0.55}
         />
       </mesh>
-      {/* Laser dot on item */}
+      {/* Scan spot on item */}
       <mesh position={[0, itemY + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.015, 16]} />
+        <circleGeometry args={[0.012, 16]} />
         <meshStandardMaterial 
           color="#22d3ee"
           emissive="#22d3ee"
@@ -396,138 +347,130 @@ function PointCloud({ active, itemPosition, scale, isRound }: {
   );
 }
 
-/** Support leg from floor to frame */
-function SupportLeg({ x }: { x: number }) {
-  const legHeight = FRAME_TOP_Y;
-  return (
-    <group position={[x, 0, 0]}>
-      {/* Main vertical leg - front */}
-      <mesh position={[0, legHeight / 2, CONVEYOR_WIDTH_M / 2 + 0.03]}>
-        <boxGeometry args={[LEG_WIDTH_M, legHeight, LEG_WIDTH_M]} />
-        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
-      </mesh>
-      {/* Main vertical leg - back */}
-      <mesh position={[0, legHeight / 2, -CONVEYOR_WIDTH_M / 2 - 0.03]}>
-        <boxGeometry args={[LEG_WIDTH_M, legHeight, LEG_WIDTH_M]} />
-        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
-      </mesh>
-      {/* Cross brace */}
-      <mesh position={[0, legHeight * 0.3, 0]}>
-        <boxGeometry args={[LEG_WIDTH_M * 0.8, LEG_WIDTH_M * 0.8, CONVEYOR_WIDTH_M + 0.1]} />
-        <meshStandardMaterial color={COLORS.supports} metalness={0.3} roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
-
-/** 
- * Conveyor belt - realistic roller conveyor
- * Belt top surface at 0.7m (BELT_TOP_Y)
- */
 /**
- * Belt extension segment (SPEC_DERIVED modular) — entry/exit flanking the CAD
- * module. Uses CAD roller pitch (500 mm) and radius (25 mm); never scales the GLB.
+ * CAD-style 20×20 aluminum-extrusion legs under the three modules.
+ * Stations at module joints / ends — skip mid-sorter so gates stay readable.
  */
-function BeltSection({ startX, endX, simplified, shadows }: { startX: number; endX: number; simplified: boolean; shadows: boolean }) {
-  const spacing = simplified ? CAD_ROLLER_PITCH_M * 2 : CAD_ROLLER_PITCH_M;
-  const length = endX - startX;
-  const centerX = (startX + endX) / 2;
-  const rollerCount = Math.max(1, Math.floor(length / spacing));
-  const rollerY = BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01;
-
-  const rollerPositions = useMemo(() => {
-    const positions: [number, number, number][] = [];
-    for (let i = 0; i < rollerCount; i++) {
-      positions.push([startX + spacing / 2 + i * spacing, rollerY, 0]);
-    }
-    return positions;
-  }, [rollerCount, spacing, startX, rollerY]);
-
-  const legPositions = useMemo(() => {
-    const positions: number[] = [];
-    for (let x = startX + 0.5; x < endX - 0.3; x += CAD_SUPPORT_SPACING_M) {
-      positions.push(x);
-    }
-    return positions;
-  }, [startX, endX]);
+function CadStyleSupportLegs({ shadows = false }: { shadows?: boolean }) {
+  const frameUndersideY = 0.50;
+  const footY = 0.015;
+  const legH = frameUndersideY - footY;
+  const tube = 0.022;
+  const zSide = 0.255;
+  /** World X stations: module starts/joints + sorter exit (not mid-gate). */
+  const stations = [-4.02, -3.015, -2.01, -1.005, 0.0, 2.01];
+  const color = '#7d8b99';
 
   return (
-    <group>
-      <mesh position={[centerX, BELT_Y - BELT_THICKNESS_M / 2, 0]} receiveShadow={shadows}>
-        <boxGeometry args={[length, BELT_THICKNESS_M, CONVEYOR_WIDTH_M]} />
-        <meshStandardMaterial color={COLORS.belt} roughness={0.85} metalness={0.05} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      <mesh position={[centerX, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, CONVEYOR_WIDTH_M / 2 + 0.02]}>
-        <boxGeometry args={[length, SIDE_GUARD_HEIGHT_M, 0.025]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.55} roughness={0.45} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      <mesh position={[centerX, BELT_Y + SIDE_GUARD_HEIGHT_M / 2, -CONVEYOR_WIDTH_M / 2 - 0.02]}>
-        <boxGeometry args={[length, SIDE_GUARD_HEIGHT_M, 0.025]} />
-        <meshStandardMaterial color={COLORS.sideGuards} metalness={0.55} roughness={0.45} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      <mesh position={[centerX, FRAME_TOP_Y + 0.025, CONVEYOR_WIDTH_M / 2 + 0.01]} castShadow={shadows}>
-        <boxGeometry args={[length, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.55} roughness={0.4} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      <mesh position={[centerX, FRAME_TOP_Y + 0.025, -CONVEYOR_WIDTH_M / 2 - 0.01]} castShadow={shadows}>
-        <boxGeometry args={[length, 0.05, 0.04]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.55} roughness={0.4} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      {rollerPositions.map((pos, i) => (
-        <StaticRoller key={i} position={pos} />
-      ))}
-      {legPositions.map((x, i) => (
-        <SupportLeg key={i} x={x} />
+    <group name="cad-style-supports">
+      {stations.map((x) =>
+        ([-1, 1] as const).map((side) => {
+          const z = side * zSide;
+          return (
+            <group key={`${x}:${side}`} position={[x, 0, z]}>
+              <mesh position={[0, footY + legH / 2, 0]} castShadow={shadows}>
+                <boxGeometry args={[tube, legH, tube]} />
+                <meshStandardMaterial color={color} metalness={0.55} roughness={0.45} />
+              </mesh>
+              <mesh position={[0, footY, 0]}>
+                <boxGeometry args={[0.06, 0.012, 0.06]} />
+                <meshStandardMaterial color="#5c6772" metalness={0.4} roughness={0.55} />
+              </mesh>
+              <mesh position={[0, frameUndersideY - 0.01, 0]}>
+                <boxGeometry args={[0.045, 0.02, 0.045]} />
+                <meshStandardMaterial color={color} metalness={0.55} roughness={0.45} />
+              </mesh>
+            </group>
+          );
+        }),
+      )}
+      {/* Light cross-braces at mid clean / camera only */}
+      {[-3.015, -1.005].map((x) => (
+        <mesh key={`brace-${x}`} position={[x, 0.18, 0]}>
+          <boxGeometry args={[tube * 0.85, tube * 0.85, zSide * 2]} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.5} />
+        </mesh>
       ))}
     </group>
   );
 }
 
 /**
- * SorterCadAssembly (inline): sole conveyor geometry source —
- * REAL_CAD module + modular SPEC_DERIVED entry/exit at CAD pitch.
- * No procedural motor (CAD NEMA17 only).
+ * Product line: three sequential CAD modules only.
+ *  1 clean conveyor · 2 conveyor+camera · 3 conveyor+sorter
+ * No procedural belt extensions, end cylinders, or side-guard clutter.
  */
-function ConveyorBelt({ pulseActive: _pulseActive, elapsedMs, simplified, shadows = false, gateOpen = false, beltVelocityMps = 0, rollerOmega = 0 }: { pulseActive: boolean; elapsedMs: number; simplified: boolean; shadows?: boolean; gateOpen?: boolean; beltVelocityMps?: number; rollerOmega?: number }) {
-  const stripeOffsets = simplified ? [-2, 0, 2] : [-3, -1, 0.5, 2];
-  const [cadStart, cadEnd] = CONVEYOR_CAD_SPAN_X;
+function ConveyorBelt({
+  pulseActive: _pulseActive,
+  elapsedMs: _elapsedMs,
+  simplified: _simplified,
+  shadows = false,
+  gateOpen: _gateOpen = false,
+  beltVelocityMps = 0,
+  rollerOmega = 0,
+  sorterCategory = null,
+  caseElapsedMs = 0,
+  productId = null,
+  itemWorldX = null,
+  itemHalfLengthS = 0.15,
+  playbackPaused = false,
+  playbackResetEpoch = 0,
+}: {
+  pulseActive: boolean;
+  elapsedMs: number;
+  simplified: boolean;
+  shadows?: boolean;
+  gateOpen?: boolean;
+  beltVelocityMps?: number;
+  rollerOmega?: number;
+  sorterCategory?: Category | null;
+  caseElapsedMs?: number;
+  productId?: string | null;
+  itemWorldX?: number | null;
+  itemHalfLengthS?: number;
+  playbackPaused?: boolean;
+  playbackResetEpoch?: number;
+}) {
+  void _pulseActive;
+  void _elapsedMs;
+  void _simplified;
+  void _gateOpen;
 
   return (
-    <group name="SorterCadAssembly" userData={{ role: 'single-cad-conveyor' }}>
+    <group name="SorterCadAssembly" userData={{ role: 'three-cad-modules' }}>
       <Suspense fallback={null}>
-        <ConveyorCadModel
-          gateOpen={gateOpen}
-          beltVelocityMps={beltVelocityMps}
-          rollerOmegaRadPerSec={rollerOmega}
+        <ConveyorCadModule
+          variant="clean"
+          originX={CAD_MODULE_ORIGINS.clean}
           shadows={shadows}
+          rollerOmegaRadPerSec={rollerOmega}
+          beltVelocityMps={beltVelocityMps}
+          playbackPaused={playbackPaused}
+        />
+        <ConveyorCadModule
+          variant="camera"
+          originX={CAD_MODULE_ORIGINS.camera}
+          shadows={shadows}
+          rollerOmegaRadPerSec={rollerOmega}
+          beltVelocityMps={beltVelocityMps}
+          playbackPaused={playbackPaused}
+        />
+        <ConveyorCadModule
+          variant="sorter"
+          originX={CAD_MODULE_ORIGINS.sorter}
+          shadows={shadows}
+          rollerOmegaRadPerSec={rollerOmega}
+          beltVelocityMps={beltVelocityMps}
+          sorterCategory={sorterCategory}
+          caseElapsedMs={caseElapsedMs}
+          productId={productId}
+          itemWorldX={itemWorldX}
+          itemHalfLengthS={itemHalfLengthS}
+          playbackPaused={playbackPaused}
+          playbackResetEpoch={playbackResetEpoch}
         />
       </Suspense>
-
-      <BeltSection startX={CONVEYOR_START_X} endX={cadStart} simplified={simplified} shadows={shadows} />
-      <BeltSection startX={cadEnd} endX={CONVEYOR_END_X} simplified={simplified} shadows={shadows} />
-
-      {stripeOffsets.map((offset, i) => (
-        <BeltStripe key={i} baseOffset={offset} elapsedMs={elapsedMs} />
-      ))}
-
-      <mesh position={[CONVEYOR_END_X - 0.1, BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M, DRIVE_ROLLER_RADIUS_M, CONVEYOR_WIDTH_M - 0.02, 16]} />
-        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} transparent={false} opacity={1} depthWrite />
-      </mesh>
-
-      <mesh position={[CONVEYOR_START_X + 0.1, BELT_Y - BELT_THICKNESS_M - CAD_ROLLER_RADIUS_M - 0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[DRIVE_ROLLER_RADIUS_M * 0.9, DRIVE_ROLLER_RADIUS_M * 0.9, CONVEYOR_WIDTH_M - 0.02, 16]} />
-        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} transparent={false} opacity={1} depthWrite />
-      </mesh>
-
-      <mesh position={[CONVEYOR_START_X, BELT_Y - 0.05, 0]}>
-        <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} transparent={false} opacity={1} depthWrite />
-      </mesh>
-      <mesh position={[CONVEYOR_END_X, BELT_Y - 0.05, 0]}>
-        <boxGeometry args={[0.05, 0.12, CONVEYOR_WIDTH_M + 0.1]} />
-        <meshStandardMaterial color={COLORS.conveyorFrame} transparent={false} opacity={1} depthWrite />
-      </mesh>
+      <CadStyleSupportLegs shadows={shadows} />
     </group>
   );
 }
@@ -568,92 +511,38 @@ function ZoneMarker({ position, label, color, active }: {
  * B receiving bin — отдельный промышленный контейнер на полу (не продолжение ленты).
  * Короткий transfer spur + drop chute в открытый bin 1.2×0.8 m.
  */
+/** Compact B bin — close to sorter module, no green spur/chute clutter. */
 function BReceiverBin({ active }: { active: boolean }) {
-  const { centerX, centerZ, width, depth, wallHeight, floorY, transferEndX, transferStartX } = B_RECEIVER;
-  const emissive = active ? 0.3 : 0.04;
+  const { centerX, centerZ, width, depth, wallHeight, floorY } = B_RECEIVER;
+  const emissive = active ? 0.22 : 0.03;
   const hx = width / 2;
   const hz = depth / 2;
   const wall = 0.03;
-  const entryX = centerX - hx + 0.1;
-  const spurLen = transferEndX - transferStartX;
+  const entryX = centerX - hx + 0.08;
+  const metal = '#4a5560';
 
   return (
     <group>
-      {/* Short B-only transfer spur (not a full belt extension) */}
-      <mesh position={[(transferStartX + transferEndX) / 2, BELT_Y - 0.02, 0]}>
-        <boxGeometry args={[spurLen, 0.04, CONVEYOR_WIDTH_M - 0.06]} />
-        <meshStandardMaterial color="#64748b" roughness={0.85} metalness={0.15} />
-      </mesh>
-      {/* Spur side rails */}
-      {[-1, 1].map((s) => (
-        <mesh key={`spur${s}`} position={[(transferStartX + transferEndX) / 2, BELT_Y + 0.04, s * (CONVEYOR_WIDTH_M / 2 - 0.02)]}>
-          <boxGeometry args={[spurLen, 0.06, 0.02]} />
-          <meshStandardMaterial color={COLORS.routeB} transparent opacity={0.55} />
-        </mesh>
-      ))}
-
-      {/* Drop chute into bin — descends toward +X (sign matches collider) */}
-      <mesh
-        position={[(transferEndX + entryX) / 2, (BELT_Y + floorY) / 2 + 0.02, centerZ]}
-        rotation={[0, 0, -Math.atan2(BELT_Y - floorY, entryX - transferEndX)]}
-      >
-        <boxGeometry args={[Math.hypot(entryX - transferEndX, BELT_Y - floorY), 0.015, CONVEYOR_WIDTH_M - 0.08]} />
-        <meshStandardMaterial color="#4ade80" transparent opacity={0.5} emissive={COLORS.routeB} emissiveIntensity={emissive} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* Floor pad under bin */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[centerX, 0.001, centerZ]}>
-        <planeGeometry args={[width + 0.25, depth + 0.25]} />
-        <meshStandardMaterial color={COLORS.routeB} transparent opacity={active ? 0.18 : 0.06} />
-      </mesh>
-
-      {/* Bin interior floor */}
       <mesh position={[centerX, floorY - 0.01, centerZ]}>
-        <boxGeometry args={[width - 0.06, 0.025, depth - 0.06]} />
-        <meshStandardMaterial color="#334155" roughness={0.8} metalness={0.2} />
+        <boxGeometry args={[width - 0.05, 0.025, depth - 0.05]} />
+        <meshStandardMaterial color="#2c333c" roughness={0.85} metalness={0.15} />
       </mesh>
-
-      {/* Bin walls — 3 sides + low front lip */}
       {[-1, 1].map((s) => (
         <mesh key={`w${s}`} position={[centerX, floorY + wallHeight / 2, centerZ + s * hz]}>
           <boxGeometry args={[width, wallHeight, wall]} />
-          <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+          <meshStandardMaterial color={metal} roughness={0.65} metalness={0.35} emissive={COLORS.routeB} emissiveIntensity={emissive} />
         </mesh>
       ))}
       <mesh position={[centerX + hx, floorY + wallHeight / 2, centerZ]}>
         <boxGeometry args={[wall, wallHeight, depth]} />
-        <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} emissive={COLORS.routeB} emissiveIntensity={emissive} />
+        <meshStandardMaterial color={metal} roughness={0.65} metalness={0.35} emissive={COLORS.routeB} emissiveIntensity={emissive} />
       </mesh>
-      <mesh position={[entryX, floorY + wallHeight / 4, centerZ]}>
-        <boxGeometry args={[wall, wallHeight / 3, depth - 0.1]} />
-        <meshStandardMaterial color="#3f6f52" roughness={0.7} metalness={0.25} transparent opacity={0.85} />
+      <mesh position={[entryX, floorY + wallHeight / 5, centerZ]}>
+        <boxGeometry args={[wall, wallHeight / 2.5, depth - 0.08]} />
+        <meshStandardMaterial color={metal} roughness={0.65} metalness={0.35} />
       </mesh>
-
-      {/* Corner posts */}
-      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-        <mesh key={`post${i}`} position={[centerX + sx * (hx - 0.04), floorY + wallHeight / 2, centerZ + sz * (hz - 0.04)]}>
-          <boxGeometry args={[0.04, wallHeight, 0.04]} />
-          <meshStandardMaterial color="#3f6f52" metalness={0.4} roughness={0.5} />
-        </mesh>
-      ))}
-
-      {/* Legs to floor */}
-      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-        <mesh key={`leg${i}`} position={[centerX + sx * (hx - 0.08), floorY / 2, centerZ + sz * (hz - 0.08)]}>
-          <boxGeometry args={[0.05, floorY, 0.05]} />
-          <meshStandardMaterial color={COLORS.conveyorFrame} metalness={0.5} roughness={0.4} />
-        </mesh>
-      ))}
-
-      <Html position={[centerX, floorY + wallHeight + 0.25, centerZ]} center>
-        <div style={{
-          color: active ? COLORS.routeB : '#64748b',
-          fontSize: '22px',
-          fontWeight: 800,
-          userSelect: 'none',
-        }}>
-          B
-        </div>
+      <Html position={[centerX, floorY + wallHeight + 0.18, centerZ]} center>
+        <div style={{ color: active ? COLORS.routeB : '#64748b', fontSize: '20px', fontWeight: 800, userSelect: 'none' }}>B</div>
       </Html>
     </group>
   );
@@ -700,6 +589,7 @@ function RollCage({ position, label, color, active, shadows = false }: {
  *  Visual geometry matches the physics collider and the domain kinematic
  *  chute line: steep gravity chute (~0.394 rad) from belt edge (y 0.66)
  *  down to the open cage front (y 0.14) — see domain/physicsWorldLayout. */
+/** Minimal muted transfer into close-in cages (no neon green blocks). */
 function RouteChute({ gateX, targetZ, color, active }: {
   gateX: number;
   targetZ: number;
@@ -714,109 +604,78 @@ function RouteChute({ gateX, targetZ, color, active }: {
 
   return (
     <group>
-      {/* Chute surface — steep gravity chute toward the cage open front */}
-      <mesh
-        position={[CHUTE_X, CHUTE_MID_Y - 0.01, midZ]}
-        rotation={rot}
-      >
-        <boxGeometry args={[chuteWidth, 0.02, CHUTE_LENGTH]} />
+      <mesh position={[CHUTE_X, CHUTE_MID_Y - 0.01, midZ]} rotation={rot}>
+        <boxGeometry args={[chuteWidth, 0.018, CHUTE_LENGTH]} />
         <meshStandardMaterial
-          color={color}
-          transparent
-          opacity={active ? 0.7 : 0.3}
+          color="#6b7280"
+          metalness={0.45}
+          roughness={0.5}
           emissive={color}
-          emissiveIntensity={active ? 0.2 : 0}
+          emissiveIntensity={active ? 0.12 : 0}
         />
-      </mesh>
-      {/* Side rails — follow the chute pitch */}
-      <mesh position={[CHUTE_X - CHUTE_HALF_W - 0.01, CHUTE_MID_Y + 0.035, midZ]} rotation={rot}>
-        <boxGeometry args={[0.02, 0.07, CHUTE_LENGTH]} />
-        <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
-      </mesh>
-      <mesh position={[CHUTE_X + CHUTE_HALF_W + 0.01, CHUTE_MID_Y + 0.035, midZ]} rotation={rot}>
-        <boxGeometry args={[0.02, 0.07, CHUTE_LENGTH]} />
-        <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
       </mesh>
     </group>
   );
 }
 
-/** Camera rig with overhead structure - positioned above belt at 0.7m */
+/**
+ * Single RealSense body mounted under the CAD portal cross-beam.
+ * Procedural floating laser housing removed (was a second "camera" body).
+ */
 function CameraRig({ active }: { active: boolean }) {
-  const cameraX = ZONES.CAMERA.x;
-  const poleSpacing = CAMERA_RIG.poleSpacing;
-  const rigHeight = CAMERA_RIG.height;
-  const cameraY = CAMERA_RIG.cameraY;
-  const poleHeight = rigHeight;
-  
+  const groupRef = useRef<Group>(null);
+  useEffect(() => {
+    const apply = () => {
+      const mount = (window as unknown as {
+        __CAMERA_PORTAL_MOUNT?: { x: number; y: number; z: number };
+      }).__CAMERA_PORTAL_MOUNT;
+      const g = groupRef.current;
+      if (!g) return;
+      if (mount) {
+        // Bind under portal beam — sensor hangs from CAD mount (AUTHOR portal).
+        g.position.set(mount.x, mount.y - D435I.height / 2, mount.z);
+      } else {
+        // Fallback until CAD camera module publishes mount.
+        g.position.set(ZONES.CAMERA.x, CAMERA_RIG.cameraY, 0);
+      }
+    };
+    apply();
+    const id = window.setInterval(apply, 200);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const runtime = {
+      NODE: 'RealSenseD435i',
+      PARENT: 'CameraRig → CAD portal mount',
+      SOURCE: 'RealSenseD435i.tsx',
+      AUTHOR_CAD_OR_RUNTIME: 'RUNTIME',
+      VISIBLE: true,
+      WORLD_POSITION: 'bound to __CAMERA_PORTAL_MOUNT',
+      FUNCTION: 'depth camera sensor body',
+      KEEP_OR_HIDE: 'KEEP',
+    };
+    const hidden = {
+      NODE: 'procedural-laser-housing',
+      PARENT: 'CameraRig',
+      SOURCE: 'SorterDigitalTwinContinuous (removed)',
+      AUTHOR_CAD_OR_RUNTIME: 'RUNTIME',
+      VISIBLE: false,
+      WORLD_POSITION: [ZONES.CAMERA.x + 0.12, LASER_HEIGHT_M, 0],
+      FUNCTION: 'legacy floating secondary camera body',
+      KEEP_OR_HIDE: 'HIDE',
+    };
+  }, []);
+
   return (
-    <group position={[cameraX, 0, 0]}>
-      {/* Support poles from floor */}
-      <mesh position={[0, poleHeight / 2, poleSpacing]}>
-        <cylinderGeometry args={[0.03, 0.03, poleHeight, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, poleHeight / 2, -poleSpacing]}>
-        <cylinderGeometry args={[0.03, 0.03, poleHeight, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
-      {/* Cross beam */}
-      <mesh position={[0, rigHeight, 0]}>
-        <boxGeometry args={[0.05, 0.05, poleSpacing * 2 + 0.1]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
-      </mesh>
-      {/* Mount arm from cross beam down to the camera bracket */}
-      <mesh position={[0, (rigHeight + cameraY) / 2, 0]}>
-        <boxGeometry args={[0.04, rigHeight - cameraY + 0.04, 0.04]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.5} roughness={0.4} />
-      </mesh>
-      {/* Camera bracket plate (attaches to the tripod boss) */}
-      <mesh position={[0, cameraY + 0.022, 0]}>
-        <boxGeometry args={[0.05, 0.006, 0.12]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.6} roughness={0.35} />
-      </mesh>
-      {/* Intel RealSense D435i (SPEC_DERIVED, official datasheet dimensions) */}
-      <group position={[0, cameraY, 0]}>
-        <RealSenseD435i />
-        {/* Status LED while measuring */}
-        <mesh position={[D435I.depth / 2 + 0.002, 0.004, 0]}>
-          <boxGeometry args={[0.002, 0.004, 0.006]} />
-          <meshStandardMaterial
-            color={active ? '#22c55e' : '#14532d'}
-            emissive={active ? '#22c55e' : '#000'}
-            emissiveIntensity={active ? 1.2 : 0}
-          />
-        </mesh>
-      </group>
-      {/* Line-laser triangulation module at 1.15 m (separate from camera
-          optical center 1.35 m — project doc height) */}
-      <mesh position={[0.12, 1.15, 0]} rotation={[0, 0, -0.35]}>
-        <boxGeometry args={[0.05, 0.04, 0.09]} />
-        <meshStandardMaterial color="#2b3138" metalness={0.7} roughness={0.4} />
-      </mesh>
-      <mesh position={[0.135, 1.128, 0]} rotation={[0, 0, -0.35]}>
-        <boxGeometry args={[0.012, 0.008, 0.05]} />
+    <group ref={groupRef} name="camera-sensor-assembly">
+      <RealSenseD435i />
+      <mesh position={[D435I.depth / 2 + 0.002, 0.004, 0]}>
+        <boxGeometry args={[0.002, 0.004, 0.006]} />
         <meshStandardMaterial
-          color={active ? '#ef4444' : '#7f1d1d'}
-          emissive={active ? '#ef4444' : '#000'}
-          emissiveIntensity={active ? 0.9 : 0}
-        />
-      </mesh>
-      {/* Laser emitters on support poles */}
-      <mesh position={[0, BELT_Y + 0.15, poleSpacing - 0.05]}>
-        <boxGeometry args={[0.06, 0.06, 0.06]} />
-        <meshStandardMaterial 
-          color={active ? '#22d3ee' : '#475569'}
-          emissive={active ? '#22d3ee' : '#000'}
-          emissiveIntensity={active ? 0.4 : 0}
-        />
-      </mesh>
-      <mesh position={[0, BELT_Y + 0.15, -poleSpacing + 0.05]}>
-        <boxGeometry args={[0.06, 0.06, 0.06]} />
-        <meshStandardMaterial 
-          color={active ? '#22d3ee' : '#475569'}
-          emissive={active ? '#22d3ee' : '#000'}
-          emissiveIntensity={active ? 0.4 : 0}
+          color={active ? '#22c55e' : '#14532d'}
+          emissive={active ? '#22c55e' : '#000'}
+          emissiveIntensity={active ? 1.2 : 0}
         />
       </mesh>
     </group>
@@ -997,83 +856,84 @@ function ShapeOutline({ position, scale, visible, isRound, category }: {
   );
 }
 
-/** Gate/accumulator zone - positioned at belt height */
-function GateZone({ category, shadows = false }: { category: Category | null; shadows?: boolean }) {
+/**
+ * Kinematic colliders locked to CAD swing diverters (Барьер001/002).
+ * Downstream hinge fixed; free end along −X at 0°, arcs with the same yaw.
+ */
+function CadGateColliders({
+  category,
+  caseElapsedMs,
+}: {
+  category: Category | null;
+  caseElapsedMs: number;
+}) {
+  const leftRef = useRef<RapierRigidBody>(null);
+  const rightRef = useRef<RapierRigidBody>(null);
+  const [hx, hy, hz] = GATE_VANE.halfExtents;
+  void category;
+  void caseElapsedMs;
+
+  useFrame(() => {
+    // Sync existing CAD gate colliders to visual diverter angles (no new physics).
+    const motions = typeof window !== 'undefined'
+      ? (window as unknown as {
+          __DIVERTER_MOTIONS?: { leftRad: number; rightRad: number };
+        }).__DIVERTER_MOTIONS
+      : undefined;
+    const leftYaw = motions?.leftRad ?? 0;
+    const rightYaw = motions?.rightRad ?? 0;
+    const apply = (
+      body: RapierRigidBody | null,
+      pivot: { x: number; y: number; z: number },
+      yaw: number,
+    ) => {
+      if (!body) return;
+      const x = pivot.x - Math.cos(yaw) * hx;
+      const z = pivot.z + Math.sin(yaw) * hx;
+      body.setNextKinematicTranslation({ x, y: GATE_VANE.centerY, z });
+      const half = yaw / 2;
+      body.setNextKinematicRotation({
+        x: 0, y: Math.sin(half), z: 0, w: Math.cos(half),
+      });
+    };
+    apply(leftRef.current, CAD_SORTER_WORLD_PIVOTS.left, leftYaw);
+    apply(rightRef.current, CAD_SORTER_WORLD_PIVOTS.right, rightYaw);
+  });
+
+  const lp = CAD_SORTER_WORLD_PIVOTS.left;
+  const rp = CAD_SORTER_WORLD_PIVOTS.right;
+  return (
+    <group name="cad-gate-colliders">
+      <RigidBody ref={leftRef} type="kinematicPosition" colliders={false} friction={0.55}
+        position={[lp.x - hx, GATE_VANE.centerY, lp.z]}>
+        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
+      </RigidBody>
+      <RigidBody ref={rightRef} type="kinematicPosition" colliders={false} friction={0.55}
+        position={[rp.x - hx, GATE_VANE.centerY, rp.z]}>
+        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
+      </RigidBody>
+    </group>
+  );
+}
+
+/** Junction status mark on the belt only. */
+function GateZone({ category }: { category: Category | null; shadows?: boolean }) {
   const gateColor = category === 'B' ? COLORS.routeB
     : category === 'C' ? COLORS.routeC
     : category === 'D' ? COLORS.routeD
     : COLORS.gateFrame;
 
-  const gateX = ZONES.GATE.x;
-  const postSpacing = CONVEYOR_WIDTH_M / 2 + 0.08;
-  const postHeight = 0.4;
-
   return (
-    <group position={[gateX, 0, 0]}>
-      {/* Gate posts from floor */}
-      <mesh position={[0, BELT_Y + postHeight / 2, postSpacing]} castShadow={shadows}>
-        <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, BELT_Y + postHeight / 2, -postSpacing]} castShadow={shadows}>
-        <cylinderGeometry args={[0.035, 0.035, postHeight, 8]} />
-        <meshStandardMaterial color={COLORS.gateFrame} metalness={0.4} roughness={0.5} />
-      </mesh>
-      {/* Gate bar */}
-      <mesh position={[0, BELT_Y + postHeight, 0]} castShadow={shadows}>
-        <boxGeometry args={[0.05, 0.05, postSpacing * 2]} />
-        <meshStandardMaterial color={gateColor} />
-      </mesh>
-      {/* Diverter indicator on belt */}
+    <group position={[ZONES.GATE.x, 0, 0]}>
       <mesh position={[0, BELT_Y + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.15, CONVEYOR_WIDTH_M - 0.05]} />
-        <meshStandardMaterial 
-          color={gateColor} 
-          transparent 
-          opacity={category ? 0.3 : 0.1}
+        <planeGeometry args={[0.12, CONVEYOR_WIDTH_M - 0.05]} />
+        <meshStandardMaterial
+          color={gateColor}
+          transparent
+          opacity={category ? 0.28 : 0.08}
+          depthWrite={false}
         />
       </mesh>
-    </group>
-  );
-}
-
-/** Route arrows showing active path - at belt height */
-function RouteArrows({ activeRoute }: { activeRoute: Category | null }) {
-  const gateX = ZONES.GATE.x;
-  const routes = [
-    { category: 'B' as Category, color: COLORS.routeB, endX: ZONES.B.x, endZ: 0 },
-    { category: 'C' as Category, color: COLORS.routeC, endX: gateX + 0.5, endZ: ZONES.C.z },
-    { category: 'D' as Category, color: COLORS.routeD, endX: gateX + 0.5, endZ: ZONES.D.z },
-  ];
-
-  return (
-    <group>
-      {routes.map(({ category, color, endX, endZ }) => {
-        const isActive = activeRoute === category;
-        if (!isActive) return null;
-        
-        return (
-          <group key={category}>
-            <mesh position={[
-              (gateX + endX) / 2,
-              BELT_Y + 0.005,
-              endZ / 2
-            ]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[
-                category === 'B' ? Math.abs(endX - gateX) : 0.3,
-                category !== 'B' ? Math.abs(endZ) : CONVEYOR_WIDTH_M - 0.1
-              ]} />
-              <meshStandardMaterial 
-                color={color} 
-                emissive={color}
-                emissiveIntensity={0.3}
-                transparent
-                opacity={0.6}
-              />
-            </mesh>
-          </group>
-        );
-      })}
     </group>
   );
 }
@@ -1158,7 +1018,7 @@ function ContinuousScene({
   // Get item data for the current case
   const itemId = currentCase.itemId.replace('-LC', '');
   const itemData = ITEMS.find(i => i.id === itemId) ?? ITEMS[0];
-  const isRound = itemData.roundness >= 0.7;
+  const isRound = isCircularCrossSection(itemData.roundness);
   const dims = getRenderedItemDimensions(itemData.dimensionsMm);
 
   // Stage 1 real-model verification overlay (debug only, read-only)
@@ -1166,13 +1026,45 @@ function ContinuousScene({
     ? (stage1.sku ?? itemId)
     : null;
 
-  // Preload the default playlist's real assets once per scene mount
-  // (deduped by loader cache; rare SKUs stay lazy — Stage 1 §19 budget).
+  // Preload ALL playlist runtime assets before first spawn (atomic readiness).
+  const [productAssetsReady, setProductAssetsReady] = useState(false);
   useEffect(() => {
-    for (const asset of getPreloadAssets()) {
-      if (asset.runtimePath) preloadRealItemModel(asset.runtimePath);
+    let cancelled = false;
+    const urls = new Set<string>();
+    for (const c of DEMO_PLAYLIST) {
+      const id = c.itemId.replace('-LC', '');
+      const asset = getModelAsset(id);
+      if (asset?.runtimePath) urls.add(asset.runtimePath);
     }
     preloadConveyorCad();
+    Promise.all([...urls].map((u) => preloadRealItemModelAsync(u)))
+      .then(() => {
+        if (cancelled) return;
+        setProductAssetsReady(true);
+        const w = window as unknown as {
+          __PRODUCT_ASSETS_READY?: boolean;
+          __PRODUCT_LIFECYCLE?: unknown;
+        };
+        w.__PRODUCT_ASSETS_READY = true;
+        w.__PRODUCT_LIFECYCLE = {
+          visualReadyBeforeSpawn: true,
+          physicsReadyBeforeSpawn: true,
+          spawnTransformAppliedOnce: true,
+          duplicateProductInstances: 0,
+          fallbackReplacementUsed: false,
+          staleRigidBodies: false,
+        };
+        window.dispatchEvent(new Event('product-assets-ready'));
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn('[PRODUCT_ASSETS] preload failed, allowing procedural spawn', err);
+        if (!cancelled) {
+          setProductAssetsReady(true);
+          (window as unknown as { __PRODUCT_ASSETS_READY?: boolean }).__PRODUCT_ASSETS_READY = true;
+        }
+      });
+    return () => { cancelled = true; };
   }, []);
   const itemScale = Math.max(dims.width, dims.depth, dims.height);
   
@@ -1189,6 +1081,31 @@ function ContinuousScene({
   });
   const itemPos = currentPose.position;
   const activeRoute = currentPose.activeRoute;
+
+  // Debug timing capture: optional forced product S for proof screenshots.
+  const forceProd = typeof window !== 'undefined'
+    ? (window as unknown as {
+        __DIVERTER_PRODUCT_INPUT?: { itemCenterS?: number };
+      }).__DIVERTER_PRODUCT_INPUT
+    : undefined;
+  const displayItemPos: [number, number, number] = (
+    typeof forceProd?.itemCenterS === 'number'
+      ? [forceProd.itemCenterS, itemPos[1], itemPos[2]]
+      : itemPos
+  );
+
+  // Reset diverter product machine on stop / restart.
+  const resetEpochRef = useRef(0);
+  const prevStatusRef = useRef(playback.status);
+  if (
+    prevStatusRef.current !== 'idle'
+    && playback.status === 'idle'
+  ) {
+    resetEpochRef.current += 1;
+  }
+  prevStatusRef.current = playback.status;
+  const playbackResetEpoch = resetEpochRef.current;
+  const itemHalfLengthS = dims.width / 2;
   
   // Motion trail visibility - show during movement phases
   const showMotionTrail = ['move_to_detection', 'routing', 'exit'].includes(phase) && 
@@ -1205,8 +1122,9 @@ function ContinuousScene({
 
   return (
     <>
-      {/* Background: light warehouse by default; dark cinematic in prototype mode */}
-      <color attach="background" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : COLORS.background]} />
+      {/* Background: industrial dark product canvas (equipment must dominate) */}
+      <color attach="background" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16']} />
+      <fog attach="fog" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16', 13, 26]} />
 
       {proto ? (
         <>
@@ -1237,12 +1155,12 @@ function ContinuousScene({
           {/* Stage 2 default: premium industrial rig — readable ambient, key with
               PCF shadows, soft fill, cool rim (Stage 0 proven values, brightened
               in 2B so brackets/rollers read as volumes from every angle) */}
-          <ambientLight intensity={0.5} />
-          <hemisphereLight args={['#39506e', '#1a2434', 1.1]} />
+          <ambientLight intensity={0.46} />
+          <hemisphereLight args={['#314860', '#0a1018', 0.9]} />
           <directionalLight
             position={[6, 9, 4]}
-            intensity={2.6}
-            castShadow={protoShadows}
+            intensity={2.7}
+            castShadow={shadowsEnabled}
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
             shadow-camera-left={-7}
@@ -1251,15 +1169,15 @@ function ContinuousScene({
             shadow-camera-bottom={-7}
             shadow-camera-near={1}
             shadow-camera-far={25}
-            shadow-bias={-0.0004}
-            shadow-normalBias={0.02}
+            shadow-bias={-0.00035}
+            shadow-normalBias={0.025}
           />
-          <directionalLight position={[-5, 6, -3]} intensity={0.65} />
-          <directionalLight position={[2, 5, -8]} intensity={0.9} color="#bcd7ff" />
+          <directionalLight position={[-5, 6, -3]} intensity={0.7} />
+          <directionalLight position={[2, 5, -8]} intensity={0.85} color="#bcd7ff" />
           {/* low front fill so the +Z face (camera side) never goes black */}
-          <directionalLight position={[1, 3, 8]} intensity={0.5} color="#cfdcf2" />
+          <directionalLight position={[1, 3, 8]} intensity={0.55} color="#cfdcf2" />
           {/* Procedural studio environment (no external HDRI — offline-safe) */}
-          {protoShadows && (
+          {shadowsEnabled && (
             <Environment resolution={64} frames={1}>
               <Lightformer intensity={1.6} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color="#dfe9ff" />
               <Lightformer intensity={0.7} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color="#b8c8e8" />
@@ -1269,95 +1187,90 @@ function ContinuousScene({
         </>
       )}
 
-      {/* Grid */}
+      {/* Grid — subdued so equipment remains the visual subject */}
       <Grid
         args={[16, 12]}
         cellSize={0.5}
-        cellThickness={0.4}
-        cellColor={darkBg ? '#22303f' : COLORS.gridCell}
+        cellThickness={0.22}
+        cellColor={darkBg ? '#1a2533' : '#1e2a38'}
         sectionSize={2}
-        sectionThickness={0.8}
-        sectionColor={darkBg ? '#2f4256' : COLORS.gridSection}
-        fadeDistance={12}
+        sectionThickness={0.45}
+        sectionColor={darkBg ? '#243344' : '#2a3a4c'}
+        fadeDistance={10}
         infiniteGrid={false}
         position={[0, 0.001, 0]}
       />
 
       {/* Floor — dark polished concrete with soft reflections */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={protoShadows}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={shadowsEnabled}>
         <planeGeometry args={[16, 12]} />
         <meshStandardMaterial
-          color={darkBg ? '#1c2534' : COLORS.floor}
-          roughness={darkBg ? 0.55 : 0.9}
-          metalness={darkBg ? 0.25 : 0}
-          envMapIntensity={0.8}
+          color={darkBg ? '#121a26' : '#151d2a'}
+          roughness={darkBg ? 0.64 : 0.8}
+          metalness={darkBg ? 0.2 : 0.1}
+          envMapIntensity={0.5}
         />
       </mesh>
 
-      {/* Conveyor: CAD module + SPEC_DERIVED extensions — belt top at 0.7m */}
+      {/* Three CAD modules: clean → camera → sorter */}
       <ConveyorBelt
         pulseActive={showPulse}
         elapsedMs={totalElapsedMs}
         simplified={liteScene}
-        shadows={protoShadows}
+        shadows={shadowsEnabled}
         gateOpen={visualState.gateOpen}
         beltVelocityMps={visualState.beltVelocityMps}
         rollerOmega={visualState.rollerOmegaRadPerSec}
+        sorterCategory={category}
+        caseElapsedMs={caseElapsedMs}
+        productId={currentCase.id}
+        itemWorldX={displayItemPos[0]}
+        itemHalfLengthS={itemHalfLengthS}
+        playbackPaused={playback.status !== 'running'}
+        playbackResetEpoch={playbackResetEpoch}
       />
 
-      {/* Zone A - spawn point */}
-      <ZoneMarker 
-        position={[ZONES.A.x, 0.01, ZONES.A.z]} 
-        label="A" 
-        color={COLORS.sensorAccent} 
+      <ZoneMarker
+        position={[ZONES.A.x, 0.01, ZONES.A.z]}
+        label="A"
+        color={COLORS.sensorAccent}
         active={playback.currentPhase === 'spawn'}
       />
-      
-      {/* Zone B - physical receiving bin at end of sorter */}
+
       <BReceiverBin active={activeRoute === 'B'} />
-      
-      {/* Zone C - roll cage for oversized items */}
       <RollCage
         position={[ZONES.C.x, 0, ZONES.C.z]}
         label="C"
         color={COLORS.routeC}
         active={activeRoute === 'C'}
-        shadows={protoShadows}
+        shadows={shadowsEnabled}
       />
-
-      {/* Zone D - roll cage for round items */}
       <RollCage
         position={[ZONES.D.x, 0, ZONES.D.z]}
         label="D"
         color={COLORS.routeD}
         active={activeRoute === 'D'}
-        shadows={protoShadows}
+        shadows={shadowsEnabled}
       />
-      
-      {/* Chutes for routing to C/D */}
-      <RouteChute 
-        gateX={ZONES.GATE.x} 
-        targetZ={ZONES.C.z} 
-        color={COLORS.routeC} 
+
+      <RouteChute
+        gateX={ZONES.GATE.x}
+        targetZ={ZONES.C.z}
+        color={COLORS.routeC}
         active={activeRoute === 'C'}
       />
-      <RouteChute 
-        gateX={ZONES.GATE.x} 
-        targetZ={ZONES.D.z} 
-        color={COLORS.routeD} 
+      <RouteChute
+        gateX={ZONES.GATE.x}
+        targetZ={ZONES.D.z}
+        color={COLORS.routeD}
         active={activeRoute === 'D'}
       />
 
-      {/* Camera rig - overhead above belt, carries the D435i + line laser */}
+      {/* RealSense on camera module (CAD portal is in ConveyorCadModule) */}
       <CameraRig active={cameraHighlight} />
-
-      {/* §9.4 debug: optical axis / FOV / measurement zone (debug only) */}
       {(physicsDebug || debugOverlays) && <RealSenseFrustumDebug />}
 
-      {/* Laser beam for height measurement */}
       <LaserBeam active={showLaser} itemY={itemPos[1]} />
-      
-      {/* Point cloud for stereo analysis — opt-in only */}
       {effectsEnabled && (
         <PointCloud
           active={showCloud}
@@ -1366,30 +1279,14 @@ function ContinuousScene({
           isRound={isRound}
         />
       )}
-      
-      {/* Inspection zone on belt surface */}
       <InspectionZone active={cameraHighlight} />
-      
-      {/* Animated scan line on belt — opt-in only */}
       {effectsEnabled && <ScanLine active={showScan} />}
-
-      {/* Gate/diverter */}
       <GateZone category={category} shadows={protoShadows} />
 
-      {/* Route arrows on belt surface */}
-      <RouteArrows activeRoute={activeRoute} />
-
-      {/* Items: kinematic on the belt (domain truth), rigid-body physics
-          after the drop handoff, verified against the domain receiver.
-          The angled paddle diverter lives in the same physics world and
-          physically contacts the items (Stage 2B §13). */}
+      {/* CAD sorter gates (visual) + matching kinematic colliders */}
       <SorterPhysicsWorld running={playback.status === 'running'} speed={playback.speed}>
-        <PusherMechanism
-          category={category}
-          routingElapsedMs={caseElapsedMs - getRoutingStartMs()}
-          castShadow={protoShadows}
-        />
-        {sceneItems.map(item => (
+        <CadGateColliders category={category} caseElapsedMs={caseElapsedMs} />
+        {productAssetsReady && sceneItems.map(item => (
           <PhysicalPlaybackItemPhysics
             key={item.id}
             caseData={item.caseData}
@@ -1397,22 +1294,22 @@ function ContinuousScene({
             slotIndex={item.slotIndex}
             verifySku={verifySku}
             jitter={item.slotIndex === currentCaseIndex ? positionJitter : undefined}
-            castShadow={protoShadows}
+            castShadow={shadowsEnabled}
           />
         ))}
       </SorterPhysicsWorld>
       
       {/* Outline/BBox for the CURRENT item only */}
       <BoundingBoxVisual 
-        position={itemPos} 
+        position={displayItemPos} 
         scale={itemScale} 
-        visible={shouldShowBoundingBox(phase)} 
+        visible={shouldShowBoundingBox(phase) || typeof forceProd?.itemCenterS === 'number'} 
         isRound={isRound}
       />
       <ShapeOutline 
-        position={itemPos} 
+        position={displayItemPos} 
         scale={itemScale} 
-        visible={shouldShowShapeOutline(phase)} 
+        visible={shouldShowShapeOutline(phase) || typeof forceProd?.itemCenterS === 'number'} 
         isRound={isRound}
         category={category}
       />
@@ -1535,17 +1432,24 @@ export default function SorterDigitalTwinContinuous({
     <div className="digital-twin-wrap continuous-twin">
       <div className="digital-twin-canvas continuous-canvas">
         <Canvas
-          camera={{ position: [4.3, 2.9, 4.6], fov: 46 }}
+          camera={{ position: [1.55, 2.05, 4.35], fov: 38, near: 0.1, far: 80 }}
           dpr={[1, quality.dprMax]}
           shadows={shadowsEnabled ? 'soft' : false}
-          gl={{ antialias, powerPreference: 'high-performance' }}
-          onCreated={({ gl }) => {
+          gl={{ antialias, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
+          onCreated={({ gl, camera, scene }) => {
             // Stage 2: premium industrial look is the default (ACES + PCFSoft).
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.toneMapping = THREE.ACESFilmicToneMapping;
-            gl.toneMappingExposure = 1.15;
+            gl.toneMappingExposure = 1.18;
+            camera.lookAt(-0.45, 0.58, 0.08);
+            camera.updateProjectionMatrix();
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
             gl.shadowMap.autoUpdate = true;
+            if (typeof window !== 'undefined') {
+              (window as unknown as { __R3F_CAPTURE?: unknown }).__R3F_CAPTURE = {
+                gl, camera, scene,
+              };
+            }
             // Stage 2D: 1024 shadow map — major cost saver vs default 2048+.
             if (gl.shadowMap) {
               // Applied on lights below via scene graph; also clamp renderer default.

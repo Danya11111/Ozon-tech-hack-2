@@ -10,7 +10,7 @@
 
 import type { ContinuousPlaybackState, CasePhase } from './continuousPlayback';
 import type { Category } from './types';
-import { classifyItem, DIMENSION_LIMITS } from './classifier';
+import { classifyItem, isCircularCrossSection } from './classifier';
 import { resolveItem } from '../data/resolveItem';
 import {
   MM_PER_STEP,
@@ -81,7 +81,7 @@ function getStageFromPhase(phase: CasePhase): MeasurementStage {
 }
 
 function getShapeResult(roundnessK: number): 'box' | 'round' | 'irregular' {
-  if (roundnessK >= DIMENSION_LIMITS.roundnessThreshold) return 'round';
+  if (isCircularCrossSection(roundnessK)) return 'round';
   if (roundnessK >= 0.3) return 'box';
   return 'irregular';
 }
@@ -128,7 +128,7 @@ export function getMeasurementData(playback: ContinuousPlaybackState): Measureme
     classificationReason = playback.classification?.reason ?? classification.reason;
     classificationLabel = playback.classification?.label ?? classification.label;
     cPriorityApplied =
-      finalCategory === 'C' && roundnessK >= DIMENSION_LIMITS.roundnessThreshold;
+      finalCategory === 'C' && isCircularCrossSection(roundnessK);
   }
 
   const command =

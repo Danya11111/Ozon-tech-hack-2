@@ -33,17 +33,14 @@ export interface StaticColliderDef {
  * edge so even a 12mm pen cannot fall into a lip gap) to (z=±1.6, y≈0.135,
  * cage open front). tan ≈ 0.39 > μ_combined for every SKU -> items slide.
  */
-export const CHUTE_PITCH = Math.atan2(0.53, 1.36); // ≈ 0.372 rad
-export const CHUTE_LENGTH = Math.hypot(1.36, 0.53); // ≈ 1.460 m
-export const CHUTE_MID_Y = 0.40;
-export const CHUTE_MID_Z = 0.92;
-/** Junction transfer plate: SPEC_DERIVED 1000mm wide (x 1.2..2.2) — covers
- *  the full junction diagonal plus the 435mm cylinder / 900mm carton with
- *  margin; converging side rails. */
-export const CHUTE_X = 1.7;
-export const CHUTE_HALF_W = 0.5;
-/** B drop chute: line from (2.15, 0.70) to (2.85, 0.13), pitch ≈ 0.684 rad. */
-export const B_CHUTE_PITCH = Math.atan2(BELT_TOP_Y - (CAGE_FLOOR_Y + 0.05), 0.7);
+/** Short transfer into close-in C/D cages (z≈±1.15). */
+export const CHUTE_PITCH = Math.atan2(0.50, 0.55);
+export const CHUTE_LENGTH = Math.hypot(0.55, 0.50);
+export const CHUTE_MID_Y = 0.42;
+export const CHUTE_MID_Z = 0.55;
+export const CHUTE_X = 1.55;
+export const CHUTE_HALF_W = 0.35;
+export const B_CHUTE_PITCH = Math.atan2(BELT_TOP_Y - (CAGE_FLOOR_Y + 0.05), 0.45);
 
 function chuteColliders(targetZ: number, label: 'C' | 'D'): StaticColliderDef[] {
   const dir = targetZ > 0 ? 1 : -1;

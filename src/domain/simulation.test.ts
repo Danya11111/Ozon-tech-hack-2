@@ -27,7 +27,7 @@ describe('simulation state machine', () => {
     let state = createSimulation(scenario('c_priority'));
     state = stepSimulationToNextState(state);
     expect(state.currentItem!.classification.category).toBe('C');
-    expect(state.currentItem!.item.roundness).toBeGreaterThanOrEqual(0.7);
+    expect(state.currentItem!.item.roundness).toBeGreaterThan(0.8);
   });
 
   it('jam scenario enters FAULT', () => {

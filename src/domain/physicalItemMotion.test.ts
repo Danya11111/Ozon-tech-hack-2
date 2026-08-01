@@ -62,7 +62,9 @@ describe('physicalItemMotion', () => {
     const pose = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 9200 });
     expect(pose.surface).toBe('b_bin_floor');
     expect(pose.position[1]).toBeLessThan(0.35); // well below belt (0.7m)
-    expect(pose.position[0]).toBeGreaterThan(2.7); // inside B bin (center 3.35)
+    const b = SURFACES.b_bin_floor.bounds;
+    expect(pose.position[0]).toBeGreaterThanOrEqual(b.minX);
+    expect(pose.position[0]).toBeLessThanOrEqual(b.maxX);
   });
 
   it('settled B item remains fixed as time increases', () => {

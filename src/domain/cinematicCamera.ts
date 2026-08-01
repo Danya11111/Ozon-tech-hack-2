@@ -53,10 +53,11 @@ const VIEWPORT_ADJUSTMENTS: Record<ViewportType, { heightMult: number; distMult:
  * Positions are relative to the scene center or specific zones.
  */
 const BASE_CAMERA_CONFIGS: Record<CameraMode, Omit<CameraConfig, 'mode'>> = {
+  // Full product line: 3 CAD modules + close-in B/C/D baskets.
   overview: {
-    position: [4.3, 2.9, 4.6],
-    target: [0.1, BELT_TOP_Y, 0],
-    fov: 46,
+    position: [0.35, 2.35, 5.1],
+    target: [-0.55, 0.55, 0.05],
+    fov: 36,
   },
   feedCloseup: {
     position: [ZONES.A.x + 1.5, 2.0, 2.0],
@@ -79,9 +80,9 @@ const BASE_CAMERA_CONFIGS: Record<CameraMode, Omit<CameraConfig, 'mode'>> = {
     fov: 45,
   },
   routingWide: {
-    position: [2.5, 3.0, 4.5],
-    target: [ZONES.GATE.x, BELT_TOP_Y, 0],
-    fov: 55,
+    position: [2.2, 2.4, 4.0],
+    target: [ZONES.GATE.x, BELT_TOP_Y, 0.15],
+    fov: 48,
   },
   chuteCloseup: {
     position: [ZONES.GATE.x + 0.5, 1.8, 2.8],
@@ -94,9 +95,9 @@ const BASE_CAMERA_CONFIGS: Record<CameraMode, Omit<CameraConfig, 'mode'>> = {
     fov: 52,
   },
   nextItemReset: {
-    position: [4.0, 3.0, 4.5],
-    target: [0, BELT_TOP_Y, 0],
-    fov: 50,
+    position: [0.35, 2.35, 5.1],
+    target: [-0.55, 0.55, 0.05],
+    fov: 36,
   },
 };
 
@@ -266,10 +267,13 @@ export function smoothCameraTransition(
 }
 
 /**
- * Get initial camera config (overview).
+ * Get initial camera config (product overview framing).
  */
 export function getInitialCameraConfig(viewport: ViewportType = 'desktop'): CameraConfig {
-  return getCameraConfig('spawn', null, null, viewport);
+  return adjustForViewport(
+    { ...BASE_CAMERA_CONFIGS.overview, mode: 'overview' },
+    viewport,
+  );
 }
 
 /**

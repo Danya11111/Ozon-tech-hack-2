@@ -75,9 +75,11 @@ test.describe('mobile fallback (390x844)', () => {
     await page.getByTestId('demo-pause').click();
     await expect(page.getByTestId('demo-play')).toBeVisible({ timeout: 10_000 });
 
-    // Details link present and working
-    await page.getByTestId('fallback-details-link').click();
-    await expect(page).toHaveURL(/\/details/);
+    // Documentation via AppNav only (duplicate CTA removed)
+    await expect(page.getByTestId('fallback-docs-link')).toHaveCount(0);
+    await expect(page.getByTestId('main-docs-link')).toHaveCount(0);
+    await page.getByTestId('nav-documentation').click();
+    await expect(page).toHaveURL(/\/documentation/);
 
     // Stage 0 artifact
     await page.goto('/');

@@ -65,11 +65,11 @@ export const ZONES = {
   /** Gate/diverter position */
   GATE: { x: 1.5, z: 0 },
   /** Zone B - main sorter exit (end of main conveyor) */
-  B: { x: 4.0, z: 0, label: 'B' },
-  /** Zone C - oversized items (lateral) */
-  C: { x: 2.0, z: 2.0, label: 'C' },
-  /** Zone D - round items (lateral opposite) */
-  D: { x: 2.0, z: -2.0, label: 'D' },
+  B: { x: 2.85, z: 0, label: 'B' },
+  /** Zone C - oversized items (travel-left / +Z), close to belt */
+  C: { x: 1.55, z: 1.15, label: 'C' },
+  /** Zone D - round items (travel-right / −Z), close to belt */
+  D: { x: 1.55, z: -1.15, label: 'D' },
 } as const;
 
 // =========================================================
@@ -146,20 +146,67 @@ export const CHUTE_D_WIDTH_M = 0.5;                 // 500mm chute
 export const CHUTE_SLOPE_START_Y = BELT_TOP_Y;      // 0.7m at junction
 export const CHUTE_END_Y = CAGE_FLOOR_Y + 0.05;     // safe entry height into cage
 
+/**
+ * Canonical sorter junction — single world anchor for visual vanes, pivots,
+ * colliders, activation trigger, and item passage math.
+ *
+ * Derived from runtime layout symbols (not screenshot guesswork):
+ *  - central belt end / gate: ZONES.GATE
+ *  - straight B spur start: B_RECEIVER.transferStartX (= GATE.x)
+ *  - left chute entry (+Z / travel-left): GATE + half belt → ZONES.C
+ *  - right chute entry (−Z / travel-right): GATE − half belt → ZONES.D
+ *
+ * Travel frame: +X forward, +Z = LEFT, −Z = RIGHT.
+ */
+export const JUNCTION = {
+  x: ZONES.GATE.x,
+  y: BELT_TOP_Y,
+  z: ZONES.GATE.z,
+  /** End of central belt / start of B spur (same X as GATE). */
+  beltEndX: ZONES.GATE.x,
+  /** Straight route entry (B transfer). */
+  straightEntry: { x: ZONES.GATE.x, z: 0 },
+  /** Physical left chute mouth (travel-left = +Z → category C). */
+  leftEntry: { x: ZONES.GATE.x, z: MAIN_BELT_WIDTH_M / 2, category: 'C' as const },
+  /** Physical right chute mouth (travel-right = −Z → category D). */
+  rightEntry: { x: ZONES.GATE.x, z: -MAIN_BELT_WIDTH_M / 2, category: 'D' as const },
+  /** Left diverter downstream hinge — CAD Барьер001 exit-side rail (+Z). */
+  leftPivot: {
+    x: 1.8661,
+    y: BELT_TOP_Y + 0.062,
+    z: 0.2878,
+  },
+  /** Right diverter downstream hinge — CAD Барьер002 exit-side rail (−Z). */
+  rightPivot: {
+    x: 1.3727,
+    y: BELT_TOP_Y + 0.062,
+    z: -0.2909,
+  },
+  rotation: [0, 0, 0] as [number, number, number],
+  beltTopY: BELT_TOP_Y,
+  centerline: { x: ZONES.GATE.x, z: 0 },
+} as const;
+
+/**
+ * World X where an on-belt item first meets CAD swing diverters
+ * (near upstream free-end of the shorter/right guide at rest).
+ */
+export const CAD_GATE_ENGAGE_X = JUNCTION.rightPivot.x - 0.75 + 0.08;
+
 // =========================================================
 // B receiving bin — отдельный промышленный контейнер на полу.
 // НЕ продолжение конвейера: короткий transfer spur → drop chute → bin floor.
 // Размер ~1.2×0.8×0.5 m (как C/D по footprint).
 // =========================================================
 export const B_RECEIVER = {
-  centerX: 3.35,                  // отдельно после конца ленты
+  centerX: 2.85,                  // immediately after sorter module end (~2.01)
   centerZ: 0,
-  width: 1.2,                     // 1200 mm
-  depth: 0.8,                     // 800 mm
-  wallHeight: 0.5,                // 500 mm walls
-  floorY: CAGE_FLOOR_Y,           // 0.08 m interior floor
-  transferStartX: ZONES.GATE.x,   // 1.5 m — spur starts at junction
-  transferEndX: 2.15,             // 0.65 m short spur, NOT a long belt extension
+  width: 1.0,
+  depth: 0.7,
+  wallHeight: 0.45,
+  floorY: CAGE_FLOOR_Y,
+  transferStartX: 1.95,           // end of sorter CAD module
+  transferEndX: 2.25,
 };
 
 // =========================================================
