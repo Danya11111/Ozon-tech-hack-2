@@ -4,20 +4,20 @@ test.describe('routes', () => {
   test('two-page UI: simulation, documentation, unknown redirect', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('app-nav')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('nav-simulation')).toHaveClass(/active/);
+    await expect(page.getByTestId('app-nav').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('nav-simulation').first()).toHaveClass(/active/);
 
-    await page.getByTestId('nav-documentation').click();
+    await page.getByTestId('nav-documentation').first().click();
     await expect(page).toHaveURL(/\/documentation\/?$/);
     await expect(page.getByTestId('documentation-page')).toBeVisible();
     await expect(page.getByTestId('docs-production-status')).toContainText('DATA_ACQUISITION_PACK_READY');
-    await expect(page.getByTestId('nav-documentation')).toHaveClass(/active/);
+    await expect(page.getByTestId('nav-documentation').first()).toHaveClass(/active/);
 
     await page.reload();
     await expect(page).toHaveURL(/\/documentation\/?$/);
     await expect(page.getByTestId('documentation-page')).toBeVisible();
 
-    await page.getByTestId('nav-simulation').click();
+    await page.getByTestId('nav-simulation').first().click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByTestId('demo-hud')).toBeVisible({ timeout: 60_000 });
 

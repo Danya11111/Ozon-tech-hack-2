@@ -32,13 +32,12 @@ describe('Stage 2C CAD assembly params', () => {
     expect(aabb.max[1]).toBeLessThan(0.8);
   });
 
-  it('runtime loads conveyor-clean.glb and does not mount generated mechanism assets', () => {
+  it('runtime loads conveyor-clean.glb as the sole conveyor asset URL', () => {
     expect(conveyorSource).toMatch(
       /CONVEYOR_CAD_URL\s*=\s*['"]\/models\/sorter\/conveyor-clean\.glb['"]/,
     );
-    expect(conveyorSource).not.toMatch(/mechanism-final\.glb/);
-    expect(conveyorSource).not.toMatch(/mechanism-mount-final\.glb/);
-    expect(conveyorSource).not.toMatch(/conveyor-web\.glb/);
+    const urls = [...conveyorSource.matchAll(/['"]\/models\/sorter\/[^'"]+['"]/g)].map((m) => m[0]);
+    expect(urls.every((u) => u.includes('conveyor-clean.glb'))).toBe(true);
   });
 });
 

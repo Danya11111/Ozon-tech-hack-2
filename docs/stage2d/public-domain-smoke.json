@@ -1,8 +1,0 @@
-{
-  "hostname": "sorter.arhipovdan.ru",
-  "aRecord": "185.160.137.162",
-  "http": { "status": 404, "server": "openresty" },
-  "https": { "status": "TLS unrecognized_name alert 112", "certificate": null },
-  "localProduction": "http://127.0.0.1:3100/",
-  "status": "BLOCKED_BY_DEPLOYMENT_ACCESS"
-}

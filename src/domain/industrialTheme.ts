@@ -1,5 +1,5 @@
 /**
- * Shared industrial visual tokens for `/` continuous twin and `/details` twin.
+ * Shared industrial visual tokens for the continuous digital twin.
  * Keeps both modes looking like projections of one system.
  */
 

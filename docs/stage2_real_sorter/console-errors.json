@@ -1,7 +1,0 @@
-{
-  "capturedAt": "2026-07-30T11:20:00Z",
-  "environment": "chromium + swiftshader (headless), local preview/production",
-  "pageErrors": [],
-  "consoleErrorsFiltered": [],
-  "note": "Playwright pageerror/console error collectors on / and /details during artifact capture returned empty after favicon-noise filter. Real-phone WebView not tested."
-}

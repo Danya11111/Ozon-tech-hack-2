@@ -33,7 +33,6 @@ describe('performance and production hygiene', () => {
     const allowed = new Set([
       '../components/ThreeD/ThreeErrorBoundary.tsx',
       '../pages/MainPage.tsx',
-      '../components/ProductDemoSection.tsx',
     ]);
     const offenders: string[] = [];
     for (const [path, text] of Object.entries(srcModules)) {
