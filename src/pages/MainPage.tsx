@@ -237,15 +237,6 @@ export default function MainPage({
   const currentCase = playback.currentCase;
   const category = playback.targetCategory;
   const command = playback.command;
-  // Driven by the same camera-classification event as the mechanical route.
-  const classStatusLabel = category ? 'Классифицировано' : 'Ожидание сканирования';
-  const routeLabel = !category
-    ? 'Не определён'
-    : category === 'C'
-      ? 'Влево'
-      : category === 'D'
-        ? 'Вправо'
-        : 'Прямо';
   const phaseConfig = getCurrentPhaseConfig(playback);
   const caseProgress = getCaseProgress(playback);
 
@@ -297,7 +288,7 @@ export default function MainPage({
             className={`hud-value status-${playback.status} ${faultActive ? 'status-fault' : ''}`}
             data-testid="demo-status"
           >
-            {isFinished ? 'FINISHED' : classStatusLabel}
+            {isFinished ? 'FINISHED' : phaseConfig.label}
           </span>
         </div>
         <div className="hud-row">
@@ -464,7 +455,7 @@ export default function MainPage({
           className={`product-tele-value status-${playback.status} ${faultActive ? 'status-fault' : ''}`}
           data-testid="demo-status"
         >
-          {isFinished ? 'FINISHED' : classStatusLabel}
+          {isFinished ? 'FINISHED' : phaseConfig.label}
         </span>
       </div>
       <div className="product-tele-item">
@@ -474,12 +465,6 @@ export default function MainPage({
           data-testid="demo-category"
         >
           {category ?? '—'}
-        </span>
-      </div>
-      <div className="product-tele-item">
-        <span className="product-tele-label">ROUTE</span>
-        <span className="product-tele-value" data-testid="demo-route">
-          {routeLabel}
         </span>
       </div>
       {debugMode && (

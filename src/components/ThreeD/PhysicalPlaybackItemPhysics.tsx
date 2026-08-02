@@ -1,11 +1,16 @@
 /**
- * Product rigid body — physical conveyor + physical junction contact.
+ * Stage 2 — item with hybrid kinematic/dynamic authority (Rapier).
  *
- * Single dynamic body from spawn through receiver settle.
- * C/D redirection is contact-only against kinematic CAD diverter colliders.
- * No junction setTranslation / route-specific lateral impulses.
+ * Authority flow (see docs/stage2_real_sorter/physics-architecture.md):
+ *  1. kinematicPosition — follows getPhysicalItemPose exactly (domain truth);
+ *  2. at getDropHandoffTimeMs → dynamic with deterministic initial velocity
+ *     (B: belt edge carry-over; C/D: pusher impulse, scaled per SKU profile);
+ *  3. gravity/collision/friction/restitution/angular velocity govern the drop;
+ *  4. on sleep (or controlled 4.5 s timeout) the final position is verified
+ *     against the DOMAIN-decided receiver volume and the body is frozen
+ *     (kinematic) — no drift, clean replay, no teleportation at any point.
  */
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import {
@@ -13,61 +18,40 @@ import {
   CuboidCollider,
   CapsuleCollider,
   CylinderCollider,
-  useBeforePhysicsStep,
   type RapierRigidBody,
 } from '@react-three/rapier';
 import { RigidBodyType } from '@dimforge/rapier3d-compat';
-import { getPhysicalItemPose } from '../../domain/physicalItemMotion';
-import {
-  getProductPhysicsProfile,
-  colliderHalfHeight,
-  spawnCenterY,
-  isSupportedByBelt,
-  computeBeltDriveForce,
-  isInvalidProductState,
-  recordInvalidProductState,
-  BELT_SPEED_MPS,
-  type ProductPhysicsPhase,
-} from '../../domain/productPhysicsProfiles';
-import {
-  DISCHARGE_EDGE_S,
-  detectReceiverZone,
-  runtimeWorldContactPlaneS,
-  SETTLE_LINEAR_SPEED_MPS,
-  SETTLE_ANGULAR_SPEED_RAD_S,
-  SETTLE_DURATION_SEC,
-} from '../../domain/junctionContactPhysics';
+import { getPhysicalItemPose, getDropHandoffTimeMs } from '../../domain/physicalItemMotion';
+import { getVisualPhysicsProfile } from '../../domain/visualPhysicsProfiles';
 import { resolveItem } from '../../data/resolveItem';
+import { classifyItem } from '../../domain/classifier';
 import { receiverContains } from '../../domain/receiverVolumes';
 import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { ItemVisualContent } from './PhysicalPlaybackItem';
-import { recordDropResult, PHYSICS_DT } from './SorterPhysics';
+import { recordDropResult, physicsSimClock } from './SorterPhysics';
 import { getModelAsset } from '../../data/modelAssets';
 import { isProductAssetReady } from './RealItemModel';
-import {
-  advanceCameraPhysicsStep,
-  getClassificationEvent,
-  tryClassifyAtCamera,
-} from '../../domain/cameraClassification';
 
-type Authority = 'preparing' | 'dynamic_active' | 'frozen' | 'fault_kinematic';
+type Authority = 'kinematic' | 'dynamic' | 'frozen';
 
-const TELEMETRY_INTERVAL_MS = 200;
-const SETTLE_BUDGET_SEC = 10;
+/** Controlled settle budget after handoff — in PHYSICS-simulated seconds,
+ *  not domain ms: under render lag domain time races ahead of the stepper,
+ *  and a domain-ms budget would freeze items mid-flight (§14.2). */
+const SETTLE_BUDGET_SEC = 4.5;
 
-function colliderDensity(profile: ReturnType<typeof getProductPhysicsProfile>): number {
-  const c = profile.collider;
-  if (c.type === 'cuboid') {
-    const [hx, hy, hz] = c.halfExtents;
-    return profile.massKg / (8 * hx * hy * hz);
+function colliderDensity(profile: ReturnType<typeof getVisualPhysicsProfile>): number {
+  if (profile.collider === 'cuboid' && profile.cuboidHalfExtents) {
+    const [hx, hy, hz] = profile.cuboidHalfExtents;
+    return profile.approximateMassKg / (8 * hx * hy * hz);
   }
-  const volume = c.type === 'capsule'
-    ? Math.PI * c.radius * c.radius * (2 * c.halfHeight + (4 / 3) * c.radius)
-    : Math.PI * c.radius * c.radius * 2 * c.halfHeight;
-  return profile.massKg / Math.max(volume, 1e-6);
+  const [r, hh] = profile.capsule ?? [0.05, 0.1];
+  const volume = profile.collider === 'capsule'
+    ? Math.PI * r * r * (2 * hh + (4 / 3) * r)
+    : Math.PI * r * r * 2 * hh;
+  return profile.approximateMassKg / volume;
 }
 
-function PhysicalPlaybackItemPhysicsInner({
+export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhysics({
   caseData,
   elapsedMs,
   slotIndex = 0,
@@ -83,26 +67,21 @@ function PhysicalPlaybackItemPhysicsInner({
   verifySku?: string | null;
 }) {
   const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
+  const classification = useMemo(() => classifyItem(itemData), [itemData]);
+  const category = classification.category as 'B' | 'C' | 'D';
   const itemId = itemData.id.replace('-LC', '');
-  const profile = getProductPhysicsProfile(itemId);
-  const halfH = colliderHalfHeight(profile);
-  const isFault = Boolean(caseData.faultType);
-  /** Immutable after camera trigger — never from playlist. */
-  const classifiedCategory = useRef<'B' | 'C' | 'D' | null>(null);
+  const profile = getVisualPhysicsProfile(itemId);
+  const handoffMs = getDropHandoffTimeMs(classification.category, caseData.faultType);
 
   const bodyRef = useRef<RapierRigidBody>(null);
-  const authority = useRef<Authority>(isFault ? 'fault_kinematic' : 'preparing');
-  const phaseRef = useRef<ProductPhysicsPhase>('preparing');
+  const traceEnabled = useRef(
+    typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('trace') === '1',
+  );
+  const authority = useRef<Authority>('kinematic');
   const frozenPose = useRef<{ p: [number, number, number]; q: THREE.Quaternion } | null>(null);
+  const handedOffAtSimSec = useRef<number | null>(null);
   const verified = useRef(false);
-  const activated = useRef(false);
-  const invalidLogged = useRef(false);
-  const lastTelemetryMs = useRef(0);
-  const forceScratch = useRef({ x: 0, y: 0, z: 0 });
-  const settleAccum = useRef(0);
-  const activeSinceSec = useRef(0);
-  const bodyIdentity = useRef(`${caseData.id}:${itemId}`);
-
   const asset = getModelAsset(itemId);
   const needsRealAsset = Boolean(asset?.defaultRealAsset && asset?.runtimePath);
   const [spawned, setSpawned] = useState(
@@ -116,279 +95,61 @@ function PhysicalPlaybackItemPhysicsInner({
     caseId: caseData.id,
     slotIndex,
     dimensionsMm: itemData.dimensionsMm,
-    targetCategory: classifiedCategory.current,
+    targetCategory: classification.category,
     elapsedMs,
     faultType: caseData.faultType,
     jitter,
   });
 
-  const spawnPose = useMemo(() => {
-    const p = getPhysicalItemPose({
+  const handoffPose = useMemo(() => {
+    if (handoffMs == null) return null;
+    return getPhysicalItemPose({
       caseId: caseData.id,
       slotIndex,
       dimensionsMm: itemData.dimensionsMm,
-      targetCategory: null,
-      elapsedMs: 0,
+      targetCategory: classification.category,
+      elapsedMs: handoffMs,
       faultType: caseData.faultType,
       jitter,
     });
-    return {
-      position: [p.position[0], spawnCenterY(profile), p.position[2]] as [number, number, number],
-      rotation: p.rotation,
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseData.id, profile.productId]);
+  }, [handoffMs, caseData.id]);
 
-  useLayoutEffect(() => {
-    bodyIdentity.current = `${caseData.id}:${itemId}`;
-    authority.current = isFault ? 'fault_kinematic' : 'preparing';
-    phaseRef.current = 'preparing';
+  // Reset authority whenever a new case mounts this body. The Rapier body is
+  // reused across cases, so a case that ended while still DYNAMIC (settle
+  // budget cut short under render lag) must be forced back to kinematic —
+  // otherwise setNextKinematicTranslation is a no-op and the next case's item
+  // is stuck invisibly mid-scene.
+  useEffect(() => {
+    authority.current = 'kinematic';
     frozenPose.current = null;
+    handedOffAtSimSec.current = null;
     verified.current = false;
-    activated.current = false;
-    invalidLogged.current = false;
-    settleAccum.current = 0;
-    activeSinceSec.current = 0;
-    classifiedCategory.current = getClassificationEvent(itemId)?.category ?? null;
     const ready = !needsRealAsset || isProductAssetReady(asset?.runtimePath);
     setSpawned(ready);
     const body = bodyRef.current;
     if (body) {
-      // Imperative spawn pose — never reapplied via React RigidBody props.
       body.setBodyType(RigidBodyType.KinematicPositionBased, false);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      const p = spawnPose.position;
+      const p = pose.position;
       body.setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
-      const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
+      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
       body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
     }
-    if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const w = window as unknown as { __ACTIVE_PRODUCT_BODIES?: Set<string> };
-      w.__ACTIVE_PRODUCT_BODIES = w.__ACTIVE_PRODUCT_BODIES ?? new Set();
-      w.__ACTIVE_PRODUCT_BODIES.add(bodyIdentity.current);
-    }
-    return () => {
-      if (import.meta.env.DEV && typeof window !== 'undefined') {
-        const w = window as unknown as { __ACTIVE_PRODUCT_BODIES?: Set<string> };
-        w.__ACTIVE_PRODUCT_BODIES?.delete(bodyIdentity.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on case id only
   }, [caseData.id]);
-
-  const activateDynamic = useCallback((body: RapierRigidBody) => {
-    const p = spawnPose.position;
-    body.setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
-    const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
-    const q = new THREE.Quaternion().setFromEuler(e);
-    body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
-    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    body.setBodyType(RigidBodyType.Dynamic, true);
-    body.wakeUp();
-    activated.current = true;
-    authority.current = 'dynamic_active';
-    phaseRef.current = 'physical_conveyor';
-    activeSinceSec.current = 0;
-  }, [spawnPose]);
-
-  useBeforePhysicsStep(() => {
-    const body = bodyRef.current;
-    if (!body || !spawned) return;
-    if (authority.current !== 'dynamic_active') {
-      body.resetForces(true);
-      return;
-    }
-    const dt = PHYSICS_DT;
-    activeSinceSec.current += dt;
-
-    const t = body.translation();
-    const lv = body.linvel();
-    const av = body.angvel();
-    const position: [number, number, number] = [t.x, t.y, t.z];
-    const linearVelocity: [number, number, number] = [lv.x, lv.y, lv.z];
-    const angularVelocity: [number, number, number] = [av.x, av.y, av.z];
-
-    if (isInvalidProductState({ position, linearVelocity, angularVelocity })) {
-      if (!invalidLogged.current) {
-        recordInvalidProductState();
-        invalidLogged.current = true;
-        if (import.meta.env.DEV) {
-          console.warn('[physics] invalid product state', itemId, position);
-        }
-      }
-      body.resetForces(true);
-      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      body.setBodyType(RigidBodyType.KinematicPositionBased, false);
-      authority.current = 'frozen';
-      phaseRef.current = 'invalid';
-      return;
-    }
-
-    const contactS = runtimeWorldContactPlaneS();
-    if (t.x >= contactS) {
-      phaseRef.current = 'junction';
-    }
-
-    // Camera-triggered classification (once per productId).
-    const step = advanceCameraPhysicsStep();
-    const classEv = tryClassifyAtCamera({
-      productId: itemId,
-      item: itemData,
-      position,
-      physicsStep: step,
-    });
-    if (classEv.lifecycle === 'CLASSIFIED' && classEv.category) {
-      classifiedCategory.current = classEv.category;
-    }
-
-    if (typeof window !== 'undefined') {
-      const w = window as unknown as {
-        __DIVERTER_PRODUCT_INPUT?: {
-          productId: string | null;
-          category: 'B' | 'C' | 'D' | null;
-          itemCenterS: number;
-          itemHalfLengthS: number;
-        };
-      };
-      // Route command only after a valid classification event.
-      w.__DIVERTER_PRODUCT_INPUT = {
-        productId: itemId,
-        category: classifiedCategory.current,
-        itemCenterS: t.x,
-        itemHalfLengthS: profile.collider.type === 'cuboid'
-          ? profile.collider.halfExtents[0]
-          : 0.12,
-      };
-    }
-
-    const supported = isSupportedByBelt({
-      position,
-      halfHeight: halfH,
-      phase: phaseRef.current === 'junction' ? 'junction' : 'physical_conveyor',
-      linearVelY: lv.y,
-    });
-
-    body.resetForces(true);
-    if (supported) {
-      const sample = computeBeltDriveForce({
-        massKg: profile.massKg,
-        linearVelocity,
-        maxBeltAccelerationMps2: profile.maxBeltAccelerationMps2,
-        // Zero lateral correction inside physical junction / contact zone.
-        applyLateralCorrection: t.x < contactS,
-      });
-      // Stationary belt collider cannot impart tangential speed — couple after
-      // measuring the drive sample. Upstream: hard 1.0 m/s. Junction: gentle
-      // pull so contact can redirect C/D without wiping lateral velocity.
-      // After DISCHARGE_EDGE_S support is false → belt force stays 0.
-      const inJunction = t.x >= contactS;
-      const latV = sample.lateralCorrection[2] * dt / Math.max(profile.massKg, 1e-6);
-      forceScratch.current.x = inJunction
-        ? lv.x + Math.max(-8, Math.min(8, (BELT_SPEED_MPS - lv.x) * 0.35))
-        : BELT_SPEED_MPS;
-      forceScratch.current.y = Math.min(lv.y, 0.05);
-      forceScratch.current.z = inJunction ? lv.z : lv.z + latV;
-      body.setLinvel(forceScratch.current, true);
-
-      if (import.meta.env.DEV && typeof window !== 'undefined') {
-        const now = performance.now();
-        if (now - lastTelemetryMs.current >= TELEMETRY_INTERVAL_MS) {
-          lastTelemetryMs.current = now;
-          const mesh = bodyRef.current as unknown as { translation?: () => { x: number; y: number; z: number } };
-          const bp = mesh?.translation?.() ?? t;
-          window.__CONVEYOR_PHYSICS_DEBUG__ = {
-            productId: itemId,
-            physicsStep: step,
-            bodyPosition: position,
-            visibleWorldPosition: [bp.x, bp.y, bp.z],
-            supportedByBelt: supported,
-            dischargeEdgeS: DISCHARGE_EDGE_S,
-            cameraInside: classEv.lifecycle !== 'UNKNOWN' || t.x >= -1.82,
-            classificationState: classEv.lifecycle,
-            measuredDimensions: classEv.measurement,
-            category: classifiedCategory.current,
-            route: classEv.physicalRoute,
-            activeDiverter: classEv.activeDiverter,
-            receiver: detectReceiverZone(position),
-            bodyVisualErrorMm: 0,
-            physicsPhase: phaseRef.current,
-            currentDownstreamSpeed: sample.currentDownstreamSpeed,
-            targetSpeed: BELT_SPEED_MPS,
-            appliedAcceleration: sample.appliedAcceleration,
-            bodyIdentity: bodyIdentity.current,
-            invalidState: false,
-          };
-        }
-      }
-    } else if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const now = performance.now();
-      if (now - lastTelemetryMs.current >= TELEMETRY_INTERVAL_MS) {
-        lastTelemetryMs.current = now;
-        window.__CONVEYOR_PHYSICS_DEBUG__ = {
-          productId: itemId,
-          physicsStep: step,
-          bodyPosition: position,
-          supportedByBelt: false,
-          dischargeEdgeS: DISCHARGE_EDGE_S,
-          classificationState: classEv.lifecycle,
-          category: classifiedCategory.current,
-          route: classEv.physicalRoute,
-          bodyVisualErrorMm: 0,
-        };
-      }
-    }
-
-    // Receiver sensor detection — never moves the body.
-    const zone = detectReceiverZone(position);
-    const expected = classifiedCategory.current;
-    if (zone && expected) {
-      const speed = Math.hypot(lv.x, lv.y, lv.z);
-      const ang = Math.hypot(av.x, av.y, av.z);
-      if (speed <= SETTLE_LINEAR_SPEED_MPS && ang <= SETTLE_ANGULAR_SPEED_RAD_S) {
-        settleAccum.current += dt;
-      } else {
-        settleAccum.current = Math.max(0, settleAccum.current - dt * 0.25);
-      }
-      if (!verified.current
-        && (settleAccum.current >= SETTLE_DURATION_SEC
-          || (activeSinceSec.current > SETTLE_BUDGET_SEC && speed < 0.35))) {
-        verified.current = true;
-        recordDropResult({
-          caseId: caseData.id,
-          itemId,
-          expectedZone: expected,
-          finalPosition: position,
-          insideExpectedReceiver: receiverContains(expected, position),
-          settledByTimeout: settleAccum.current < SETTLE_DURATION_SEC,
-          timestampMs: Date.now(),
-        });
-        const r = body.rotation();
-        frozenPose.current = {
-          p: position,
-          q: new THREE.Quaternion(r.x, r.y, r.z, r.w),
-        };
-        body.resetForces(true);
-        body.setLinvel({ x: 0, y: 0, z: 0 }, false);
-        body.setAngvel({ x: 0, y: 0, z: 0 }, false);
-        body.setBodyType(RigidBodyType.KinematicPositionBased, false);
-        authority.current = 'frozen';
-        phaseRef.current = 'settled';
-      }
-    }
-  });
 
   useFrame(() => {
     const body = bodyRef.current;
     if (!body) return;
 
+    // PREPARING: hold at spawn pose, zero velocity, keep invisible until visual ready.
     if (!spawned) {
-      const p = spawnPose.position;
+      const p = pose.position;
       body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
-      const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
+      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
       body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -396,12 +157,34 @@ function PhysicalPlaybackItemPhysicsInner({
       return;
     }
 
-    if (authority.current === 'preparing' && !activated.current && !isFault) {
-      activateDynamic(body);
-      return;
-    }
+    if (authority.current === 'kinematic') {
+      // Physics handoff at pusher contact / belt edge — never for fault cases.
+      // MUST be checked BEFORE the kinematic drive: under render lag a single
+      // frame can jump several seconds past handoffMs, and pose(elapsedMs) is
+      // then already deep inside the receiver. Applying setNextKinematic*
+      // from that pose in the same frame as the dynamic switch teleports the
+      // body (forbidden) — the next-step kinematic target still applies.
+      if (handoffMs != null && handoffPose && elapsedMs >= handoffMs) {
+        const hp = handoffPose.position;
+        body.setTranslation({ x: hp[0], y: hp[1], z: hp[2] }, true);
+        const he = new THREE.Euler(handoffPose.rotation[0], handoffPose.rotation[1], handoffPose.rotation[2]);
+        const hq = new THREE.Quaternion().setFromEuler(he);
+        body.setRotation({ x: hq.x, y: hq.y, z: hq.z, w: hq.w }, true);
+        body.setBodyType(RigidBodyType.Dynamic, true);
+        // Deterministic initial velocity: belt carry-over only — for C/D the
+        // Z motion comes from the kinematic paddle CONTACT (Stage 2B §13).
+        body.setLinvel({ x: 1.0, y: 0, z: 0 }, true);
+        if (profile.canRoll && category === 'B') {
+          body.setAngvel({ x: 2.0, y: 0.4, z: 0 }, true);
+        } else {
+          body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
+        authority.current = 'dynamic';
+        handedOffAtSimSec.current = physicsSimClock.simSec;
+        return;
+      }
 
-    if (authority.current === 'fault_kinematic') {
+      // Kinematic drive: domain pose is truth (belt travel, inspection dwell).
       const p = pose.position;
       const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
@@ -410,7 +193,50 @@ function PhysicalPlaybackItemPhysicsInner({
       return;
     }
 
-    if (authority.current === 'frozen' && frozenPose.current) {
+    if (authority.current === 'dynamic') {
+      const slept = body.isSleeping();
+      const lv = body.linvel();
+      const av = body.angvel();
+      const slow = Math.hypot(lv.x, lv.y, lv.z) < 0.2 && Math.hypot(av.x, av.y, av.z) < 1.0;
+      if (traceEnabled.current) {
+        const t = body.translation();
+        const w = window as unknown as { __ITEM_TRACE?: unknown[] };
+        w.__ITEM_TRACE = w.__ITEM_TRACE ?? [];
+        const arr = w.__ITEM_TRACE as { e: number; x: number; y: number; z: number; lv: number; slept: boolean }[];
+        if (arr.length === 0 || arr[arr.length - 1].e < elapsedMs - 200) {
+          arr.push({ e: Math.round(elapsedMs), x: +t.x.toFixed(3), y: +t.y.toFixed(3), z: +t.z.toFixed(3), lv: +Math.hypot(lv.x, lv.y, lv.z).toFixed(2), slept });
+          if (arr.length > 120) arr.shift();
+        }
+      }
+      const timedOut = handedOffAtSimSec.current != null
+        && physicsSimClock.simSec - handedOffAtSimSec.current > SETTLE_BUDGET_SEC;
+      // §14.2: freeze only after actual rest (sleep) or a timeout WITH low
+      // velocities — never freeze a body that is still moving/flying.
+      if ((slept || (timedOut && slow)) && !verified.current) {
+        verified.current = true;
+        const t = body.translation();
+        const p: [number, number, number] = [t.x, t.y, t.z];
+        recordDropResult({
+          caseId: caseData.id,
+          itemId,
+          expectedZone: category,
+          finalPosition: p,
+          insideExpectedReceiver: receiverContains(category, p),
+          settledByTimeout: !slept,
+          timestampMs: Date.now(),
+        });
+        const r = body.rotation();
+        frozenPose.current = { p, q: new THREE.Quaternion(r.x, r.y, r.z, r.w) };
+        body.setBodyType(RigidBodyType.KinematicPositionBased, false);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, false);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, false);
+        authority.current = 'frozen';
+      }
+      return;
+    }
+
+    // frozen: hold the verified rest pose (no drift across replays).
+    if (frozenPose.current) {
       const { p, q } = frozenPose.current;
       body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
       body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
@@ -420,63 +246,46 @@ function PhysicalPlaybackItemPhysicsInner({
   if (elapsedMs < 0) return null;
 
   const density = colliderDensity(profile);
-  const enabledRotations = useMemo<[boolean, boolean, boolean]>(
-    () => [!profile.lockRotationX, !profile.lockRotationY, !profile.lockRotationZ],
-    [profile.lockRotationX, profile.lockRotationY, profile.lockRotationZ],
-  );
+  // CCD for small/fast items (pen) and thin items (plate) — mirrors the sim.
+  const ccd = profile.approximateMassKg < 0.05 || itemData.dimensionsMm.height < 50;
 
-  // Initial pose props are mount-only (component is memoized against elapsedMs
-  // for non-fault cases). Never pass `type` — imperative setBodyType owns it.
-  // World transform authority after spawn: Rapier body → R3F object3D sync.
   return (
     <RigidBody
       ref={bodyRef}
+      type="kinematicPosition"
       colliders={false}
-      friction={profile.beltFriction}
+      friction={profile.friction}
       restitution={profile.restitution}
       linearDamping={profile.linearDamping}
       angularDamping={profile.angularDamping}
-      ccd={profile.ccd}
-      canSleep={false}
-      gravityScale={1}
-      enabledRotations={enabledRotations}
-      position={spawnPose.position}
-      rotation={spawnPose.rotation}
-      name={`product-body-${itemId}`}
-      userData={{ productId: itemId, bodyIdentity: bodyIdentity.current }}
+      ccd={ccd}
+      enabledRotations={[true, true, true]}
+      position={pose.position}
     >
-      {spawned && profile.collider.type === 'cuboid' && (
-        <CuboidCollider
-          args={profile.collider.halfExtents}
-          density={density}
-          friction={profile.guideFriction}
-          restitution={profile.restitution}
-        />
+      {/* Colliders only after visual ready — avoids stale/orphan contact. */}
+      {spawned && profile.collider === 'cuboid' && profile.cuboidHalfExtents && (
+        <CuboidCollider args={profile.cuboidHalfExtents} density={density} />
       )}
-      {spawned && profile.collider.type === 'capsule' && (
+      {spawned && profile.collider === 'capsule' && profile.capsule && (
         <CapsuleCollider
-          args={[profile.collider.halfHeight, profile.collider.radius]}
+          args={[profile.capsule[1], profile.capsule[0]]}
           density={density}
-          friction={profile.guideFriction}
-          restitution={profile.restitution}
-          rotation={profile.collider.axis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      {spawned && profile.collider.type === 'cylinder' && (
+      {spawned && profile.collider === 'cylinder' && profile.capsule && (
         <CylinderCollider
-          args={[profile.collider.halfHeight, profile.collider.radius]}
+          args={[profile.capsule[1], profile.capsule[0]]}
           density={density}
-          friction={profile.guideFriction}
-          restitution={profile.restitution}
-          rotation={profile.collider.axis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      <group name="ProductVisualGroup" visible={spawned}>
+      <group visible={spawned}>
         <ItemVisualContent
           caseData={caseData}
           phase={pose.phase}
           surface={pose.surface}
-          isSettled={authority.current === 'frozen'}
+          isSettled={authority.current === 'frozen' ? true : pose.isSettled}
           castShadow={castShadow && spawned}
           verifySku={verifySku}
           onVisualReady={onVisualReady}
@@ -484,25 +293,4 @@ function PhysicalPlaybackItemPhysicsInner({
       </group>
     </RigidBody>
   );
-}
-
-/**
- * Block playback-tick re-renders for normal (non-fault) products so React
- * RigidBody props cannot fight Rapier's mesh sync every frame.
- */
-export const PhysicalPlaybackItemPhysics = memo(
-  PhysicalPlaybackItemPhysicsInner,
-  (prev, next) => {
-    if (prev.caseData.id !== next.caseData.id) return false;
-    if (prev.slotIndex !== next.slotIndex) return false;
-    if (prev.castShadow !== next.castShadow) return false;
-    if (prev.verifySku !== next.verifySku) return false;
-    if (prev.caseData.faultType !== next.caseData.faultType) return false;
-    if (prev.jitter !== next.jitter) return false;
-    // Fault kinematics still need elapsedMs; physical products do not.
-    if (next.caseData.faultType) {
-      return prev.elapsedMs === next.elapsedMs;
-    }
-    return true;
-  },
-);
+});

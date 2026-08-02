@@ -6,11 +6,11 @@
 
 /** Kept for e2e (`docs-production-status`) and acquisition-pack provenance. */
 export const PRODUCTION_STATUS = {
-  acquisitionPackStatus: 'END_OF_LINE_CAMERA_CLASSIFICATION_PASS',
-  webTwinStatus: 'CAMERA_TRIGGERED_CLASSIFICATION_ACTIVE',
-  unitTests: 'PASS',
+  acquisitionPackStatus: 'DATA_ACQUISITION_PACK_READY',
+  webTwinStatus: 'BASELINE_PRESERVED',
+  unitTests: '196/196',
   productionBuild: 'PASS',
-  contactPhysics: 'DISCHARGE_EDGE_AND_CAMERA_CLASSIFICATION',
+  contactPhysics: 'NOT_FULLY_VALIDATED',
   officialCompliance: 'PARTIAL_SOURCES_PRESENT',
 } as const;
 
@@ -46,7 +46,6 @@ export const ROUTE_MAPPING = [
 export const DIVERTER_KINEMATICS = {
   rotationDurationSec: 0.5,
   openingSafetyMarginSec: 0.15,
-  /** Documented LOCAL sorter offsets (world = assemblyOrigin + local). */
   contactPlaneS: 1.0538,
   clearPlaneS: 1.6,
   phases: ['READY', 'ARMED', 'OPENING', 'HOLDING', 'CLOSING'] as const,
@@ -54,7 +53,6 @@ export const DIVERTER_KINEMATICS = {
   oneActiveProduct: true,
   closeAfterRearClear: true,
   generatedMechanismActive: false,
-  cameraTriggeredClassification: true,
 } as const;
 
 export const CAD_PROVENANCE = {
@@ -69,36 +67,35 @@ export const CAD_PROVENANCE = {
 
 export const PHYSICS_STATUS = {
   implemented: [
-    'Single dynamic product rigid body from spawn through junction settle',
-    'KinematicPositionBased CAD diverter colliders synced to visual yaw',
-    'Contact-only C/D routing (no route-specific translation / lateral impulse)',
-    'Discharge edge ends belt support; gravity fall into receivers',
-    'Camera-volume triggered measurement + classifyItem (DIGITAL_SENSOR_SIMULATION)',
-    'Playlist selects SKU only — no preassigned sorter route',
-    'Receiver sensors detect only; settling thresholds applied',
-    'Belt drive toward 1.0 m/s while supported (velocity coupling)',
-    'CCD enabled on active product profiles',
+    'Runtime product motion on belt (domain pose + Rapier handoff)',
+    'Product-associated diverter route timing (productId-bound)',
+    'Synchronized CAD diverter visual / kinematic targets',
+    'CCD enabled for light/thin SKUs in runtime and headless sim',
+    'Visual/physics spawn gating via product asset preload',
   ],
   notFullyValidated: [
-    'Production-calibrated mass / COM / friction per SKU',
-    'Visual full belt loop with true surface-velocity conveyor mesh',
-    'All playlist SKUs under owner visual review',
+    'Complete contact-only routing through CAD diverters',
+    'Belt surface velocity exactly 1 m/s with tangential drive',
+    'Calibrated friction / mass / COM per SKU',
+    'Fully physical continuous conveyor loop',
+    'Receiver capture under all item classes',
   ],
   planned: [
-    'Owner visual review of end-of-line fall and camera classification',
-    'Production calibration of product profiles',
+    'Visual full belt loop with surface-velocity coupling',
+    'Controlled tangential friction at 1 m/s',
+    'Dynamic rigid bodies for divert segment with fixed timestep',
+    'Per-SKU collider, damping, and friction profiles',
   ],
 } as const;
 
 export const VALIDATION_BOARD = [
-  { item: 'Unit tests', status: 'PASS' },
+  { item: 'Unit tests', status: '196/196 PASS' },
   { item: 'Production build', status: 'PASS' },
   { item: 'Active routes / + /documentation', status: 'PASS' },
   { item: 'conveyor-clean.glb checksum', status: 'PASS' },
   { item: 'Author FCStd checksum', status: 'PASS' },
   { item: 'Frozen diverter angles / 0.50 s', status: 'PASS' },
-  { item: 'Camera-triggered classification', status: 'PHYSICAL_CAMERA_CROSSING' },
-  { item: 'End-of-line discharge fall', status: 'GRAVITY_AFTER_SUPPORT_LOSS' },
+  { item: 'Full contact physics', status: 'NOT_FULLY_VALIDATED' },
 ] as const;
 
 export const OFFICIAL_SOURCE_MATRIX = [

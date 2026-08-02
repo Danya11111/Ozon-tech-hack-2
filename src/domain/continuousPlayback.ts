@@ -1,7 +1,6 @@
 /**
  * Continuous Playback Engine — manages auto-demo on main page.
- * Playlist selects SKU only. Sorter route / category is assigned by the
- * physical camera classification pipeline (see cameraClassification.ts).
+ * Classification is always driven by classifyItem (live rule engine).
  * Supports speed control, case seek, seeded variability, and event journal.
  */
 
@@ -10,7 +9,6 @@ import { DEMO_PLAYLIST, type PlaylistCase, PLAYLIST_LENGTH } from './demoPlaylis
 import { classifyItem } from './classifier';
 import { resolveItem } from '../data/resolveItem';
 import { createSeededRng, DEFAULT_DEMO_SEED, seededOffset } from './seededRng';
-import { resetCameraClassifications } from './cameraClassification';
 
 /** Playback status for the continuous demo. */
 export type PlaybackStatus = 'idle' | 'running' | 'paused' | 'finished';
@@ -43,9 +41,9 @@ export interface PhaseConfig {
  */
 export const CASE_PHASES: PhaseConfig[] = [
   { phase: 'spawn', durationMs: 300, label: 'Spawn at A' },
-  // A→GATE = 5.95 m at 1.0 m/s. feed(300)+2350+600+1000+1000+1000 = 6250 ms
-  // → travel from feed start = 5950 ms = GATE.x − A.x.
-  { phase: 'move_to_detection', durationMs: 2350, label: 'Moving to camera' },
+  // Stage 2B §10: 1900 ms so that feed(300)+1900+600+1000+1000+1000 = 5500 ms
+  // == A->GATE distance (5.5 m) at 1.0 m/s — continuous motion, no dwell.
+  { phase: 'move_to_detection', durationMs: 1900, label: 'Moving to camera' },
   { phase: 'detection', durationMs: 600, label: 'CV Detection' },
   { phase: 'measurement', durationMs: 1000, label: 'Laser measurement' },
   { phase: 'classification', durationMs: 1000, label: 'Classification' },
@@ -129,6 +127,11 @@ function caseDurationMs(playlistCase: PlaylistCase): number {
   return getPlaylistCaseDurationMs(playlistCase);
 }
 
+function classifyCase(playlistCase: PlaylistCase): ClassificationResult {
+  const item = resolveItem(playlistCase.itemId);
+  return classifyItem(item);
+}
+
 function buildJitter(seed: number, caseIndex: number): { x: number; z: number; yaw: number } {
   const rng = createSeededRng(seed + caseIndex * 9973);
   return {
@@ -155,9 +158,11 @@ function pushEvent(
 }
 
 function initCaseFields(playlistCase: PlaylistCase, seed: number, caseIndex: number, events: EventLogEntry[], simTime: number) {
-  // SKU only — no preassigned category / route for motion.
-  void resolveItem(playlistCase.itemId);
-  const warnings = playlistCase.warning ? [playlistCase.warning] : [];
+  const classification = classifyCase(playlistCase);
+  const warnings = [
+    ...(playlistCase.warning ? [playlistCase.warning] : []),
+    ...classification.warnings,
+  ];
   return {
     currentCase: playlistCase,
     currentCaseIndex: caseIndex,
@@ -165,8 +170,8 @@ function initCaseFields(playlistCase: PlaylistCase, seed: number, caseIndex: num
     currentPhase: 'spawn' as CasePhase,
     phaseElapsedMs: 0,
     caseElapsedMs: 0,
-    targetCategory: null as Category | null,
-    classification: null as ClassificationResult | null,
+    targetCategory: classification.category,
+    classification,
     command: 'IDLE',
     warning: warnings[0] ?? null,
     positionJitter: buildJitter(seed, caseIndex),
@@ -174,29 +179,16 @@ function initCaseFields(playlistCase: PlaylistCase, seed: number, caseIndex: num
       itemId: playlistCase.itemId,
       type: 'system',
       message: `Case start: ${playlistCase.title}`,
-      category: undefined,
+      category: classification.category,
       status: 'info',
     }),
-  };
-}
-
-/** Bind camera classification result into playback UI state (never at spawn). */
-export function applyCameraClassificationToPlayback(
-  state: ContinuousPlaybackState,
-  classification: ClassificationResult,
-): ContinuousPlaybackState {
-  return {
-    ...state,
-    targetCategory: classification.category,
-    classification,
-    warning: classification.warnings[0] ?? state.warning,
   };
 }
 
 /** Create initial playback state. */
 export function createPlaybackState(seed: number = DEFAULT_DEMO_SEED): ContinuousPlaybackState {
   const firstCase = DEMO_PLAYLIST[0];
-  resetCameraClassifications();
+  const classification = classifyCase(firstCase);
   return {
     status: 'idle',
     currentCaseIndex: 0,
@@ -221,7 +213,6 @@ export function createPlaybackState(seed: number = DEFAULT_DEMO_SEED): Continuou
 /** Start playback from the beginning. */
 export function startPlayback(state: ContinuousPlaybackState): ContinuousPlaybackState {
   const firstCase = DEMO_PLAYLIST[0];
-  resetCameraClassifications();
   const fields = initCaseFields(firstCase, state.seed, 0, [], 0);
   return {
     ...state,
@@ -303,7 +294,7 @@ function advanceToNextCase(state: ContinuousPlaybackState): ContinuousPlaybackSt
   return { ...state, ...fields };
 }
 
-function getCommandForPhase(phase: CasePhase, category: Category | null): string {
+function getCommandForPhase(phase: CasePhase, category: Category): string {
   switch (phase) {
     case 'spawn':
     case 'move_to_detection':
@@ -317,7 +308,7 @@ function getCommandForPhase(phase: CasePhase, category: Category | null): string
     case 'command_sent':
     case 'routing':
     case 'exit':
-      return category ? `ROUTE_TO_${category}` : 'AWAITING_CLASSIFICATION';
+      return `ROUTE_TO_${category}`;
     case 'fault_hold':
       return 'FAULT';
     case 'emergency_hold':
@@ -419,9 +410,7 @@ export function updatePlayback(
     }
   }
 
-  if (newState.status === 'running') {
-    // Phase commands (incl. FAULT) update without a preassigned route;
-    // ROUTE_TO_* only appears after camera classification binds category.
+  if (newState.status === 'running' && newState.targetCategory) {
     newState.command = getCommandForPhase(newState.currentPhase, newState.targetCategory);
   }
 
@@ -468,12 +457,12 @@ export function getTotalProgress(state: ContinuousPlaybackState): number {
   return (completedCases + currentCaseProgress) / PLAYLIST_LENGTH;
 }
 
-/** Assert playlist expectedCategory matches live classifier (test metadata only). */
+/** Assert playlist expectedCategory matches live classifier (for tests). */
 export function assertPlaylistClassifierConsistency(): Array<{ id: string; expected: Category; actual: Category }> {
   const mismatches: Array<{ id: string; expected: Category; actual: Category }> = [];
   for (const c of DEMO_PLAYLIST) {
     if (c.faultType) continue;
-    const result = classifyItem(resolveItem(c.itemId));
+    const result = classifyCase(c);
     if (result.category !== c.expectedCategory) {
       mismatches.push({ id: c.id, expected: c.expectedCategory, actual: result.category });
     }

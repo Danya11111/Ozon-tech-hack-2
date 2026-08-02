@@ -10,7 +10,7 @@ test.describe('routes', () => {
     await page.getByTestId('nav-documentation').first().click();
     await expect(page).toHaveURL(/\/documentation\/?$/);
     await expect(page.getByTestId('documentation-page')).toBeVisible();
-    await expect(page.getByTestId('docs-production-status')).toContainText('END_OF_LINE_CAMERA_CLASSIFICATION_PASS');
+    await expect(page.getByTestId('docs-production-status')).toContainText('DATA_ACQUISITION_PACK_READY');
     await expect(page.getByTestId('nav-documentation').first()).toHaveClass(/active/);
 
     await page.reload();

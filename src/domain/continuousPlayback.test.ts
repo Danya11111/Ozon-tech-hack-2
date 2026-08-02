@@ -58,11 +58,11 @@ describe('continuousPlayback', () => {
     expect(state.currentCaseIndex).toBe(0);
   });
 
-  it('startPlayback sets status to running without preassigned route', () => {
+  it('startPlayback sets status to running and classifies via classifyItem', () => {
     const state = startPlayback(createPlaybackState());
     expect(state.status).toBe('running');
-    expect(state.classification).toBeNull();
-    expect(state.targetCategory).toBeNull();
+    expect(state.classification).not.toBeNull();
+    expect(state.targetCategory).toBe(state.classification!.category);
   });
 
   it('pausePlayback sets status to paused', () => {

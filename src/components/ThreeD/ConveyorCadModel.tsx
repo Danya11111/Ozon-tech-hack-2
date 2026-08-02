@@ -13,7 +13,7 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import type { Category } from '../../domain/types';
-import { CONVEYOR_SPEED_MPS, SORTER_ASSEMBLY_ORIGIN_S } from '../../domain/physicalLayout';
+import { CONVEYOR_SPEED_MPS } from '../../domain/physicalLayout';
 import {
   buildDiverterPlanes,
   createDiverterProductMachine,
@@ -90,9 +90,8 @@ export const CAD_MODULE_Y = 0.594;
 export const CAD_MODULE_ORIGINS = {
   clean: -4.02,
   camera: -2.01,
-  /** Final discharge section — whole sorter assembly origin. */
-  sorter: SORTER_ASSEMBLY_ORIGIN_S,
-};
+  sorter: 0.0,
+} as const;
 
 export type CadModuleVariant = keyof typeof CAD_MODULE_ORIGINS;
 

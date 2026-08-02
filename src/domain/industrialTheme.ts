@@ -1,55 +1,30 @@
 /**
- * Shared visual tokens for the continuous digital twin.
- * Ozon light presentation environment (runtime materials / lights only).
- * CSS mirrors these values in `src/styles.css` (:root).
+ * Shared industrial visual tokens for the continuous digital twin.
+ * Keeps both modes looking like projections of one system.
  */
 
-/** Canonical Ozon brand + semantic tokens (source of truth for tests / 3D). */
-export const OZON_TOKENS = {
-  blue: '#005BFF',
-  magenta: '#F1117E',
-  darkSpace: '#001A34',
-  morning: '#00A2FF',
-  green: '#00BE6C',
-  orange: '#FFA800',
-  white: '#FFFFFF',
-  page: '#F5F7FA',
-  surface: '#FFFFFF',
-  surfaceSoft: '#EEF4FF',
-  border: '#DCE6F5',
-  muted: '#5F6F82',
-} as const;
-
 export const INDUSTRIAL_PALETTE = {
-  /** Scene clear / fog — soft Ozon morning surface */
-  background: OZON_TOKENS.surfaceSoft,
-  backgroundDark: OZON_TOKENS.darkSpace,
-  floor: '#E2EAF5',
-  gridCell: '#C5D4EA',
-  gridSection: OZON_TOKENS.blue,
+  background: '#e8eef4',
+  backgroundDark: '#0b1220',
+  floor: '#d5dde8',
+  gridCell: '#c5d0de',
+  gridSection: '#9aabbf',
   belt: '#2f3a48',
-  beltStripe: OZON_TOKENS.orange,
+  beltStripe: '#f1c40f',
   metal: '#7b8796',
   metalDark: '#4a5563',
   frame: '#5b6b7c',
   plastic: '#94a3b8',
   rubber: '#1f2937',
   cardboard: '#b68b58',
-  /** Ozon blue — primary technical markers */
-  sensorAccent: OZON_TOKENS.blue,
-  sensorActive: OZON_TOKENS.morning,
-  /** Success / B */
-  routeB: OZON_TOKENS.green,
-  /** Attention / C */
-  routeC: OZON_TOKENS.orange,
-  /** Active selection / D accent (magenta used selectively) */
-  routeD: OZON_TOKENS.magenta,
-  fault: OZON_TOKENS.magenta,
-  warning: OZON_TOKENS.orange,
-  success: OZON_TOKENS.green,
-  lightKey: OZON_TOKENS.white,
-  lightFill: OZON_TOKENS.surfaceSoft,
-  text: OZON_TOKENS.darkSpace,
+  sensorAccent: '#3b82f6',
+  routeB: '#16a34a',
+  routeC: '#ea580c',
+  routeD: '#7c3aed',
+  fault: '#ef4444',
+  warning: '#f59e0b',
+  lightKey: '#f8fafc',
+  lightFill: '#d0dae8',
 } as const;
 
 export const INDUSTRIAL_MATERIALS = {

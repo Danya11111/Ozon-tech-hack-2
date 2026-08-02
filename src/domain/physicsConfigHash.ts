@@ -5,20 +5,15 @@
  */
 import { getStaticColliders } from './physicsWorldLayout';
 import { PUSHER } from './pusherMotion';
-import {
-  PHYSICS_TIMESTEP_SEC,
-  PHYSICS_GRAVITY,
-  PHYSICS_MAX_SUBSTEPS,
-} from './physicsTimestep';
+import { PHYSICS_TIMESTEP_SEC, PHYSICS_GRAVITY } from './physicsTimestep';
 import { allVisualPhysicsProfiles } from './visualPhysicsProfiles';
 import { SIM_SETTLE_SECONDS } from './physicsDropSim';
 import { B_RECEIVER, ROLL_CAGE, ZONES } from './physicalLayout';
 
-export {
-  PHYSICS_TIMESTEP_SEC,
-  PHYSICS_GRAVITY,
-  PHYSICS_MAX_SUBSTEPS,
-} from './physicsTimestep';
+export { PHYSICS_TIMESTEP_SEC, PHYSICS_GRAVITY } from './physicsTimestep';
+
+/** Must match SorterPhysics PHYSICS_MAX_SUBSTEPS. */
+export const PHYSICS_MAX_SUBSTEPS = 4;
 
 export interface PhysicsConfigSnapshot {
   timestep: number;

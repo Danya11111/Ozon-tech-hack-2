@@ -15,10 +15,6 @@ import type { Mesh, Group } from 'three';
 import * as THREE from 'three';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
-import {
-  getClassificationEvent,
-  peekClassificationUi,
-} from '../../domain/cameraClassification';
 import { getPhysicalItemPose, getRoutingStartMs } from '../../domain/physicalItemMotion';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
 import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud } from '../../domain/measurementSystem';
@@ -35,19 +31,8 @@ import {
   preloadConveyorCad,
 } from './ConveyorCadModel';
 import { SorterPhysicsWorld } from './SorterPhysics';
-import {
-  RigidBody,
-  CuboidCollider,
-  useBeforePhysicsStep,
-  type RapierRigidBody,
-} from '@react-three/rapier';
+import { RigidBody, CuboidCollider, type RapierRigidBody } from '@react-three/rapier';
 import { GATE_VANE } from '../../domain/pusherMotion';
-import {
-  DIVERTER_COLLIDER_HALF_EXTENTS,
-  DIVERTER_GUIDE_FRICTION,
-  DIVERTER_RESTITUTION,
-  diverterColliderPose,
-} from '../../domain/junctionContactPhysics';
 import { deriveSorterVisualState } from '../../domain/sorterVisualState';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
 import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
@@ -118,12 +103,12 @@ const COLORS = {
   supports: INDUSTRIAL_PALETTE.plastic,
   motor: INDUSTRIAL_PALETTE.metalDark,
   sensorAccent: INDUSTRIAL_PALETTE.sensorAccent,
-  sensorActive: INDUSTRIAL_PALETTE.sensorActive,
+  sensorActive: '#60a5fa',
   gateFrame: INDUSTRIAL_PALETTE.metal,
   routeB: INDUSTRIAL_PALETTE.routeB,
   routeC: INDUSTRIAL_PALETTE.routeC,
   routeD: INDUSTRIAL_PALETTE.routeD,
-  itemShadow: INDUSTRIAL_PALETTE.metalDark,
+  itemShadow: '#3a4a5a',
 };
 
 const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalness?: number }> = {
@@ -509,13 +494,10 @@ function ZoneMarker({ position, label, color, active }: {
       </mesh>
       <Html position={[0, 0.15, 0]} center>
         <div style={{
-          color: active ? color : INDUSTRIAL_PALETTE.text,
+          color: active ? color : '#64748b',
           fontSize: '20px',
           fontWeight: 800,
-          padding: '2px 8px',
-          borderRadius: 8,
-          background: 'rgba(255,255,255,0.88)',
-          border: `1px solid ${active ? color : INDUSTRIAL_PALETTE.gridCell}`,
+          textShadow: active ? `0 0 8px ${color}` : 'none',
           userSelect: 'none',
         }}>
           {label}
@@ -560,16 +542,7 @@ function BReceiverBin({ active }: { active: boolean }) {
         <meshStandardMaterial color={metal} roughness={0.65} metalness={0.35} />
       </mesh>
       <Html position={[centerX, floorY + wallHeight + 0.18, centerZ]} center>
-        <div style={{
-          color: active ? COLORS.routeB : INDUSTRIAL_PALETTE.text,
-          fontSize: '20px',
-          fontWeight: 800,
-          padding: '2px 8px',
-          borderRadius: 8,
-          background: 'rgba(255,255,255,0.88)',
-          border: `1px solid ${active ? COLORS.routeB : INDUSTRIAL_PALETTE.gridCell}`,
-          userSelect: 'none',
-        }}>B</div>
+        <div style={{ color: active ? COLORS.routeB : '#64748b', fontSize: '20px', fontWeight: 800, userSelect: 'none' }}>B</div>
       </Html>
     </group>
   );
@@ -598,13 +571,10 @@ function RollCage({ position, label, color, active, shadows = false }: {
       {/* Label */}
       <Html position={[0, height + 0.15, 0]} center>
         <div style={{
-          color: active ? color : INDUSTRIAL_PALETTE.text,
+          color: active ? color : '#64748b',
           fontSize: '18px',
           fontWeight: 800,
-          padding: '2px 8px',
-          borderRadius: 8,
-          background: 'rgba(255,255,255,0.88)',
-          border: `1px solid ${active ? color : INDUSTRIAL_PALETTE.gridCell}`,
+          textShadow: active ? `0 0 8px ${color}` : 'none',
           userSelect: 'none',
         }}>
           {label}
@@ -887,8 +857,8 @@ function ShapeOutline({ position, scale, visible, isRound, category }: {
 }
 
 /**
- * Kinematic CAD diverter colliders — same pivot/yaw as visual CAD.
- * Updated in useBeforePhysicsStep so Rapier sees correct next-pose velocity.
+ * Kinematic colliders locked to CAD swing diverters (Барьер001/002).
+ * Downstream hinge fixed; free end along −X at 0°, arcs with the same yaw.
  */
 function CadGateColliders({
   category,
@@ -899,13 +869,12 @@ function CadGateColliders({
 }) {
   const leftRef = useRef<RapierRigidBody>(null);
   const rightRef = useRef<RapierRigidBody>(null);
-  const [hx, hy, hz] = DIVERTER_COLLIDER_HALF_EXTENTS;
-  const debug = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('colliderDebug') === '1';
+  const [hx, hy, hz] = GATE_VANE.halfExtents;
   void category;
   void caseElapsedMs;
 
-  useBeforePhysicsStep(() => {
+  useFrame(() => {
+    // Sync existing CAD gate colliders to visual diverter angles (no new physics).
     const motions = typeof window !== 'undefined'
       ? (window as unknown as {
           __DIVERTER_MOTIONS?: { leftRad: number; rightRad: number };
@@ -919,13 +888,13 @@ function CadGateColliders({
       yaw: number,
     ) => {
       if (!body) return;
-      const pose = diverterColliderPose(
-        { x: pivot.x, y: GATE_VANE.centerY, z: pivot.z },
-        yaw,
-        hx,
-      );
-      body.setNextKinematicTranslation(pose.center);
-      body.setNextKinematicRotation(pose.rotation);
+      const x = pivot.x - Math.cos(yaw) * hx;
+      const z = pivot.z + Math.sin(yaw) * hx;
+      body.setNextKinematicTranslation({ x, y: GATE_VANE.centerY, z });
+      const half = yaw / 2;
+      body.setNextKinematicRotation({
+        x: 0, y: Math.sin(half), z: 0, w: Math.cos(half),
+      });
     };
     apply(leftRef.current, CAD_SORTER_WORLD_PIVOTS.left, leftYaw);
     apply(rightRef.current, CAD_SORTER_WORLD_PIVOTS.right, rightYaw);
@@ -933,55 +902,15 @@ function CadGateColliders({
 
   const lp = CAD_SORTER_WORLD_PIVOTS.left;
   const rp = CAD_SORTER_WORLD_PIVOTS.right;
-  const left0 = diverterColliderPose(
-    { x: lp.x, y: GATE_VANE.centerY, z: lp.z },
-    0,
-    hx,
-  );
-  const right0 = diverterColliderPose(
-    { x: rp.x, y: GATE_VANE.centerY, z: rp.z },
-    0,
-    hx,
-  );
   return (
     <group name="cad-gate-colliders">
-      <RigidBody
-        ref={leftRef}
-        name="LEFT_DIVERTER_BODY"
-        type="kinematicPosition"
-        colliders={false}
-        position={[left0.center.x, left0.center.y, left0.center.z]}
-      >
-        <CuboidCollider
-          args={[hx, hy, hz]}
-          friction={DIVERTER_GUIDE_FRICTION}
-          restitution={DIVERTER_RESTITUTION}
-        />
-        {debug && (
-          <mesh>
-            <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
-            <meshBasicMaterial color="#22c55e" wireframe transparent opacity={0.85} />
-          </mesh>
-        )}
+      <RigidBody ref={leftRef} type="kinematicPosition" colliders={false} friction={0.55}
+        position={[lp.x - hx, GATE_VANE.centerY, lp.z]}>
+        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
       </RigidBody>
-      <RigidBody
-        ref={rightRef}
-        name="RIGHT_DIVERTER_BODY"
-        type="kinematicPosition"
-        colliders={false}
-        position={[right0.center.x, right0.center.y, right0.center.z]}
-      >
-        <CuboidCollider
-          args={[hx, hy, hz]}
-          friction={DIVERTER_GUIDE_FRICTION}
-          restitution={DIVERTER_RESTITUTION}
-        />
-        {debug && (
-          <mesh>
-            <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
-            <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.85} />
-          </mesh>
-        )}
+      <RigidBody ref={rightRef} type="kinematicPosition" colliders={false} friction={0.55}
+        position={[rp.x - hx, GATE_VANE.centerY, rp.z]}>
+        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
       </RigidBody>
     </group>
   );
@@ -1034,26 +963,8 @@ function ContinuousScene({
   debugOverlays?: boolean;
   physicsDebug?: boolean;
 }) {
-  const itemIdForClass = playback.currentCase.itemId.replace('-LC', '');
-  const [cameraCategory, setCameraCategory] = useState<'B' | 'C' | 'D' | null>(
-    () => getClassificationEvent(itemIdForClass)?.category ?? playback.targetCategory,
-  );
-  useEffect(() => {
-    const sync = () => {
-      const ev = getClassificationEvent(itemIdForClass);
-      setCameraCategory(ev?.category ?? null);
-    };
-    sync();
-    window.addEventListener('camera-classification', sync);
-    return () => window.removeEventListener('camera-classification', sync);
-  }, [itemIdForClass, playback.currentCaseIndex, playback.status]);
-  // Mechanical / visual category only from camera event — never playlist spawn.
-  const category = cameraCategory;
-  const classUi = peekClassificationUi(itemIdForClass);
+  const category = playback.targetCategory;
   const phase = playback.currentPhase;
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    (window as unknown as { __CLASSIFICATION_UI__?: typeof classUi }).__CLASSIFICATION_UI__ = classUi;
-  }
   const liteScene = simplified || !ENABLE_DEMO_EFFECTS;
   const effectsEnabled = ENABLE_DEMO_EFFECTS && !simplified;
 
@@ -1062,9 +973,8 @@ function ContinuousScene({
   const protoShadows = proto ? (proto && stage0!.shadows) : shadowsEnabled;
   const protoCamera = proto && stage0!.camera;
   const shotOverride = protoCamera && stage0!.shot ? shotToPhaseCategory(stage0!.shot) : null;
-  // Ozon light presentation environment is the default product look.
-  // Prototype stage0 may still request a dark background explicitly.
-  const darkBg = proto ? stage0!.darkBackground : false;
+  // Stage 2: premium industrial dark environment is the default look.
+  const darkBg = proto ? stage0!.darkBackground : true;
   
   const cameraHighlight = shouldHighlightCamera(phase);
   const showScan = shouldShowScanEffect(phase);
@@ -1212,18 +1122,13 @@ function ContinuousScene({
 
   return (
     <>
-      {/* Background: Ozon light presentation canvas (equipment stays readable) */}
-      <color
-        attach="background"
-        args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : INDUSTRIAL_PALETTE.background]}
-      />
-      <fog
-        attach="fog"
-        args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : INDUSTRIAL_PALETTE.background, 16, 32]}
-      />
+      {/* Background: industrial dark product canvas (equipment must dominate) */}
+      <color attach="background" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16']} />
+      <fog attach="fog" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16', 13, 26]} />
 
       {proto ? (
         <>
+          {/* Cinematic rig: very low ambient, strong key, soft fill, cool rim */}
           <ambientLight intensity={stage0!.ambient} />
           <hemisphereLight args={['#223148', '#0b1220', 0.3]} />
           <directionalLight
@@ -1240,18 +1145,21 @@ function ContinuousScene({
             shadow-camera-far={25}
             shadow-bias={-0.0004}
           />
+          {/* Fill — keeps shadowed side readable */}
           {stage0!.fill && <directionalLight position={[-5, 6, -3]} intensity={0.35} />}
+          {/* Rim — cheap back light for edge separation */}
           {stage0!.rim && <directionalLight position={[2, 5, -8]} intensity={0.7} color="#bcd7ff" />}
         </>
       ) : (
         <>
-          {/* Light Ozon studio: cool ambient, neutral key, soft shadows */}
-          <ambientLight intensity={0.72} />
-          <hemisphereLight args={[INDUSTRIAL_PALETTE.lightFill, INDUSTRIAL_PALETTE.gridCell, 0.85]} />
+          {/* Stage 2 default: premium industrial rig — readable ambient, key with
+              PCF shadows, soft fill, cool rim (Stage 0 proven values, brightened
+              in 2B so brackets/rollers read as volumes from every angle) */}
+          <ambientLight intensity={0.46} />
+          <hemisphereLight args={['#314860', '#0a1018', 0.9]} />
           <directionalLight
             position={[6, 9, 4]}
-            intensity={1.55}
-            color={INDUSTRIAL_PALETTE.lightKey}
+            intensity={2.7}
             castShadow={shadowsEnabled}
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
@@ -1261,44 +1169,46 @@ function ContinuousScene({
             shadow-camera-bottom={-7}
             shadow-camera-near={1}
             shadow-camera-far={25}
-            shadow-bias={-0.0003}
-            shadow-normalBias={0.03}
+            shadow-bias={-0.00035}
+            shadow-normalBias={0.025}
           />
-          <directionalLight position={[-5, 6, -3]} intensity={0.55} color={INDUSTRIAL_PALETTE.lightFill} />
-          <directionalLight position={[2, 5, -8]} intensity={0.45} color={INDUSTRIAL_PALETTE.sensorActive} />
-          <directionalLight position={[1, 3, 8]} intensity={0.4} color={INDUSTRIAL_PALETTE.lightKey} />
+          <directionalLight position={[-5, 6, -3]} intensity={0.7} />
+          <directionalLight position={[2, 5, -8]} intensity={0.85} color="#bcd7ff" />
+          {/* low front fill so the +Z face (camera side) never goes black */}
+          <directionalLight position={[1, 3, 8]} intensity={0.55} color="#cfdcf2" />
+          {/* Procedural studio environment (no external HDRI — offline-safe) */}
           {shadowsEnabled && (
             <Environment resolution={64} frames={1}>
-              <Lightformer intensity={1.8} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color={INDUSTRIAL_PALETTE.lightKey} />
-              <Lightformer intensity={0.6} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color={INDUSTRIAL_PALETTE.lightFill} />
-              <Lightformer intensity={0.35} position={[5, 1.5, 3]} rotation-y={-Math.PI / 4} scale={[3, 1.5, 1]} color={INDUSTRIAL_PALETTE.lightKey} />
+              <Lightformer intensity={1.6} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color="#dfe9ff" />
+              <Lightformer intensity={0.7} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color="#b8c8e8" />
+              <Lightformer intensity={0.5} position={[5, 1.5, 3]} rotation-y={-Math.PI / 4} scale={[3, 1.5, 1]} color="#ffe9c8" />
             </Environment>
           )}
         </>
       )}
 
-      {/* Grid — subtle Ozon blue-gray */}
+      {/* Grid — subdued so equipment remains the visual subject */}
       <Grid
         args={[16, 12]}
         cellSize={0.5}
-        cellThickness={0.28}
-        cellColor={darkBg ? INDUSTRIAL_PALETTE.metalDark : INDUSTRIAL_PALETTE.gridCell}
+        cellThickness={0.22}
+        cellColor={darkBg ? '#1a2533' : '#1e2a38'}
         sectionSize={2}
-        sectionThickness={0.4}
-        sectionColor={darkBg ? INDUSTRIAL_PALETTE.frame : INDUSTRIAL_PALETTE.sensorActive}
-        fadeDistance={12}
+        sectionThickness={0.45}
+        sectionColor={darkBg ? '#243344' : '#2a3a4c'}
+        fadeDistance={10}
         infiniteGrid={false}
         position={[0, 0.001, 0]}
       />
 
-      {/* Floor — light cool gray */}
+      {/* Floor — dark polished concrete with soft reflections */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={shadowsEnabled}>
         <planeGeometry args={[16, 12]} />
         <meshStandardMaterial
-          color={darkBg ? '#121a26' : INDUSTRIAL_PALETTE.floor}
-          roughness={darkBg ? 0.64 : 0.88}
-          metalness={darkBg ? 0.2 : 0.04}
-          envMapIntensity={0.35}
+          color={darkBg ? '#121a26' : '#151d2a'}
+          roughness={darkBg ? 0.64 : 0.8}
+          metalness={darkBg ? 0.2 : 0.1}
+          envMapIntensity={0.5}
         />
       </mesh>
 
