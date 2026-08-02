@@ -1,25 +1,54 @@
 /* =========================================================
-   OZON Tech Sorter — Product Demo UI
+   OZON Tech Sorter — Product Demo UI (light Ozon palette)
    ========================================================= */
 
 :root {
-  color-scheme: dark;
-  --bg: #050910;
-  --panel: rgba(10, 19, 31, 0.92);
-  --panel-strong: #0c1725;
-  --line: #1e3a54;
-  --muted: #91a4b8;
-  --text: #e5f2ff;
-  --cyan: #38bdf8;
-  --cyan-hover: #7dd3fc;
-  --green: #4ade80;
-  --orange: #f59e0b;
-  --purple: #c084fc;
-  --red: #fb3d4e;
+  color-scheme: light;
+
+  /* Brand tokens */
+  --ozon-blue: #005BFF;
+  --ozon-magenta: #F1117E;
+  --ozon-dark-space: #001A34;
+  --ozon-morning: #00A2FF;
+  --ozon-green: #00BE6C;
+  --ozon-orange: #FFA800;
+  --ozon-white: #FFFFFF;
+  --ozon-page: #F5F7FA;
+  --ozon-surface: #FFFFFF;
+  --ozon-surface-soft: #EEF4FF;
+  --ozon-border: #DCE6F5;
+  --ozon-text: #001A34;
+  --ozon-muted: #5F6F82;
+
+  /* Semantic */
+  --brand-primary: var(--ozon-blue);
+  --brand-secondary: var(--ozon-magenta);
+  --brand-light: var(--ozon-morning);
+  --status-success: var(--ozon-green);
+  --status-warning: var(--ozon-orange);
+  --text-primary: var(--ozon-dark-space);
+  --page-background: var(--ozon-page);
+  --panel-background: var(--ozon-surface);
+  --panel-border: var(--ozon-border);
+  --focus-ring: var(--ozon-blue);
+
+  /* Compat aliases used across the stylesheet */
+  --bg: var(--page-background);
+  --panel: var(--panel-background);
+  --panel-strong: var(--ozon-surface-soft);
+  --line: var(--panel-border);
+  --muted: var(--ozon-muted);
+  --text: var(--text-primary);
+  --cyan: var(--brand-primary);
+  --cyan-hover: var(--brand-light);
+  --green: var(--status-success);
+  --orange: var(--status-warning);
+  --purple: var(--brand-secondary);
+  --red: var(--brand-secondary);
   --section-max: 1200px;
-  --radius: 16px;
+  --radius: 14px;
   --tap: 44px;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Manrope", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 *,
@@ -45,9 +74,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 18% 8%, rgba(56, 189, 248, 0.14), transparent 28%),
-    radial-gradient(circle at 88% 18%, rgba(192, 132, 252, 0.1), transparent 24%),
-    linear-gradient(160deg, #03060b 0%, #07111d 52%, #050910 100%);
+    radial-gradient(circle at 12% 0%, rgba(0, 162, 255, 0.10), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(0, 91, 255, 0.06), transparent 28%),
+    linear-gradient(180deg, var(--ozon-surface-soft) 0%, var(--page-background) 42%, var(--page-background) 100%);
   color: var(--text);
   font-size: 16px;
   line-height: 1.5;
@@ -77,25 +106,26 @@ a {
 
 button {
   min-height: var(--tap);
-  border: 1px solid #2a4a66;
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
-  background: #0e1b2b;
-  color: var(--text);
+  background: var(--panel-background);
+  color: var(--text-primary);
   cursor: pointer;
   font-weight: 700;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  box-shadow: 0 1px 2px rgba(0, 26, 52, 0.06);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 button:hover {
-  border-color: var(--cyan);
-  background: #11273b;
+  border-color: var(--brand-primary);
+  background: var(--ozon-surface-soft);
   transform: translateY(-1px);
 }
 
 button:focus-visible,
 .nav-link:focus-visible,
 .criteria-link:focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -121,19 +151,20 @@ button:disabled {
 
 .btn-primary {
   border: none;
-  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-  color: #041018;
+  background: var(--brand-primary);
+  color: var(--ozon-white);
+  box-shadow: 0 2px 8px rgba(0, 91, 255, 0.28);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
-  color: #041018;
+  background: var(--brand-light);
+  color: var(--ozon-white);
 }
 
 .btn-secondary {
-  background: #0e1b2b;
-  color: var(--text);
-  border: 1px solid #2a4a66;
+  background: var(--panel-background);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border);
 }
 
 .category-B { color: var(--green); }
@@ -3686,7 +3717,7 @@ button:disabled {
     height: 100vh;
     max-width: 100vw;
     overflow: hidden;
-    background: #070d16;
+    background: var(--page-background);
   }
 
   .main-page--product .product-topbar,
@@ -3701,8 +3732,8 @@ button:disabled {
     height: 68px;
     max-height: 72px;
     padding: 0 24px;
-    border-bottom: 1px solid rgba(56, 189, 248, 0.18);
-    background: rgba(6, 12, 20, 0.88);
+    border-bottom: 1px solid var(--panel-border);
+    background: var(--ozon-white);
     backdrop-filter: blur(14px);
   }
 
@@ -3720,9 +3751,9 @@ button:disabled {
     width: 34px;
     height: 34px;
     border-radius: 9px;
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    background: rgba(56, 189, 248, 0.12);
-    color: #7dd3fc;
+    border: 1px solid var(--panel-border);
+    background: var(--ozon-surface-soft);
+    color: var(--brand-primary);
     font-weight: 800;
     font-size: 15px;
     flex: 0 0 auto;
@@ -3732,7 +3763,7 @@ button:disabled {
     font-size: 15px;
     font-weight: 700;
     line-height: 1.15;
-    color: #e8f2ff;
+    color: var(--text-primary);
   }
 
   .product-brand-sub {
@@ -3829,7 +3860,7 @@ button:disabled {
     display: grid;
     place-items: center;
     color: var(--muted);
-    background: #070d16;
+    background: var(--page-background);
     z-index: 2;
   }
 
@@ -3840,8 +3871,8 @@ button:disabled {
     height: 78px;
     max-height: 84px;
     padding: 0 24px 10px;
-    border-top: 1px solid rgba(56, 189, 248, 0.18);
-    background: rgba(6, 12, 20, 0.9);
+    border-top: 1px solid var(--panel-border);
+    background: var(--ozon-white);
     backdrop-filter: blur(14px);
   }
 
@@ -3895,7 +3926,9 @@ button:disabled {
     position: static;
     min-height: 40px;
     border-radius: 10px;
-    background: rgba(12, 22, 34, 0.9);
+    background: var(--ozon-surface-soft);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
   }
 
   .product-sim-pill {
@@ -3989,4 +4022,90 @@ button:disabled {
   .docs-status-value {
     font-size: 1.05rem;
   }
+}
+
+/* =========================================================
+   Ozon light chrome overrides (shell / HUD / nav / controls)
+   ========================================================= */
+
+.main-hud,
+.app-nav-overlay,
+.app-nav-bar,
+.main-progress {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: var(--panel-border) !important;
+  color: var(--text-primary);
+  box-shadow: 0 4px 18px rgba(0, 26, 52, 0.08);
+}
+
+.play-button,
+.main-page--product .play-button {
+  background: var(--brand-primary) !important;
+  color: var(--ozon-white) !important;
+  box-shadow: 0 4px 16px rgba(0, 91, 255, 0.28);
+}
+
+.play-button:hover {
+  background: var(--brand-light) !important;
+}
+
+.app-nav-link.active {
+  color: var(--ozon-white) !important;
+  background: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+}
+
+.app-nav-link:hover {
+  color: var(--brand-primary);
+  border-color: var(--panel-border);
+  background: var(--ozon-surface-soft);
+}
+
+.product-topbar,
+.docs-product-topbar,
+.main-page--product .product-topbar,
+.docs-page .product-topbar {
+  background: var(--ozon-white) !important;
+  border-bottom: 1px solid var(--panel-border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 0 rgba(0, 26, 52, 0.04);
+}
+
+.product-brand-title,
+.product-tele-value {
+  color: var(--text-primary) !important;
+}
+
+.product-brand-sub,
+.product-tele-label {
+  color: var(--ozon-muted) !important;
+}
+
+.main-page--product .app-nav-solid,
+.docs-page .product-topbar .app-nav-solid {
+  background: var(--ozon-surface-soft) !important;
+  border-color: var(--panel-border) !important;
+}
+
+.product-webgl-note,
+.docs-page {
+  background: var(--page-background) !important;
+  color: var(--text-primary);
+}
+
+.product-tele-value.category-B { color: var(--status-success) !important; }
+.product-tele-value.category-C { color: var(--status-warning) !important; }
+.product-tele-value.category-D { color: var(--brand-secondary) !important; }
+
+.progress-dot {
+  background: var(--ozon-border);
+}
+
+.main-page--product .product-dock,
+.main-page--product .main-controls .auto-camera-toggle,
+.main-page--product .presentation-toggle,
+.stop-button {
+  background: var(--ozon-white) !important;
+  border-color: var(--panel-border) !important;
+  color: var(--text-primary) !important;
 }

@@ -114,12 +114,12 @@ const COLORS = {
   supports: INDUSTRIAL_PALETTE.plastic,
   motor: INDUSTRIAL_PALETTE.metalDark,
   sensorAccent: INDUSTRIAL_PALETTE.sensorAccent,
-  sensorActive: '#60a5fa',
+  sensorActive: INDUSTRIAL_PALETTE.sensorActive,
   gateFrame: INDUSTRIAL_PALETTE.metal,
   routeB: INDUSTRIAL_PALETTE.routeB,
   routeC: INDUSTRIAL_PALETTE.routeC,
   routeD: INDUSTRIAL_PALETTE.routeD,
-  itemShadow: '#3a4a5a',
+  itemShadow: INDUSTRIAL_PALETTE.metalDark,
 };
 
 const ITEM_MATERIALS: Record<string, { color: string; roughness: number; metalness?: number }> = {
@@ -505,10 +505,13 @@ function ZoneMarker({ position, label, color, active }: {
       </mesh>
       <Html position={[0, 0.15, 0]} center>
         <div style={{
-          color: active ? color : '#64748b',
+          color: active ? color : INDUSTRIAL_PALETTE.text,
           fontSize: '20px',
           fontWeight: 800,
-          textShadow: active ? `0 0 8px ${color}` : 'none',
+          padding: '2px 8px',
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.88)',
+          border: `1px solid ${active ? color : INDUSTRIAL_PALETTE.gridCell}`,
           userSelect: 'none',
         }}>
           {label}
@@ -553,7 +556,16 @@ function BReceiverBin({ active }: { active: boolean }) {
         <meshStandardMaterial color={metal} roughness={0.65} metalness={0.35} />
       </mesh>
       <Html position={[centerX, floorY + wallHeight + 0.18, centerZ]} center>
-        <div style={{ color: active ? COLORS.routeB : '#64748b', fontSize: '20px', fontWeight: 800, userSelect: 'none' }}>B</div>
+        <div style={{
+          color: active ? COLORS.routeB : INDUSTRIAL_PALETTE.text,
+          fontSize: '20px',
+          fontWeight: 800,
+          padding: '2px 8px',
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.88)',
+          border: `1px solid ${active ? COLORS.routeB : INDUSTRIAL_PALETTE.gridCell}`,
+          userSelect: 'none',
+        }}>B</div>
       </Html>
     </group>
   );
@@ -582,10 +594,13 @@ function RollCage({ position, label, color, active, shadows = false }: {
       {/* Label */}
       <Html position={[0, height + 0.15, 0]} center>
         <div style={{
-          color: active ? color : '#64748b',
+          color: active ? color : INDUSTRIAL_PALETTE.text,
           fontSize: '18px',
           fontWeight: 800,
-          textShadow: active ? `0 0 8px ${color}` : 'none',
+          padding: '2px 8px',
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.88)',
+          border: `1px solid ${active ? color : INDUSTRIAL_PALETTE.gridCell}`,
           userSelect: 'none',
         }}>
           {label}
@@ -1025,8 +1040,9 @@ function ContinuousScene({
   const protoShadows = proto ? (proto && stage0!.shadows) : shadowsEnabled;
   const protoCamera = proto && stage0!.camera;
   const shotOverride = protoCamera && stage0!.shot ? shotToPhaseCategory(stage0!.shot) : null;
-  // Stage 2: premium industrial dark environment is the default look.
-  const darkBg = proto ? stage0!.darkBackground : true;
+  // Ozon light presentation environment is the default product look.
+  // Prototype stage0 may still request a dark background explicitly.
+  const darkBg = proto ? stage0!.darkBackground : false;
   
   const cameraHighlight = shouldHighlightCamera(phase);
   const showScan = shouldShowScanEffect(phase);
@@ -1174,13 +1190,18 @@ function ContinuousScene({
 
   return (
     <>
-      {/* Background: industrial dark product canvas (equipment must dominate) */}
-      <color attach="background" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16']} />
-      <fog attach="fog" args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : '#070d16', 13, 26]} />
+      {/* Background: Ozon light presentation canvas (equipment stays readable) */}
+      <color
+        attach="background"
+        args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : INDUSTRIAL_PALETTE.background]}
+      />
+      <fog
+        attach="fog"
+        args={[darkBg ? INDUSTRIAL_PALETTE.backgroundDark : INDUSTRIAL_PALETTE.background, 16, 32]}
+      />
 
       {proto ? (
         <>
-          {/* Cinematic rig: very low ambient, strong key, soft fill, cool rim */}
           <ambientLight intensity={stage0!.ambient} />
           <hemisphereLight args={['#223148', '#0b1220', 0.3]} />
           <directionalLight
@@ -1197,21 +1218,18 @@ function ContinuousScene({
             shadow-camera-far={25}
             shadow-bias={-0.0004}
           />
-          {/* Fill — keeps shadowed side readable */}
           {stage0!.fill && <directionalLight position={[-5, 6, -3]} intensity={0.35} />}
-          {/* Rim — cheap back light for edge separation */}
           {stage0!.rim && <directionalLight position={[2, 5, -8]} intensity={0.7} color="#bcd7ff" />}
         </>
       ) : (
         <>
-          {/* Stage 2 default: premium industrial rig — readable ambient, key with
-              PCF shadows, soft fill, cool rim (Stage 0 proven values, brightened
-              in 2B so brackets/rollers read as volumes from every angle) */}
-          <ambientLight intensity={0.46} />
-          <hemisphereLight args={['#314860', '#0a1018', 0.9]} />
+          {/* Light Ozon studio: cool ambient, neutral key, soft shadows */}
+          <ambientLight intensity={0.72} />
+          <hemisphereLight args={[INDUSTRIAL_PALETTE.lightFill, INDUSTRIAL_PALETTE.gridCell, 0.85]} />
           <directionalLight
             position={[6, 9, 4]}
-            intensity={2.7}
+            intensity={1.55}
+            color={INDUSTRIAL_PALETTE.lightKey}
             castShadow={shadowsEnabled}
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
@@ -1221,46 +1239,44 @@ function ContinuousScene({
             shadow-camera-bottom={-7}
             shadow-camera-near={1}
             shadow-camera-far={25}
-            shadow-bias={-0.00035}
-            shadow-normalBias={0.025}
+            shadow-bias={-0.0003}
+            shadow-normalBias={0.03}
           />
-          <directionalLight position={[-5, 6, -3]} intensity={0.7} />
-          <directionalLight position={[2, 5, -8]} intensity={0.85} color="#bcd7ff" />
-          {/* low front fill so the +Z face (camera side) never goes black */}
-          <directionalLight position={[1, 3, 8]} intensity={0.55} color="#cfdcf2" />
-          {/* Procedural studio environment (no external HDRI — offline-safe) */}
+          <directionalLight position={[-5, 6, -3]} intensity={0.55} color={INDUSTRIAL_PALETTE.lightFill} />
+          <directionalLight position={[2, 5, -8]} intensity={0.45} color={INDUSTRIAL_PALETTE.sensorActive} />
+          <directionalLight position={[1, 3, 8]} intensity={0.4} color={INDUSTRIAL_PALETTE.lightKey} />
           {shadowsEnabled && (
             <Environment resolution={64} frames={1}>
-              <Lightformer intensity={1.6} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color="#dfe9ff" />
-              <Lightformer intensity={0.7} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color="#b8c8e8" />
-              <Lightformer intensity={0.5} position={[5, 1.5, 3]} rotation-y={-Math.PI / 4} scale={[3, 1.5, 1]} color="#ffe9c8" />
+              <Lightformer intensity={1.8} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[8, 8, 1]} color={INDUSTRIAL_PALETTE.lightKey} />
+              <Lightformer intensity={0.6} position={[-5, 2, -4]} rotation-y={Math.PI / 3} scale={[4, 2, 1]} color={INDUSTRIAL_PALETTE.lightFill} />
+              <Lightformer intensity={0.35} position={[5, 1.5, 3]} rotation-y={-Math.PI / 4} scale={[3, 1.5, 1]} color={INDUSTRIAL_PALETTE.lightKey} />
             </Environment>
           )}
         </>
       )}
 
-      {/* Grid — subdued so equipment remains the visual subject */}
+      {/* Grid — subtle Ozon blue-gray */}
       <Grid
         args={[16, 12]}
         cellSize={0.5}
-        cellThickness={0.22}
-        cellColor={darkBg ? '#1a2533' : '#1e2a38'}
+        cellThickness={0.28}
+        cellColor={darkBg ? INDUSTRIAL_PALETTE.metalDark : INDUSTRIAL_PALETTE.gridCell}
         sectionSize={2}
-        sectionThickness={0.45}
-        sectionColor={darkBg ? '#243344' : '#2a3a4c'}
-        fadeDistance={10}
+        sectionThickness={0.4}
+        sectionColor={darkBg ? INDUSTRIAL_PALETTE.frame : INDUSTRIAL_PALETTE.sensorActive}
+        fadeDistance={12}
         infiniteGrid={false}
         position={[0, 0.001, 0]}
       />
 
-      {/* Floor — dark polished concrete with soft reflections */}
+      {/* Floor — light cool gray */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={shadowsEnabled}>
         <planeGeometry args={[16, 12]} />
         <meshStandardMaterial
-          color={darkBg ? '#121a26' : '#151d2a'}
-          roughness={darkBg ? 0.64 : 0.8}
-          metalness={darkBg ? 0.2 : 0.1}
-          envMapIntensity={0.5}
+          color={darkBg ? '#121a26' : INDUSTRIAL_PALETTE.floor}
+          roughness={darkBg ? 0.64 : 0.88}
+          metalness={darkBg ? 0.2 : 0.04}
+          envMapIntensity={0.35}
         />
       </mesh>
 

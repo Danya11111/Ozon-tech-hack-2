@@ -5,7 +5,7 @@
  * C/D redirection is contact-only against kinematic CAD diverter colliders.
  * No junction setTranslation / route-specific lateral impulses.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import {
@@ -62,7 +62,7 @@ function colliderDensity(profile: ReturnType<typeof getProductPhysicsProfile>): 
   return profile.massKg / Math.max(volume, 1e-6);
 }
 
-export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhysics({
+function PhysicalPlaybackItemPhysicsInner({
   caseData,
   elapsedMs,
   slotIndex = 0,
@@ -134,7 +134,7 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseData.id, profile.productId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     bodyIdentity.current = `${caseData.id}:${itemId}`;
     authority.current = isFault ? 'fault_kinematic' : 'preparing';
     phaseRef.current = 'preparing';
@@ -148,6 +148,7 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     setSpawned(ready);
     const body = bodyRef.current;
     if (body) {
+      // Imperative spawn pose — never reapplied via React RigidBody props.
       body.setBodyType(RigidBodyType.KinematicPositionBased, false);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -350,16 +351,17 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   if (elapsedMs < 0) return null;
 
   const density = colliderDensity(profile);
-  const enabledRotations: [boolean, boolean, boolean] = [
-    !profile.lockRotationX,
-    !profile.lockRotationY,
-    !profile.lockRotationZ,
-  ];
+  const enabledRotations = useMemo<[boolean, boolean, boolean]>(
+    () => [!profile.lockRotationX, !profile.lockRotationY, !profile.lockRotationZ],
+    [profile.lockRotationX, profile.lockRotationY, profile.lockRotationZ],
+  );
 
+  // Initial pose props are mount-only (component is memoized against elapsedMs
+  // for non-fault cases). Never pass `type` — imperative setBodyType owns it.
+  // World transform authority after spawn: Rapier body → R3F object3D sync.
   return (
     <RigidBody
       ref={bodyRef}
-      type="kinematicPosition"
       colliders={false}
       friction={profile.beltFriction}
       restitution={profile.restitution}
@@ -371,6 +373,8 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       enabledRotations={enabledRotations}
       position={spawnPose.position}
       rotation={spawnPose.rotation}
+      name={`product-body-${itemId}`}
+      userData={{ productId: itemId, bodyIdentity: bodyIdentity.current }}
     >
       {spawned && profile.collider.type === 'cuboid' && (
         <CuboidCollider
@@ -398,7 +402,7 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
           rotation={profile.collider.axis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      <group visible={spawned}>
+      <group name="ProductVisualGroup" visible={spawned}>
         <ItemVisualContent
           caseData={caseData}
           phase={pose.phase}
@@ -411,4 +415,25 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       </group>
     </RigidBody>
   );
-});
+}
+
+/**
+ * Block playback-tick re-renders for normal (non-fault) products so React
+ * RigidBody props cannot fight Rapier's mesh sync every frame.
+ */
+export const PhysicalPlaybackItemPhysics = memo(
+  PhysicalPlaybackItemPhysicsInner,
+  (prev, next) => {
+    if (prev.caseData.id !== next.caseData.id) return false;
+    if (prev.slotIndex !== next.slotIndex) return false;
+    if (prev.castShadow !== next.castShadow) return false;
+    if (prev.verifySku !== next.verifySku) return false;
+    if (prev.caseData.faultType !== next.caseData.faultType) return false;
+    if (prev.jitter !== next.jitter) return false;
+    // Fault kinematics still need elapsedMs; physical products do not.
+    if (next.caseData.faultType) {
+      return prev.elapsedMs === next.elapsedMs;
+    }
+    return true;
+  },
+);

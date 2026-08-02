@@ -8,12 +8,13 @@ import { getRenderedItemDimensions } from '../../domain/physicalLayout';
 import * as THREE from 'three';
 import RealItemModel, { isProductAssetReady } from './RealItemModel';
 import { ItemVerificationOverlay } from './RealModelVerification';
+import { CATEGORY_COLORS, INDUSTRIAL_PALETTE } from '../../domain/industrialTheme';
 
 const COLORS = {
-  B: '#16a34a',
-  C: '#ea580c',
-  D: '#7c3aed',
-  sensorAccent: '#3b82f6',
+  B: CATEGORY_COLORS.B,
+  C: CATEGORY_COLORS.C,
+  D: CATEGORY_COLORS.D,
+  sensorAccent: INDUSTRIAL_PALETTE.sensorAccent,
 };
 
 /** Base real-model materials per SKU (Stage 1 §20 — basic, form-revealing). */
