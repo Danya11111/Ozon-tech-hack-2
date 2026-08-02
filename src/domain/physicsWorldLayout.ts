@@ -118,9 +118,9 @@ export function getStaticColliders(): StaticColliderDef[] {
     { id: 'world-floor', halfExtents: [8, 0.05, 6], position: [0, -0.05, 0], rotation: [0, 0, 0], friction: 0.8 },
     // Belt safety slab — items never pass through the belt surface.
     // Ends at the B spur end (2.15): beyond it the B drop chute takes over.
+    // Continuous deck (no separate spur cuboid): an overlapping spur box
+    // creates a vertical curb that stops velocity-coupled dynamic products.
     { id: 'belt-slab', halfExtents: [(2.15 + 4.2) / 2, 0.012, CONVEYOR_WIDTH_M / 2], position: [(2.15 - 4.2) / 2, BELT_TOP_Y - 0.014, 0], rotation: [0, 0, 0], friction: 0.7 },
-    // B transfer spur — top FLUSH with the belt slab (no 2mm trip step)
-    { id: 'b-spur', halfExtents: [0.325, 0.02, (CONVEYOR_WIDTH_M - 0.06) / 2], position: [1.825, BELT_TOP_Y - 0.022, 0], rotation: [0, 0, 0], friction: 0.4 },
     ...chuteColliders(ZONES.C.z, 'C'),
     ...chuteColliders(ZONES.D.z, 'D'),
     ...receiverColliders(),

@@ -46,14 +46,23 @@ src/styles.css
 | Classifier PDF | `official_sources/doc-1783095831.pdf` |
 | Workspace / scoring PDFs | `input_info/doc-1783009942.pdf`, `doc-1783011400.pdf` |
 
-## Physics roadmap (not completed)
+## Physics status (ENGINEERING-DERIVED PHYSICAL VALIDATION)
 
-1. Surface-velocity belt at 1 m/s with visual loop.
-2. Contact-validated CAD diverter deflection for all playlist SKUs.
-3. Calibrated per-SKU mass, COM, friction, damping.
-4. Receiver capture verification under dynamic drops.
+Implemented and covered by `src/domain/junctionContactPhysics.ts` (+ tests):
 
-CCD for light/thin items exists in runtime/sim; that alone is **not** full contact validation.
+1. Fixed timestep **1/120 s**, max **4** substeps, gravity **[0, −9.81, 0]**.
+2. Belt target speed **1.0 m/s** via supported-body velocity coupling (stationary belt collider).
+3. Single dynamic product body through junction; temporary scripted handoff removed.
+4. LEFT/RIGHT diverter colliders: `kinematicPositionBased`, cuboid half-extents **[0.375, 0.05, 0.02]**, same pivot/yaw as CAD.
+5. C/D change direction only by physical contact; B uses the open neutral corridor.
+6. Receiver volumes are sensors for completion; they do not translate the body.
+7. Deterministic matrix **45/45** correct receiver entries (3 profiles × 5 runs × B/C/D).
+
+Still not production-certified:
+
+- Per-SKU mass / COM / friction calibration against real hardware
+- Visual full belt loop mesh with true surface velocity
+- Owner visual review of contact behavior
 
 ## Compliance evidence rules
 

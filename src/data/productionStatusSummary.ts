@@ -8,9 +8,9 @@
 export const PRODUCTION_STATUS = {
   acquisitionPackStatus: 'DATA_ACQUISITION_PACK_READY',
   webTwinStatus: 'BASELINE_PRESERVED',
-  unitTests: '196/196',
+  unitTests: '221/221',
   productionBuild: 'PASS',
-  contactPhysics: 'NOT_FULLY_VALIDATED',
+  contactPhysics: 'ENGINEERING_DERIVED_PHYSICAL_VALIDATION',
   officialCompliance: 'PARTIAL_SOURCES_PRESENT',
 } as const;
 
@@ -67,35 +67,34 @@ export const CAD_PROVENANCE = {
 
 export const PHYSICS_STATUS = {
   implemented: [
-    'Runtime product motion on belt (domain pose + Rapier handoff)',
-    'Product-associated diverter route timing (productId-bound)',
-    'Synchronized CAD diverter visual / kinematic targets',
-    'CCD enabled for light/thin SKUs in runtime and headless sim',
-    'Visual/physics spawn gating via product asset preload',
+    'Single dynamic product rigid body from spawn through junction settle',
+    'KinematicPositionBased CAD diverter colliders synced to visual yaw',
+    'Contact-only C/D routing (no route-specific translation / lateral impulse)',
+    'Physical B straight corridor with neutral guides',
+    'Receiver sensors detect only; settling thresholds applied',
+    'Belt drive toward 1.0 m/s while supported (velocity coupling)',
+    'CCD enabled on active product profiles',
+    '45-run deterministic junction matrix (ENGINEERING-DERIVED PHYSICAL VALIDATION)',
   ],
   notFullyValidated: [
-    'Complete contact-only routing through CAD diverters',
-    'Belt surface velocity exactly 1 m/s with tangential drive',
-    'Calibrated friction / mass / COM per SKU',
-    'Fully physical continuous conveyor loop',
-    'Receiver capture under all item classes',
+    'Production-calibrated mass / COM / friction per SKU',
+    'Visual full belt loop with true surface-velocity conveyor mesh',
+    'All playlist SKUs under owner visual review',
   ],
   planned: [
-    'Visual full belt loop with surface-velocity coupling',
-    'Controlled tangential friction at 1 m/s',
-    'Dynamic rigid bodies for divert segment with fixed timestep',
-    'Per-SKU collider, damping, and friction profiles',
+    'Owner visual / physical-behavior review of contact routing',
+    'Production calibration of product profiles',
   ],
 } as const;
 
 export const VALIDATION_BOARD = [
-  { item: 'Unit tests', status: '196/196 PASS' },
+  { item: 'Unit tests', status: '221/221 PASS' },
   { item: 'Production build', status: 'PASS' },
   { item: 'Active routes / + /documentation', status: 'PASS' },
   { item: 'conveyor-clean.glb checksum', status: 'PASS' },
   { item: 'Author FCStd checksum', status: 'PASS' },
   { item: 'Frozen diverter angles / 0.50 s', status: 'PASS' },
-  { item: 'Full contact physics', status: 'NOT_FULLY_VALIDATED' },
+  { item: 'Physical junction contact matrix', status: '45/45 ENGINEERING-DERIVED PHYSICAL VALIDATION' },
 ] as const;
 
 export const OFFICIAL_SOURCE_MATRIX = [

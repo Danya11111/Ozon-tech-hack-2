@@ -96,17 +96,23 @@ Missing primary brief (do not cite as present): `input_info/extracted/Поста
 
 ## Validation
 
-- Unit tests: **196/196** (`npm test -- --run`)
+- Unit tests: **221/221** (`npm test -- --run`)
 - Production build: **PASS** (`npm run build`)
 - Two-page routing: `/` + `/documentation`
 - CAD / GLB checksums: verified against values above
 - Diverter frozen angles / duration: covered by unit tests
+- Physical junction contact matrix: **45/45** — **ENGINEERING-DERIVED PHYSICAL VALIDATION** (not production-certified)
+
+## Physics (junction contact)
+
+- Same dynamic product rigid body through spawn → junction → receiver settle
+- LEFT/RIGHT CAD diverters use `kinematicPositionBased` colliders synced to the accepted CAD yaw
+- B: physical straight corridor; C/D: contact-only redirection; receiver sensors detect only
+- Temporary scripted junction handoff removed from the active product path
 
 ## Current limitations
 
-- Full contact-only sorting through CAD diverters is **not fully validated**.
-- Belt surface-velocity physics (true 1 m/s tangential drive) is **planned**, not complete.
-- Per-SKU mass / COM / friction profiles still need calibration.
+- Product profiles are **engineering-derived**, not production-calibrated.
 - Author CAD horn / complete transmission is absent or incomplete in the active GLB (`AUTHOR_CAD_INCOMPLETE`).
 - Official compliance claims are limited by the **missing** extracted task PDF and by not re-parsing PDFs in every doc pass.
 - Generated screenshots, videos, Gate stage folders, and tool `out/` trees are **not** canonical.

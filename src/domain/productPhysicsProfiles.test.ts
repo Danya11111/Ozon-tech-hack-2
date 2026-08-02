@@ -108,7 +108,7 @@ describe('physical conveyor foundation contracts', () => {
     expect(sample.force[0]).toBe(0);
   });
 
-  it('no belt support when airborne or past junction', () => {
+  it('no belt support when airborne or past belt end', () => {
     const half = colliderHalfHeight(getProductPhysicsProfile('SKU-001'));
     expect(isSupportedByBelt({
       position: [-3, BELT_TOP_Y + half + 0.1, 0],
@@ -118,18 +118,18 @@ describe('physical conveyor foundation contracts', () => {
     })).toBe(false);
 
     expect(isSupportedByBelt({
-      position: [JUNCTION_ENTRY_S + 0.01, BELT_TOP_Y + half, 0],
+      position: [2.3, BELT_TOP_Y + half, 0],
       halfHeight: half,
       phase: 'physical_conveyor',
       linearVelY: 0,
     })).toBe(false);
 
     expect(isSupportedByBelt({
-      position: [-3, BELT_TOP_Y + half + 0.002, 0],
+      position: [JUNCTION_ENTRY_S + 0.01, spawnCenterY(getProductPhysicsProfile('SKU-001')), 0],
       halfHeight: half,
       phase: 'junction',
       linearVelY: 0,
-    })).toBe(false);
+    })).toBe(true);
   });
 
   it('supported on belt top within clearance', () => {
@@ -175,14 +175,15 @@ describe('physical conveyor foundation contracts', () => {
     expect(BELT_RESPONSE_TIME_SEC).toBe(0.35);
   });
 
-  it('physical conveyor phase has no per-frame setTranslation drive', async () => {
+  it('physical conveyor has no per-frame setTranslation and no handoff switch', async () => {
     const src = await import('../components/ThreeD/PhysicalPlaybackItemPhysics.tsx?raw');
     const text = (src as { default: string }).default;
-    // Spawn/reset/handoff may call setTranslation once; kinematic drive loop must not.
-    expect(text).toMatch(/authority\.current === 'physical_conveyor'/);
-    expect(text).not.toMatch(/physical_conveyor[\s\S]{0,200}setNextKinematicTranslation/);
+    expect(text).toMatch(/dynamic_active/);
     expect(text).toMatch(/useBeforePhysicsStep/);
-    expect(text).toMatch(/addForce/);
+    expect(text).toMatch(/setLinvel/);
+    expect(text).toMatch(/BELT_SPEED_MPS/);
+    expect(text).not.toMatch(/getDropHandoffTimeMs/);
+    expect(text).not.toMatch(/setLinvel\(\{ x: Math\.max/);
   });
 });
 

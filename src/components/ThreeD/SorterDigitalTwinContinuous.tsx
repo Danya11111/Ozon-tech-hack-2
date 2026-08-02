@@ -31,8 +31,19 @@ import {
   preloadConveyorCad,
 } from './ConveyorCadModel';
 import { SorterPhysicsWorld } from './SorterPhysics';
-import { RigidBody, CuboidCollider, type RapierRigidBody } from '@react-three/rapier';
+import {
+  RigidBody,
+  CuboidCollider,
+  useBeforePhysicsStep,
+  type RapierRigidBody,
+} from '@react-three/rapier';
 import { GATE_VANE } from '../../domain/pusherMotion';
+import {
+  DIVERTER_COLLIDER_HALF_EXTENTS,
+  DIVERTER_GUIDE_FRICTION,
+  DIVERTER_RESTITUTION,
+  diverterColliderPose,
+} from '../../domain/junctionContactPhysics';
 import { deriveSorterVisualState } from '../../domain/sorterVisualState';
 import { DEMO_PLAYLIST, PLAYLIST_LENGTH } from '../../domain/demoPlaylist';
 import { cumulativePlaylistDurationMs, getPlaylistCaseDurationMs } from '../../domain/continuousPlayback';
@@ -857,8 +868,8 @@ function ShapeOutline({ position, scale, visible, isRound, category }: {
 }
 
 /**
- * Kinematic colliders locked to CAD swing diverters (Барьер001/002).
- * Downstream hinge fixed; free end along −X at 0°, arcs with the same yaw.
+ * Kinematic CAD diverter colliders — same pivot/yaw as visual CAD.
+ * Updated in useBeforePhysicsStep so Rapier sees correct next-pose velocity.
  */
 function CadGateColliders({
   category,
@@ -869,12 +880,13 @@ function CadGateColliders({
 }) {
   const leftRef = useRef<RapierRigidBody>(null);
   const rightRef = useRef<RapierRigidBody>(null);
-  const [hx, hy, hz] = GATE_VANE.halfExtents;
+  const [hx, hy, hz] = DIVERTER_COLLIDER_HALF_EXTENTS;
+  const debug = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('colliderDebug') === '1';
   void category;
   void caseElapsedMs;
 
-  useFrame(() => {
-    // Sync existing CAD gate colliders to visual diverter angles (no new physics).
+  useBeforePhysicsStep(() => {
     const motions = typeof window !== 'undefined'
       ? (window as unknown as {
           __DIVERTER_MOTIONS?: { leftRad: number; rightRad: number };
@@ -888,13 +900,13 @@ function CadGateColliders({
       yaw: number,
     ) => {
       if (!body) return;
-      const x = pivot.x - Math.cos(yaw) * hx;
-      const z = pivot.z + Math.sin(yaw) * hx;
-      body.setNextKinematicTranslation({ x, y: GATE_VANE.centerY, z });
-      const half = yaw / 2;
-      body.setNextKinematicRotation({
-        x: 0, y: Math.sin(half), z: 0, w: Math.cos(half),
-      });
+      const pose = diverterColliderPose(
+        { x: pivot.x, y: GATE_VANE.centerY, z: pivot.z },
+        yaw,
+        hx,
+      );
+      body.setNextKinematicTranslation(pose.center);
+      body.setNextKinematicRotation(pose.rotation);
     };
     apply(leftRef.current, CAD_SORTER_WORLD_PIVOTS.left, leftYaw);
     apply(rightRef.current, CAD_SORTER_WORLD_PIVOTS.right, rightYaw);
@@ -902,15 +914,55 @@ function CadGateColliders({
 
   const lp = CAD_SORTER_WORLD_PIVOTS.left;
   const rp = CAD_SORTER_WORLD_PIVOTS.right;
+  const left0 = diverterColliderPose(
+    { x: lp.x, y: GATE_VANE.centerY, z: lp.z },
+    0,
+    hx,
+  );
+  const right0 = diverterColliderPose(
+    { x: rp.x, y: GATE_VANE.centerY, z: rp.z },
+    0,
+    hx,
+  );
   return (
     <group name="cad-gate-colliders">
-      <RigidBody ref={leftRef} type="kinematicPosition" colliders={false} friction={0.55}
-        position={[lp.x - hx, GATE_VANE.centerY, lp.z]}>
-        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
+      <RigidBody
+        ref={leftRef}
+        name="LEFT_DIVERTER_BODY"
+        type="kinematicPosition"
+        colliders={false}
+        position={[left0.center.x, left0.center.y, left0.center.z]}
+      >
+        <CuboidCollider
+          args={[hx, hy, hz]}
+          friction={DIVERTER_GUIDE_FRICTION}
+          restitution={DIVERTER_RESTITUTION}
+        />
+        {debug && (
+          <mesh>
+            <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
+            <meshBasicMaterial color="#22c55e" wireframe transparent opacity={0.85} />
+          </mesh>
+        )}
       </RigidBody>
-      <RigidBody ref={rightRef} type="kinematicPosition" colliders={false} friction={0.55}
-        position={[rp.x - hx, GATE_VANE.centerY, rp.z]}>
-        <CuboidCollider args={[hx, hy, hz]} friction={0.55} restitution={0} />
+      <RigidBody
+        ref={rightRef}
+        name="RIGHT_DIVERTER_BODY"
+        type="kinematicPosition"
+        colliders={false}
+        position={[right0.center.x, right0.center.y, right0.center.z]}
+      >
+        <CuboidCollider
+          args={[hx, hy, hz]}
+          friction={DIVERTER_GUIDE_FRICTION}
+          restitution={DIVERTER_RESTITUTION}
+        />
+        {debug && (
+          <mesh>
+            <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
+            <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.85} />
+          </mesh>
+        )}
       </RigidBody>
     </group>
   );

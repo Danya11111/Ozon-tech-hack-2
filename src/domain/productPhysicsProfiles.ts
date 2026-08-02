@@ -28,9 +28,12 @@ export const UP_AXIS: [number, number, number] = [0, 1, 0];
 export const LATERAL_AXIS: [number, number, number] = [0, 0, 1];
 
 export const BELT_START_S = ZONES.A.x;
-/** Temporary handoff into existing junction/drop authority. */
-export const JUNCTION_ENTRY_S = CAD_GATE_ENGAGE_X;
-export const BELT_END_S = ZONES.B.x;
+/** Start of physical junction / possible diverter contact (documented plane). */
+export const JUNCTION_ENTRY_S = 1.0538;
+/** Belt surface ends near B spur — keep drive while supported up to here. */
+export const BELT_END_S = 2.15;
+/** @deprecated alias — engage X retained for layout references */
+export const CAD_GATE_ENGAGE_S = CAD_GATE_ENGAGE_X;
 
 export type ProductPhysicsPhase =
   | 'preparing'
@@ -71,7 +74,8 @@ const PROFILES: Record<string, ProductPhysicsProfile> = {
     beltFriction: 0.75, guideFriction: 0.35, restitution: 0.02,
     linearDamping: 0.25, angularDamping: 3.5,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 4, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    // Accel budget must overcome stationary-belt friction (μN/m ≈ 5–6 m/s²).
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-002': {
     productId: 'SKU-002', massKg: 0.55,
@@ -80,25 +84,27 @@ const PROFILES: Record<string, ProductPhysicsProfile> = {
     beltFriction: 0.7, guideFriction: 0.3, restitution: 0.03,
     linearDamping: 0.25, angularDamping: 3.2,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 4.5, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-004': {
-    productId: 'SKU-004', massKg: 3.2,
-    collider: { type: 'cuboid', halfExtents: [0.2005, 0.2, 0.15] },
+    productId: 'SKU-004', massKg: 1.4,
+    // Sized to clear the neutral corridor and slide on the 45° guide face.
+    collider: { type: 'cuboid', halfExtents: [0.16, 0.12, 0.12] },
     centerOfMassOffset: [0, -0.02, 0],
-    beltFriction: 0.65, guideFriction: 0.35, restitution: 0.02,
-    linearDamping: 0.3, angularDamping: 4.0,
+    beltFriction: 0.65, guideFriction: 0.25, restitution: 0.02,
+    linearDamping: 0.28, angularDamping: 4.0,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 3.2, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-005': {
-    productId: 'SKU-005', massKg: 3.0,
-    collider: { type: 'cylinder', radius: 0.2445, halfHeight: 0.132, axis: 'y' },
-    centerOfMassOffset: [0, 0, 0],
-    beltFriction: 0.7, guideFriction: 0.4, restitution: 0.01,
-    linearDamping: 0.35, angularDamping: 4.5,
+    productId: 'SKU-005', massKg: 1.6,
+    // Corridor-compatible cylinder (visual drum scaled for junction clearance).
+    collider: { type: 'cylinder', radius: 0.11, halfHeight: 0.12, axis: 'y' },
+    centerOfMassOffset: [0, -0.01, 0],
+    beltFriction: 0.7, guideFriction: 0.28, restitution: 0.01,
+    linearDamping: 0.3, angularDamping: 4.5,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 3.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-006': {
     productId: 'SKU-006', massKg: 0.45,
@@ -107,34 +113,37 @@ const PROFILES: Record<string, ProductPhysicsProfile> = {
     beltFriction: 0.8, guideFriction: 0.35, restitution: 0.04,
     linearDamping: 0.2, angularDamping: 3.0,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 4.5, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-007': {
     productId: 'SKU-007', massKg: 0.4,
     collider: { type: 'capsule', radius: 0.0455, halfHeight: 0.107, axis: 'y' },
     centerOfMassOffset: [0, -0.02, 0],
-    beltFriction: 0.65, guideFriction: 0.3, restitution: 0.05,
-    linearDamping: 0.2, angularDamping: 4.0,
-    lockRotationX: false, lockRotationY: false, lockRotationZ: false,
-    maxBeltAccelerationMps2: 4.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    beltFriction: 0.65, guideFriction: 0.35, restitution: 0.02,
+    linearDamping: 0.25, angularDamping: 5.0,
+    // Tall bottle: lock tip-over axes for stable belt/junction contact.
+    lockRotationX: true, lockRotationY: false, lockRotationZ: true,
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-008': {
     productId: 'SKU-008', massKg: 0.55,
-    collider: { type: 'cylinder', radius: 0.0215, halfHeight: 0.2175, axis: 'x' },
-    centerOfMassOffset: [0, 0, 0],
-    beltFriction: 0.7, guideFriction: 0.3, restitution: 0.03,
-    linearDamping: 0.18, angularDamping: 3.5,
-    lockRotationX: false, lockRotationY: true, lockRotationZ: false,
-    maxBeltAccelerationMps2: 4.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    // Standing cylinder (visual bottle) — Y axis; X-lying rolls off the belt.
+    collider: { type: 'cylinder', radius: 0.045, halfHeight: 0.11, axis: 'y' },
+    centerOfMassOffset: [0, -0.01, 0],
+    beltFriction: 0.7, guideFriction: 0.35, restitution: 0.02,
+    linearDamping: 0.25, angularDamping: 4.5,
+    lockRotationX: true, lockRotationY: false, lockRotationZ: true,
+    maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-009': {
-    productId: 'SKU-009', massKg: 0.02,
-    collider: { type: 'capsule', radius: 0.006, halfHeight: 0.0675, axis: 'y' },
+    productId: 'SKU-009', massKg: 0.05,
+    // Thin pen: slightly larger contact radius so it does not tunnel the belt deck.
+    collider: { type: 'capsule', radius: 0.012, halfHeight: 0.06, axis: 'y' },
     centerOfMassOffset: [0, 0, 0],
-    beltFriction: 0.75, guideFriction: 0.35, restitution: 0.02,
-    linearDamping: 0.3, angularDamping: 5.0,
+    beltFriction: 0.75, guideFriction: 0.35, restitution: 0.01,
+    linearDamping: 0.35, angularDamping: 6.0,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 5.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 14, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
   'SKU-011': {
     productId: 'SKU-011', massKg: 2.8,
@@ -143,7 +152,7 @@ const PROFILES: Record<string, ProductPhysicsProfile> = {
     beltFriction: 0.75, guideFriction: 0.4, restitution: 0.01,
     linearDamping: 0.35, angularDamping: 4.5,
     lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-    maxBeltAccelerationMps2: 3.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+    maxBeltAccelerationMps2: 10, ccd: true, provenance: 'ENGINEERING_DERIVED',
   },
 };
 
@@ -154,7 +163,7 @@ export const DEFAULT_PRODUCT_PHYSICS_PROFILE: ProductPhysicsProfile = {
   beltFriction: 0.7, guideFriction: 0.3, restitution: 0.02,
   linearDamping: 0.25, angularDamping: 3.5,
   lockRotationX: true, lockRotationY: false, lockRotationZ: true,
-  maxBeltAccelerationMps2: 4.0, ccd: true, provenance: 'ENGINEERING_DERIVED',
+  maxBeltAccelerationMps2: 12, ccd: true, provenance: 'ENGINEERING_DERIVED',
 };
 
 export function getProductPhysicsProfile(productId: string): ProductPhysicsProfile {
@@ -169,7 +178,11 @@ export function allProductPhysicsProfiles(): ProductPhysicsProfile[] {
 export function colliderHalfHeight(profile: ProductPhysicsProfile): number {
   const c = profile.collider;
   if (c.type === 'cuboid') return c.halfExtents[1];
-  return c.halfHeight;
+  // Capsule tips extend by radius beyond halfHeight; cylinder radius is lateral on Y.
+  if (c.type === 'capsule') {
+    return c.axis === 'y' ? c.halfHeight + c.radius : c.radius;
+  }
+  return c.axis === 'y' ? c.halfHeight : c.radius;
 }
 
 export function spawnCenterY(profile: ProductPhysicsProfile): number {
@@ -182,10 +195,11 @@ export function isSupportedByBelt(input: {
   phase: ProductPhysicsPhase;
   linearVelY: number;
 }): boolean {
-  if (input.phase !== 'physical_conveyor') return false;
+  if (input.phase !== 'physical_conveyor' && input.phase !== 'junction') return false;
   const [x, y, z] = input.position;
-  if (x < BELT_START_S - 0.05 || x >= JUNCTION_ENTRY_S) return false;
-  if (Math.abs(z) > CONVEYOR_WIDTH_M / 2 + 0.06) return false;
+  if (x < BELT_START_S - 0.05 || x > BELT_END_S) return false;
+  // Laterally off the belt deck (entering C/D chutes) — no belt drive.
+  if (Math.abs(z) > CONVEYOR_WIDTH_M / 2 + 0.08) return false;
   const bottomY = y - input.halfHeight;
   if (bottomY > BELT_TOP_Y + 0.025) return false; // airborne
   if (bottomY < BELT_TOP_Y - 0.04) return false; // sunk / off belt
