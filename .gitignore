@@ -14,4 +14,9 @@ playwright-report/
 blob-report/
 .demo-preview.pid
 .demo-preview.log
-__pycache__
+__pycache__/
+*.pyc
+cv/.venv/
+cv/debug_frames/
+cv/logs/
+cv/config.yaml

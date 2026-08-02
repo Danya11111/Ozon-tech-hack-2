@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+debug_frames/
+logs/
+*.jpg
+*.png
+.pytest_cache/
+config.yaml
+.env
+.env.*

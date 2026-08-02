@@ -1,0 +1,90 @@
+# Vision classifier config EXAMPLE — copy to config.yaml and edit locally.
+# Do not commit config.yaml (it may contain site-specific credentials).
+
+camera:
+  depth_device: /dev/video0
+  color_device: /dev/video4
+  width: 640
+  height: 480
+  fps: 30
+  depth_scale_mm: 1.0
+  # D415 @ 640x480 approximate intrinsics — calibrate on your setup
+  fx: 564.0
+  fy: 564.0
+  cx: 320.0
+  cy: 240.0
+  color_dx: -40.0
+  color_dy: -8.0
+  color_scale: 1.030
+
+belt_distance_mm: 594
+belt_tolerance_mm: 25
+min_object_height_mm: 20
+min_object_area_px: 800
+roi_margin:
+  top: 0.12
+  bottom: 0.02
+  left: 0.05
+  right: 0.12
+max_objects_in_frame: 3
+use_color: true
+use_background_map: false
+detect_flat_rgb: false
+rgb_diff_threshold: 35
+
+classification:
+  min_mm: [10, 10, 10]
+  max_mm: [450, 320, 320]
+  circle_ratio_threshold: 0.8
+  uncertain_after_frames: 45
+  uncertain_fallback_zone: C
+
+# MQTT is OPTIONAL and disabled by default for safe local runs.
+mqtt:
+  broker: "127.0.0.1"
+  port: 1883
+  user: ""
+  password: ""
+  client_id: "vision_classifier"
+  topic_result: "vision/feedback/category"
+  topic_dims: "vision/feedback/dimensions"
+  topic_circle: "vision/feedback/circle_ratio"
+  topic_debug: "vision/feedback/debug"
+  enabled: false
+
+motor:
+  enabled: false
+  rpm: -200
+  current_percent: 50
+  microsteps: 16
+  stealthchop: true
+  disable_on_stop: false
+
+routing:
+  enabled: false
+  zones:
+    B:
+      servo: 0
+      idle_angle: 0
+      divert_angle: 0
+      hold_ms: 500
+    C:
+      servo: 1
+      idle_angle: 0
+      divert_angle: 90
+      hold_ms: 800
+    D:
+      servo: 2
+      idle_angle: 0
+      divert_angle: 90
+      hold_ms: 800
+  cooldown_ms: 1500
+
+runtime:
+  show_preview: false
+  save_debug_frames: false
+  debug_dir: "debug_frames"
+  decisions_log: "logs/decisions.jsonl"
+  preview_every_n: 3
+  process_every_n: 1
+  confirm_frames: 8

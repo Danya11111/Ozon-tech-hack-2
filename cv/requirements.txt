@@ -1,0 +1,6 @@
+opencv-python-headless>=4.8
+numpy>=1.24
+paho-mqtt>=2.0
+PyYAML>=6.0
+pillow>=10.0  # кириллица на HUD (demo_hud.py)
+# ffmpeg должен быть в системе (pacman/apt: ffmpeg) — depth Z16 читается через него

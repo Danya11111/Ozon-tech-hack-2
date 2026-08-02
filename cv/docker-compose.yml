@@ -1,0 +1,25 @@
+services:
+  vision:
+    build: .
+    container_name: realsense_vision
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+      - /dev/video3:/dev/video3
+      - /dev/video4:/dev/video4
+      - /dev/video5:/dev/video5
+    volumes:
+      # Copy config.example.yaml → config.yaml locally before enabling MQTT/hardware.
+      - ./config.yaml:/app/config.yaml:ro
+      - ./debug_frames:/app/debug_frames
+    # Prefer: command with --no-mqtt until credentials are configured.
+    group_add:
+      - video
+    environment:
+      - QT_X11_NO_MITSHM=1
+    # Без GUI в контейнере по умолчанию; превью — через native run
+    command: ["python", "main.py", "-c", "config.yaml"]
