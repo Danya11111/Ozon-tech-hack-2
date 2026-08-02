@@ -17,7 +17,15 @@
  * Every collider mirrors VISIBLE scene geometry — no fake guides (§11.6).
  */
 
-import { ZONES, B_RECEIVER, ROLL_CAGE, CONVEYOR_WIDTH_M, BELT_TOP_Y, CAGE_FLOOR_Y } from './physicalLayout';
+import {
+  ZONES,
+  B_RECEIVER,
+  ROLL_CAGE,
+  CONVEYOR_WIDTH_M,
+  BELT_TOP_Y,
+  CAGE_FLOOR_Y,
+  DISCHARGE_EDGE_S,
+} from './physicalLayout';
 
 export interface StaticColliderDef {
   id: string;
@@ -38,7 +46,7 @@ export const CHUTE_PITCH = Math.atan2(0.50, 0.55);
 export const CHUTE_LENGTH = Math.hypot(0.55, 0.50);
 export const CHUTE_MID_Y = 0.42;
 export const CHUTE_MID_Z = 0.55;
-export const CHUTE_X = 1.55;
+export const CHUTE_X = ZONES.GATE.x;
 export const CHUTE_HALF_W = 0.35;
 export const B_CHUTE_PITCH = Math.atan2(BELT_TOP_Y - (CAGE_FLOOR_Y + 0.05), 0.45);
 
@@ -88,16 +96,9 @@ function receiverColliders(): StaticColliderDef[] {
     { id: 'b-bin-wall-x+', halfExtents: [0.015, bin.wallHeight / 2, hz], position: [bin.centerX + hx, bin.floorY + bin.wallHeight / 2, bin.centerZ], rotation: [0, 0, 0], friction: 0.6 },
     { id: 'b-bin-entry-lip', halfExtents: [0.015, 0.04, hz], position: [bin.centerX - hx, bin.floorY + 0.04, bin.centerZ], rotation: [0, 0, 0], friction: 0.6 },
   ];
-  const entryX = bin.centerX - hx + 0.1;
-  const chuteLen = Math.hypot(entryX - bin.transferEndX, BELT_TOP_Y - bin.floorY);
-  defs.push({
-    id: 'b-drop-chute',
-    halfExtents: [chuteLen / 2, 0.008, (CONVEYOR_WIDTH_M - 0.08) / 2],
-    // top surface runs (2.15, 0.696) -> (2.85, 0.126): flush with spur end
-    position: [(bin.transferEndX + entryX) / 2, 0.395, bin.centerZ],
-    rotation: [0, 0, -B_CHUTE_PITCH], // descends toward +X (into the bin)
-    friction: 0.25,
-  });
+  // No flush bridge at belt height — products leave DISCHARGE_EDGE_S and fall
+  // under gravity into the B basket (no invisible end-of-line support).
+  void B_CHUTE_PITCH;
   for (const [label, zone] of [['C', ZONES.C], ['D', ZONES.D]] as const) {
     const entrySide = label === 'C' ? -1 : 1; // open front faces the conveyor
     defs.push(
@@ -116,11 +117,16 @@ function receiverColliders(): StaticColliderDef[] {
 export function getStaticColliders(): StaticColliderDef[] {
   return [
     { id: 'world-floor', halfExtents: [8, 0.05, 6], position: [0, -0.05, 0], rotation: [0, 0, 0], friction: 0.8 },
-    // Belt safety slab — items never pass through the belt surface.
-    // Ends at the B spur end (2.15): beyond it the B drop chute takes over.
+    // Belt safety slab — support terminates at DISCHARGE_EDGE_S (open discharge).
     // Continuous deck (no separate spur cuboid): an overlapping spur box
     // creates a vertical curb that stops velocity-coupled dynamic products.
-    { id: 'belt-slab', halfExtents: [(2.15 + 4.2) / 2, 0.012, CONVEYOR_WIDTH_M / 2], position: [(2.15 - 4.2) / 2, BELT_TOP_Y - 0.014, 0], rotation: [0, 0, 0], friction: 0.7 },
+    {
+      id: 'belt-slab',
+      halfExtents: [(DISCHARGE_EDGE_S + 4.2) / 2, 0.012, CONVEYOR_WIDTH_M / 2],
+      position: [(DISCHARGE_EDGE_S - 4.2) / 2, BELT_TOP_Y - 0.014, 0],
+      rotation: [0, 0, 0],
+      friction: 0.7,
+    },
     ...chuteColliders(ZONES.C.z, 'C'),
     ...chuteColliders(ZONES.D.z, 'D'),
     ...receiverColliders(),

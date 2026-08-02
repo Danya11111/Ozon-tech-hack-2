@@ -13,9 +13,11 @@ import {
   seekNextCase,
   seekPrevCase,
   setPlaybackSpeed,
+  applyCameraClassificationToPlayback,
   type ContinuousPlaybackState,
   type PlaybackSpeed,
 } from './domain/continuousPlayback';
+import type { ClassificationEvent } from './domain/cameraClassification';
 
 function AppContent() {
   const [playback, setPlayback] = useState<ContinuousPlaybackState>(() => createPlaybackState());
@@ -32,6 +34,17 @@ function AppContent() {
     if (params.get('playback') === 'paused') return;
     setPlayback((prev) => (prev.status === 'idle' ? startPlayback(prev) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // UI/state category binds only from physical camera classification events.
+  useEffect(() => {
+    const onClass = (e: Event) => {
+      const detail = (e as CustomEvent<ClassificationEvent>).detail;
+      if (!detail?.result) return;
+      setPlayback((prev) => applyCameraClassificationToPlayback(prev, detail.result!));
+    };
+    window.addEventListener('camera-classification', onClass);
+    return () => window.removeEventListener('camera-classification', onClass);
   }, []);
 
   useEffect(() => {

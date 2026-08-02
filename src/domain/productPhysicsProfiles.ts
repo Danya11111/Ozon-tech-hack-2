@@ -10,6 +10,8 @@ import {
   CAD_GATE_ENGAGE_X,
   CONVEYOR_SPEED_MPS,
   CONVEYOR_WIDTH_M,
+  DISCHARGE_EDGE_S,
+  worldContactPlaneS,
   ZONES,
 } from './physicalLayout';
 
@@ -28,10 +30,10 @@ export const UP_AXIS: [number, number, number] = [0, 1, 0];
 export const LATERAL_AXIS: [number, number, number] = [0, 0, 1];
 
 export const BELT_START_S = ZONES.A.x;
-/** Start of physical junction / possible diverter contact (documented plane). */
-export const JUNCTION_ENTRY_S = 1.0538;
-/** Belt surface ends near B spur — keep drive while supported up to here. */
-export const BELT_END_S = 2.15;
+/** Start of physical junction / possible diverter contact (world plane). */
+export const JUNCTION_ENTRY_S = worldContactPlaneS();
+/** Belt surface ends at the canonical discharge edge — no support beyond. */
+export const BELT_END_S = DISCHARGE_EDGE_S;
 /** @deprecated alias — engage X retained for layout references */
 export const CAD_GATE_ENGAGE_S = CAD_GATE_ENGAGE_X;
 

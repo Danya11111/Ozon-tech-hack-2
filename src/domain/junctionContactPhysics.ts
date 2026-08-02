@@ -1,9 +1,11 @@
 /**
  * Physical junction contact — CAD diverter colliders + deterministic route matrix.
  *
- * Frozen documented planes (do not change):
- *   contactPlaneS = 1.0538
- *   clearPlaneS   = 1.6000
+ * Frozen documented LOCAL sorter offsets (do not change numeric meaning):
+ *   DOCUMENTED_LOCAL_CONTACT_OFFSET = 1.0538
+ *   DOCUMENTED_LOCAL_CLEAR_OFFSET   = 1.6000
+ *
+ * Runtime world planes = sorterAssemblyOriginS + local offset.
  *
  * Collider half-extents [halfLength, halfHeight, halfThickness] = [0.375, 0.05, 0.02]
  */
@@ -26,10 +28,33 @@ import {
 } from './pusherMotion';
 import { receiverContains, type ReceiverZone } from './receiverVolumes';
 import { PHYSICS_TIMESTEP_SEC } from './physicsTimestep';
-import { CONVEYOR_WIDTH_M } from './physicalLayout';
+import {
+  CONVEYOR_WIDTH_M,
+  DISCHARGE_EDGE_S,
+  DOCUMENTED_LOCAL_CLEAR_OFFSET,
+  DOCUMENTED_LOCAL_CONTACT_OFFSET,
+  SORTER_ASSEMBLY_ORIGIN_S,
+  worldClearPlaneS,
+  worldContactPlaneS,
+} from './physicalLayout';
 
-export const DOCUMENTED_CONTACT_PLANE_S = 1.0538;
-export const DOCUMENTED_CLEAR_PLANE_S = 1.6000;
+/** Local offset aliases (canonical documented values). */
+export const DOCUMENTED_CONTACT_PLANE_S = DOCUMENTED_LOCAL_CONTACT_OFFSET;
+export const DOCUMENTED_CLEAR_PLANE_S = DOCUMENTED_LOCAL_CLEAR_OFFSET;
+
+export function runtimeWorldContactPlaneS(): number {
+  return worldContactPlaneS();
+}
+export function runtimeWorldClearPlaneS(): number {
+  return worldClearPlaneS();
+}
+
+/** Falling physics must remain identical after support removal. */
+export const FALL_PHYSICS_PARAMETERS_UNCHANGED = true as const;
+export const FALL_GRAVITY_Y = -9.81;
+export const FALL_SETTLE_LINEAR_SPEED_MPS = 0.20;
+export const FALL_SETTLE_ANGULAR_SPEED_RAD_S = 1.0;
+export const FALL_SETTLE_DURATION_SEC = 0.30;
 
 export const DIVERTER_COLLIDER_HALF_EXTENTS: [number, number, number] = [
   GATE_VANE.halfExtents[0],
@@ -40,15 +65,26 @@ export const DIVERTER_COLLIDER_HALF_EXTENTS: [number, number, number] = [
 export const DIVERTER_GUIDE_FRICTION = 0.22;
 export const DIVERTER_RESTITUTION = 0.0;
 
-export const SETTLE_LINEAR_SPEED_MPS = 0.20;
-export const SETTLE_ANGULAR_SPEED_RAD_S = 1.0;
-export const SETTLE_DURATION_SEC = 0.30;
+export const SETTLE_LINEAR_SPEED_MPS = FALL_SETTLE_LINEAR_SPEED_MPS;
+export const SETTLE_ANGULAR_SPEED_RAD_S = FALL_SETTLE_ANGULAR_SPEED_RAD_S;
+export const SETTLE_DURATION_SEC = FALL_SETTLE_DURATION_SEC;
 export const STUCK_TIMEOUT_SEC = 3.0;
 
+const HINGE_LOCAL_S = 1.55;
 export const DIVERTER_WORLD_PIVOTS = {
-  left: { x: 1.55, y: GATE_VANE.centerY, z: +(CONVEYOR_WIDTH_M / 2 - 0.02) },
-  right: { x: 1.55, y: GATE_VANE.centerY, z: -(CONVEYOR_WIDTH_M / 2 - 0.02) },
+  left: {
+    x: SORTER_ASSEMBLY_ORIGIN_S + HINGE_LOCAL_S,
+    y: GATE_VANE.centerY,
+    z: +(CONVEYOR_WIDTH_M / 2 - 0.02),
+  },
+  right: {
+    x: SORTER_ASSEMBLY_ORIGIN_S + HINGE_LOCAL_S,
+    y: GATE_VANE.centerY,
+    z: -(CONVEYOR_WIDTH_M / 2 - 0.02),
+  },
 };
+
+export { DISCHARGE_EDGE_S, SORTER_ASSEMBLY_ORIGIN_S };
 
 export type JunctionFailure =
   | 'WRONG_RECEIVER_ENTRY'
@@ -276,7 +312,8 @@ export function simulateJunctionContact(
 
       // Pre-step belt surface velocity (1.0 m/s downstream) while supported.
       {
-        const phase = t.x >= DOCUMENTED_CONTACT_PLANE_S ? 'junction' : 'physical_conveyor';
+        const contactS = runtimeWorldContactPlaneS();
+        const phase = t.x >= contactS ? 'junction' : 'physical_conveyor';
         const supported = isSupportedByBelt({
           position: [t.x, t.y, t.z],
           halfHeight: halfH,
@@ -286,7 +323,7 @@ export function simulateJunctionContact(
         if (supported) {
           // Upstream: hard-couple to belt speed. Inside junction: gently pull
           // toward 1.0 m/s without wiping contact-induced lateral velocity.
-          const inJunction = t.x >= DOCUMENTED_CONTACT_PLANE_S;
+          const inJunction = t.x >= contactS;
           const targetVx = inJunction
             ? lv.x + Math.max(-8, Math.min(8, (BELT_SPEED_MPS - lv.x) * 0.35))
             : BELT_SPEED_MPS;
@@ -317,7 +354,12 @@ export function simulateJunctionContact(
       maxSpeed = Math.max(maxSpeed, speed);
       maxAng = Math.max(maxAng, ang);
 
-      if (t2.y < 0.2 && Math.abs(t2.z) < 0.12 && t2.x < 2.0 && t2.x > 0.5) {
+      if (
+        t2.y < 0.2
+        && Math.abs(t2.z) < 0.12
+        && t2.x < DISCHARGE_EDGE_S
+        && t2.x > SORTER_ASSEMBLY_ORIGIN_S + 0.2
+      ) {
         tunnelling = true;
       }
       if (speed > 4.0) {
@@ -338,8 +380,8 @@ export function simulateJunctionContact(
       }
 
       if (
-        t2.x > DOCUMENTED_CONTACT_PLANE_S - 0.2
-        && t2.x < DOCUMENTED_CLEAR_PLANE_S + 0.5
+        t2.x > runtimeWorldContactPlaneS() - 0.2
+        && t2.x < runtimeWorldClearPlaneS() + 0.5
         && !zone
       ) {
         // C/D progress is often lateral along the guide — track |Δx|+|Δz|.

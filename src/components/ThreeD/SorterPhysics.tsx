@@ -190,7 +190,7 @@ export function SorterPhysicsWorld({
       paused
       timeStep={PHYSICS_DT}
       gravity={PHYSICS_GRAVITY}
-      interpolate
+      interpolate={false}
     >
       <PhysicsSimClock />
       <RapierStepper running={running} speed={speed} />

@@ -15,6 +15,10 @@ import type { Mesh, Group } from 'three';
 import * as THREE from 'three';
 import type { ContinuousPlaybackState, CasePhase } from '../../domain/continuousPlayback';
 import { isDetectionActive, isRoutingActive, getPhaseProgress } from '../../domain/continuousPlayback';
+import {
+  getClassificationEvent,
+  peekClassificationUi,
+} from '../../domain/cameraClassification';
 import { getPhysicalItemPose, getRoutingStartMs } from '../../domain/physicalItemMotion';
 import { shouldShowBoundingBox, shouldShowScanEffect, shouldShowShapeOutline, shouldHighlightCamera } from '../../domain/inspectionViewModel';
 import { getMeasurementData, shouldShowLaserBeam, shouldShowStepperPulse, shouldShowPointCloud } from '../../domain/measurementSystem';
@@ -1030,8 +1034,26 @@ function ContinuousScene({
   debugOverlays?: boolean;
   physicsDebug?: boolean;
 }) {
-  const category = playback.targetCategory;
+  const itemIdForClass = playback.currentCase.itemId.replace('-LC', '');
+  const [cameraCategory, setCameraCategory] = useState<'B' | 'C' | 'D' | null>(
+    () => getClassificationEvent(itemIdForClass)?.category ?? playback.targetCategory,
+  );
+  useEffect(() => {
+    const sync = () => {
+      const ev = getClassificationEvent(itemIdForClass);
+      setCameraCategory(ev?.category ?? null);
+    };
+    sync();
+    window.addEventListener('camera-classification', sync);
+    return () => window.removeEventListener('camera-classification', sync);
+  }, [itemIdForClass, playback.currentCaseIndex, playback.status]);
+  // Mechanical / visual category only from camera event — never playlist spawn.
+  const category = cameraCategory;
+  const classUi = peekClassificationUi(itemIdForClass);
   const phase = playback.currentPhase;
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    (window as unknown as { __CLASSIFICATION_UI__?: typeof classUi }).__CLASSIFICATION_UI__ = classUi;
+  }
   const liteScene = simplified || !ENABLE_DEMO_EFFECTS;
   const effectsEnabled = ENABLE_DEMO_EFFECTS && !simplified;
 

@@ -21,8 +21,8 @@ import { ZONES } from './physicalLayout';
 export const SCAN_START_X = ZONES.CAMERA.x - 0.36;
 export const SCAN_END_X = ZONES.CAMERA.x + 0.36;
 
-/** Classification must be complete by this belt position (gate at ZONES.GATE.x = 1.5 — 1.0 m margin). */
-export const CLASSIFICATION_DEADLINE_X = 0.5;
+/** Classification must be complete by this belt position (1.0 m upstream of GATE). */
+export const CLASSIFICATION_DEADLINE_X = ZONES.GATE.x - 1.0;
 
 /** Mechanism engagement point (paddle engages the item at the gate). */
 export const MECHANISM_CONTACT_X = ZONES.GATE.x;

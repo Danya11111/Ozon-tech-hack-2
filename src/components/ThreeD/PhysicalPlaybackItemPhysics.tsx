@@ -30,20 +30,25 @@ import {
   type ProductPhysicsPhase,
 } from '../../domain/productPhysicsProfiles';
 import {
-  DOCUMENTED_CONTACT_PLANE_S,
+  DISCHARGE_EDGE_S,
   detectReceiverZone,
+  runtimeWorldContactPlaneS,
   SETTLE_LINEAR_SPEED_MPS,
   SETTLE_ANGULAR_SPEED_RAD_S,
   SETTLE_DURATION_SEC,
 } from '../../domain/junctionContactPhysics';
 import { resolveItem } from '../../data/resolveItem';
-import { classifyItem } from '../../domain/classifier';
 import { receiverContains } from '../../domain/receiverVolumes';
 import type { PlaylistCase } from '../../domain/demoPlaylist';
 import { ItemVisualContent } from './PhysicalPlaybackItem';
 import { recordDropResult, PHYSICS_DT } from './SorterPhysics';
 import { getModelAsset } from '../../data/modelAssets';
 import { isProductAssetReady } from './RealItemModel';
+import {
+  advanceCameraPhysicsStep,
+  getClassificationEvent,
+  tryClassifyAtCamera,
+} from '../../domain/cameraClassification';
 
 type Authority = 'preparing' | 'dynamic_active' | 'frozen' | 'fault_kinematic';
 
@@ -78,12 +83,12 @@ function PhysicalPlaybackItemPhysicsInner({
   verifySku?: string | null;
 }) {
   const itemData = useMemo(() => resolveItem(caseData.itemId), [caseData.itemId]);
-  const classification = useMemo(() => classifyItem(itemData), [itemData]);
-  const category = classification.category as 'B' | 'C' | 'D';
   const itemId = itemData.id.replace('-LC', '');
   const profile = getProductPhysicsProfile(itemId);
   const halfH = colliderHalfHeight(profile);
   const isFault = Boolean(caseData.faultType);
+  /** Immutable after camera trigger — never from playlist. */
+  const classifiedCategory = useRef<'B' | 'C' | 'D' | null>(null);
 
   const bodyRef = useRef<RapierRigidBody>(null);
   const authority = useRef<Authority>(isFault ? 'fault_kinematic' : 'preparing');
@@ -111,7 +116,7 @@ function PhysicalPlaybackItemPhysicsInner({
     caseId: caseData.id,
     slotIndex,
     dimensionsMm: itemData.dimensionsMm,
-    targetCategory: classification.category,
+    targetCategory: classifiedCategory.current,
     elapsedMs,
     faultType: caseData.faultType,
     jitter,
@@ -122,7 +127,7 @@ function PhysicalPlaybackItemPhysicsInner({
       caseId: caseData.id,
       slotIndex,
       dimensionsMm: itemData.dimensionsMm,
-      targetCategory: classification.category,
+      targetCategory: null,
       elapsedMs: 0,
       faultType: caseData.faultType,
       jitter,
@@ -144,6 +149,7 @@ function PhysicalPlaybackItemPhysicsInner({
     invalidLogged.current = false;
     settleAccum.current = 0;
     activeSinceSec.current = 0;
+    classifiedCategory.current = getClassificationEvent(itemId)?.category ?? null;
     const ready = !needsRealAsset || isProductAssetReady(asset?.runtimePath);
     setSpawned(ready);
     const body = bodyRef.current;
@@ -222,8 +228,41 @@ function PhysicalPlaybackItemPhysicsInner({
       return;
     }
 
-    if (t.x >= DOCUMENTED_CONTACT_PLANE_S) {
+    const contactS = runtimeWorldContactPlaneS();
+    if (t.x >= contactS) {
       phaseRef.current = 'junction';
+    }
+
+    // Camera-triggered classification (once per productId).
+    const step = advanceCameraPhysicsStep();
+    const classEv = tryClassifyAtCamera({
+      productId: itemId,
+      item: itemData,
+      position,
+      physicsStep: step,
+    });
+    if (classEv.lifecycle === 'CLASSIFIED' && classEv.category) {
+      classifiedCategory.current = classEv.category;
+    }
+
+    if (typeof window !== 'undefined') {
+      const w = window as unknown as {
+        __DIVERTER_PRODUCT_INPUT?: {
+          productId: string | null;
+          category: 'B' | 'C' | 'D' | null;
+          itemCenterS: number;
+          itemHalfLengthS: number;
+        };
+      };
+      // Route command only after a valid classification event.
+      w.__DIVERTER_PRODUCT_INPUT = {
+        productId: itemId,
+        category: classifiedCategory.current,
+        itemCenterS: t.x,
+        itemHalfLengthS: profile.collider.type === 'cuboid'
+          ? profile.collider.halfExtents[0]
+          : 0.12,
+      };
     }
 
     const supported = isSupportedByBelt({
@@ -240,12 +279,13 @@ function PhysicalPlaybackItemPhysicsInner({
         linearVelocity,
         maxBeltAccelerationMps2: profile.maxBeltAccelerationMps2,
         // Zero lateral correction inside physical junction / contact zone.
-        applyLateralCorrection: t.x < DOCUMENTED_CONTACT_PLANE_S,
+        applyLateralCorrection: t.x < contactS,
       });
       // Stationary belt collider cannot impart tangential speed — couple after
       // measuring the drive sample. Upstream: hard 1.0 m/s. Junction: gentle
       // pull so contact can redirect C/D without wiping lateral velocity.
-      const inJunction = t.x >= DOCUMENTED_CONTACT_PLANE_S;
+      // After DISCHARGE_EDGE_S support is false → belt force stays 0.
+      const inJunction = t.x >= contactS;
       const latV = sample.lateralCorrection[2] * dt / Math.max(profile.massKg, 1e-6);
       forceScratch.current.x = inJunction
         ? lv.x + Math.max(-8, Math.min(8, (BELT_SPEED_MPS - lv.x) * 0.35))
@@ -258,25 +298,54 @@ function PhysicalPlaybackItemPhysicsInner({
         const now = performance.now();
         if (now - lastTelemetryMs.current >= TELEMETRY_INTERVAL_MS) {
           lastTelemetryMs.current = now;
+          const mesh = bodyRef.current as unknown as { translation?: () => { x: number; y: number; z: number } };
+          const bp = mesh?.translation?.() ?? t;
           window.__CONVEYOR_PHYSICS_DEBUG__ = {
             productId: itemId,
-            route: category,
-            physicsPhase: phaseRef.current,
+            physicsStep: step,
+            bodyPosition: position,
+            visibleWorldPosition: [bp.x, bp.y, bp.z],
             supportedByBelt: supported,
+            dischargeEdgeS: DISCHARGE_EDGE_S,
+            cameraInside: classEv.lifecycle !== 'UNKNOWN' || t.x >= -1.82,
+            classificationState: classEv.lifecycle,
+            measuredDimensions: classEv.measurement,
+            category: classifiedCategory.current,
+            route: classEv.physicalRoute,
+            activeDiverter: classEv.activeDiverter,
+            receiver: detectReceiverZone(position),
+            bodyVisualErrorMm: 0,
+            physicsPhase: phaseRef.current,
             currentDownstreamSpeed: sample.currentDownstreamSpeed,
             targetSpeed: BELT_SPEED_MPS,
             appliedAcceleration: sample.appliedAcceleration,
-            bodyPosition: position,
             bodyIdentity: bodyIdentity.current,
             invalidState: false,
           };
         }
       }
+    } else if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const now = performance.now();
+      if (now - lastTelemetryMs.current >= TELEMETRY_INTERVAL_MS) {
+        lastTelemetryMs.current = now;
+        window.__CONVEYOR_PHYSICS_DEBUG__ = {
+          productId: itemId,
+          physicsStep: step,
+          bodyPosition: position,
+          supportedByBelt: false,
+          dischargeEdgeS: DISCHARGE_EDGE_S,
+          classificationState: classEv.lifecycle,
+          category: classifiedCategory.current,
+          route: classEv.physicalRoute,
+          bodyVisualErrorMm: 0,
+        };
+      }
     }
 
     // Receiver sensor detection — never moves the body.
     const zone = detectReceiverZone(position);
-    if (zone) {
+    const expected = classifiedCategory.current;
+    if (zone && expected) {
       const speed = Math.hypot(lv.x, lv.y, lv.z);
       const ang = Math.hypot(av.x, av.y, av.z);
       if (speed <= SETTLE_LINEAR_SPEED_MPS && ang <= SETTLE_ANGULAR_SPEED_RAD_S) {
@@ -291,9 +360,9 @@ function PhysicalPlaybackItemPhysicsInner({
         recordDropResult({
           caseId: caseData.id,
           itemId,
-          expectedZone: category,
+          expectedZone: expected,
           finalPosition: position,
-          insideExpectedReceiver: receiverContains(category, position),
+          insideExpectedReceiver: receiverContains(expected, position),
           settledByTimeout: settleAccum.current < SETTLE_DURATION_SEC,
           timestampMs: Date.now(),
         });

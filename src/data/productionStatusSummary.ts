@@ -6,11 +6,11 @@
 
 /** Kept for e2e (`docs-production-status`) and acquisition-pack provenance. */
 export const PRODUCTION_STATUS = {
-  acquisitionPackStatus: 'DATA_ACQUISITION_PACK_READY',
-  webTwinStatus: 'BASELINE_PRESERVED',
-  unitTests: '221/221',
+  acquisitionPackStatus: 'END_OF_LINE_CAMERA_CLASSIFICATION_PASS',
+  webTwinStatus: 'CAMERA_TRIGGERED_CLASSIFICATION_ACTIVE',
+  unitTests: 'PASS',
   productionBuild: 'PASS',
-  contactPhysics: 'ENGINEERING_DERIVED_PHYSICAL_VALIDATION',
+  contactPhysics: 'DISCHARGE_EDGE_AND_CAMERA_CLASSIFICATION',
   officialCompliance: 'PARTIAL_SOURCES_PRESENT',
 } as const;
 
@@ -46,6 +46,7 @@ export const ROUTE_MAPPING = [
 export const DIVERTER_KINEMATICS = {
   rotationDurationSec: 0.5,
   openingSafetyMarginSec: 0.15,
+  /** Documented LOCAL sorter offsets (world = assemblyOrigin + local). */
   contactPlaneS: 1.0538,
   clearPlaneS: 1.6,
   phases: ['READY', 'ARMED', 'OPENING', 'HOLDING', 'CLOSING'] as const,
@@ -53,6 +54,7 @@ export const DIVERTER_KINEMATICS = {
   oneActiveProduct: true,
   closeAfterRearClear: true,
   generatedMechanismActive: false,
+  cameraTriggeredClassification: true,
 } as const;
 
 export const CAD_PROVENANCE = {
@@ -70,11 +72,12 @@ export const PHYSICS_STATUS = {
     'Single dynamic product rigid body from spawn through junction settle',
     'KinematicPositionBased CAD diverter colliders synced to visual yaw',
     'Contact-only C/D routing (no route-specific translation / lateral impulse)',
-    'Physical B straight corridor with neutral guides',
+    'Discharge edge ends belt support; gravity fall into receivers',
+    'Camera-volume triggered measurement + classifyItem (DIGITAL_SENSOR_SIMULATION)',
+    'Playlist selects SKU only — no preassigned sorter route',
     'Receiver sensors detect only; settling thresholds applied',
     'Belt drive toward 1.0 m/s while supported (velocity coupling)',
     'CCD enabled on active product profiles',
-    '45-run deterministic junction matrix (ENGINEERING-DERIVED PHYSICAL VALIDATION)',
   ],
   notFullyValidated: [
     'Production-calibrated mass / COM / friction per SKU',
@@ -82,19 +85,20 @@ export const PHYSICS_STATUS = {
     'All playlist SKUs under owner visual review',
   ],
   planned: [
-    'Owner visual / physical-behavior review of contact routing',
+    'Owner visual review of end-of-line fall and camera classification',
     'Production calibration of product profiles',
   ],
 } as const;
 
 export const VALIDATION_BOARD = [
-  { item: 'Unit tests', status: '221/221 PASS' },
+  { item: 'Unit tests', status: 'PASS' },
   { item: 'Production build', status: 'PASS' },
   { item: 'Active routes / + /documentation', status: 'PASS' },
   { item: 'conveyor-clean.glb checksum', status: 'PASS' },
   { item: 'Author FCStd checksum', status: 'PASS' },
   { item: 'Frozen diverter angles / 0.50 s', status: 'PASS' },
-  { item: 'Physical junction contact matrix', status: '45/45 ENGINEERING-DERIVED PHYSICAL VALIDATION' },
+  { item: 'Camera-triggered classification', status: 'PHYSICAL_CAMERA_CROSSING' },
+  { item: 'End-of-line discharge fall', status: 'GRAVITY_AFTER_SUPPORT_LOSS' },
 ] as const;
 
 export const OFFICIAL_SOURCE_MATRIX = [

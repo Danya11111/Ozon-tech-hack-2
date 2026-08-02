@@ -55,6 +55,24 @@ export const DRIVE_ROLLER_RADIUS_M = 0.06;     // 60mm drive roller
 // Zone positions (X axis = along conveyor, Z axis = lateral)
 // Must be declared before other constants that reference it
 // =========================================================
+/**
+ * Sorter module world-X origin (assembly moves as one unit).
+ * Downstream hinges sit at origin + 1.55 m (module-local).
+ */
+export const SORTER_ASSEMBLY_ORIGIN_S = 0.40;
+/** Canonical local sorter offsets (documented contract — not world X). */
+export const DOCUMENTED_LOCAL_CONTACT_OFFSET = 1.0538;
+export const DOCUMENTED_LOCAL_CLEAR_OFFSET = 1.6000;
+/** Last physical upper-belt support X (matches belt-slab max bound). */
+export const DISCHARGE_EDGE_S = 2.12;
+
+export function worldContactPlaneS(): number {
+  return SORTER_ASSEMBLY_ORIGIN_S + DOCUMENTED_LOCAL_CONTACT_OFFSET;
+}
+export function worldClearPlaneS(): number {
+  return SORTER_ASSEMBLY_ORIGIN_S + DOCUMENTED_LOCAL_CLEAR_OFFSET;
+}
+
 export const ZONES = {
   /** Zone A - item spawn point (start of conveyor) */
   A: { x: -4.0, z: 0, label: 'A' },
@@ -62,14 +80,14 @@ export const ZONES = {
   CAMERA: { x: -1.5, z: 0 },
   /** Laser measurement zone */
   LASER: { x: -0.5, z: 0 },
-  /** Gate/diverter position */
-  GATE: { x: 1.5, z: 0 },
-  /** Zone B - main sorter exit (end of main conveyor) */
-  B: { x: 2.85, z: 0, label: 'B' },
-  /** Zone C - oversized items (travel-left / +Z), close to belt */
-  C: { x: 1.55, z: 1.15, label: 'C' },
-  /** Zone D - round items (travel-right / −Z), close to belt */
-  D: { x: 1.55, z: -1.15, label: 'D' },
+  /** Gate/diverter position (downstream hinges of moved sorter assembly) */
+  GATE: { x: SORTER_ASSEMBLY_ORIGIN_S + 1.55, z: 0 },
+  /** Zone B - main sorter exit (straight discharge, past C/D lateral exit) */
+  B: { x: 2.65, z: 0, label: 'B' },
+  /** Zone C - oversized items (travel-left / +Z), aligned to guide exit */
+  C: { x: SORTER_ASSEMBLY_ORIGIN_S + 1.55, z: 1.15, label: 'C' },
+  /** Zone D - round items (travel-right / −Z), aligned to guide exit */
+  D: { x: SORTER_ASSEMBLY_ORIGIN_S + 1.55, z: -1.15, label: 'D' },
 } as const;
 
 // =========================================================
@@ -199,14 +217,16 @@ export const CAD_GATE_ENGAGE_X = JUNCTION.rightPivot.x - 0.75 + 0.08;
 // Размер ~1.2×0.8×0.5 m (как C/D по footprint).
 // =========================================================
 export const B_RECEIVER = {
-  centerX: 2.85,                  // immediately after sorter module end (~2.01)
+  // Closer than legacy 2.85, but opening starts after C/D leave the belt
+  // so diverted items are not falsely captured by the B sensor volume.
+  centerX: 2.65,
   centerZ: 0,
-  width: 1.0,
+  width: 0.85,
   depth: 0.7,
   wallHeight: 0.45,
   floorY: CAGE_FLOOR_Y,
-  transferStartX: 1.95,           // end of sorter CAD module
-  transferEndX: 2.25,
+  transferStartX: DISCHARGE_EDGE_S + 0.05,
+  transferEndX: DISCHARGE_EDGE_S + 0.12,
 };
 
 // =========================================================

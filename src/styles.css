@@ -3350,10 +3350,10 @@ button:disabled {
   min-height: 100dvh;
   max-width: 100vw;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.12), transparent 32%),
-    linear-gradient(180deg, #07111d 0%, #050910 100%);
-  color: var(--text);
+  box-sizing: border-box;
+  background: #F5F7FA;
+  color: #001A34;
+  opacity: 1;
 }
 
 .docs-header {
@@ -3367,9 +3367,10 @@ button:disabled {
   gap: 12px 20px;
   min-height: 56px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(5, 9, 16, 0.92);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #DCE6F5;
+  background: #FFFFFF;
+  color: #001A34;
+  backdrop-filter: none;
 }
 
 .docs-brand {
@@ -3395,10 +3396,13 @@ button:disabled {
 .docs-title {
   font-size: 1.25rem;
   line-height: 1.2;
+  color: #001A34;
+  opacity: 1;
 }
 
 .docs-subtitle {
-  color: var(--muted);
+  color: #5F6F82;
+  opacity: 1;
   font-size: 0.85rem;
 }
 
@@ -3416,10 +3420,11 @@ button:disabled {
   top: 84px;
   align-self: start;
   padding: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid #DCE6F5;
   border-radius: 12px;
-  background: rgba(10, 19, 31, 0.7);
+  background: #FFFFFF;
   font-size: 0.85rem;
+  color: #001A34;
 }
 
 .docs-toc-mobile {
@@ -3436,7 +3441,8 @@ button:disabled {
 
 .docs-toc-desktop a,
 .docs-toc-mobile a {
-  color: var(--muted);
+  color: #005BFF;
+  opacity: 1;
   text-decoration: none;
   display: inline-flex;
   min-height: 36px;
@@ -3445,7 +3451,8 @@ button:disabled {
 
 .docs-toc-desktop a:hover,
 .docs-toc-mobile a:hover {
-  color: var(--cyan);
+  color: #001A34;
+  background: #EEF4FF;
 }
 
 .docs-main {
@@ -3463,43 +3470,63 @@ button:disabled {
 }
 
 .docs-status-banner {
-  border: 1px solid rgba(74, 222, 128, 0.35);
-  background: rgba(20, 48, 32, 0.45);
+  border: 1px solid #DCE6F5;
+  background: #EEF4FF;
+  color: #33465B;
 }
 
 .docs-status-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: #5F6F82;
+  opacity: 1;
 }
 
 .docs-status-value {
   margin-top: 6px;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--green);
+  color: #005BFF;
+  opacity: 1;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .docs-status-note {
   margin-top: 10px;
-  color: var(--muted);
+  color: #33465B;
+  opacity: 1;
   font-size: 0.92rem;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 .docs-section h2 {
   font-size: 1.15rem;
   margin-bottom: 10px;
+  color: #001A34;
+  opacity: 1;
 }
 
 .docs-section p,
 .docs-section li {
-  color: #c9d8e8;
+  color: #33465B;
+  opacity: 1;
   font-size: 0.98rem;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.docs-main,
+.docs-section,
+.docs-status-banner {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 
 .docs-section ul {
@@ -3511,19 +3538,22 @@ button:disabled {
 .docs-section code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.88em;
-  color: var(--cyan-hover);
+  color: #005BFF;
+  opacity: 1;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .docs-conflict {
   margin-top: 12px;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  background: rgba(48, 32, 10, 0.4);
+  border: 1px solid #DCE6F5;
+  background: #FFFFFF;
+  color: #33465B;
 }
 
 .docs-blocker-list li {
-  color: #ffd0d5;
+  color: #33465B;
+  opacity: 1;
 }
 
 .docs-table-scroll {
@@ -3543,15 +3573,18 @@ button:disabled {
 .docs-table th,
 .docs-table td {
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid #DCE6F5;
   text-align: left;
   vertical-align: top;
   white-space: nowrap;
+  color: #33465B;
+  opacity: 1;
+  overflow-wrap: anywhere;
 }
 
 .docs-table th {
-  background: rgba(12, 23, 37, 0.9);
-  color: var(--muted);
+  background: #EEF4FF;
+  color: #001A34;
   font-weight: 600;
 }
 
@@ -3624,9 +3657,10 @@ button:disabled {
 
   .docs-toc-mobile {
     display: block;
-    border: 1px solid var(--line);
+    border: 1px solid #DCE6F5;
     border-radius: 12px;
-    background: rgba(10, 19, 31, 0.7);
+    background: #FFFFFF;
+    color: #001A34;
     padding: 0 12px;
   }
 
@@ -3638,6 +3672,8 @@ button:disabled {
     align-items: center;
     font-weight: 700;
     font-size: 15px;
+    color: #001A34;
+    opacity: 1;
   }
 
   .docs-toc-mobile > summary::-webkit-details-marker {
@@ -3975,9 +4011,8 @@ button:disabled {
 
   /* Documentation desktop grid aligned to product chrome */
   .docs-page {
-    background:
-      radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.1), transparent 34%),
-      linear-gradient(180deg, #07111d 0%, #050910 100%);
+    background: #F5F7FA;
+    color: #001A34;
   }
 
   .docs-layout {

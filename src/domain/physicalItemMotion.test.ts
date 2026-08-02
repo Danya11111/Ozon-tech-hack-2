@@ -76,14 +76,14 @@ describe('physicalItemMotion', () => {
   });
 
   it('B travels via belt transfer then drop chute before settling', () => {
-    // routing span 5800..8300 (Stage 2B continuous-motion retiming):
-    // b_transfer t<0.35 -> <= 6675; chute 0.35..0.88 -> 6675..8000
-    const transfer = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 6100 });
+    // routing starts at 6250 ms after discharge-aligned GATE retiming:
+    // b_transfer t<0.35 -> <= 7125; chute 0.35..0.88 -> 7125..8450
+    const transfer = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 6500 });
     expect(transfer.surface).toBe('b_transfer');
     expect(transfer.phase).toBe('routing');
-    const chute = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 7600 });
+    const chute = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 7800 });
     expect(chute.surface).toBe('chute_b');
-    const settled = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 9000 });
+    const settled = getPhysicalItemPose({ ...defaultInput, targetCategory: 'B', elapsedMs: 9500 });
     expect(settled.surface).toBe('b_bin_floor');
     expect(settled.phase).toBe('settled');
   });
