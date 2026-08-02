@@ -1,14 +1,12 @@
 /**
- * Stage 2 — item with hybrid kinematic/dynamic authority (Rapier).
+ * Product rigid body: dynamic physical conveyor foundation + junction handoff.
  *
- * Authority flow (see docs/stage2_real_sorter/physics-architecture.md):
- *  1. kinematicPosition — follows getPhysicalItemPose exactly (domain truth);
- *  2. at getDropHandoffTimeMs → dynamic with deterministic initial velocity
- *     (B: belt edge carry-over; C/D: pusher impulse, scaled per SKU profile);
- *  3. gravity/collision/friction/restitution/angular velocity govern the drop;
- *  4. on sleep (or controlled 4.5 s timeout) the final position is verified
- *     against the DOMAIN-decided receiver volume and the body is frozen
- *     (kinematic) — no drift, clean replay, no teleportation at any point.
+ * Lifecycle:
+ *  PREPARING → PHYSICAL_CONVEYOR (dynamic + belt force) → JUNCTION
+ *  (existing drop/settle authority at getDropHandoffTimeMs) → FROZEN.
+ *
+ * Temporary handoff: belt drive stops at JUNCTION_ENTRY_S / handoffMs; current
+ * classifier+diverter routing remains responsible for basket assignment.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -18,11 +16,23 @@ import {
   CuboidCollider,
   CapsuleCollider,
   CylinderCollider,
+  useBeforePhysicsStep,
   type RapierRigidBody,
 } from '@react-three/rapier';
 import { RigidBodyType } from '@dimforge/rapier3d-compat';
 import { getPhysicalItemPose, getDropHandoffTimeMs } from '../../domain/physicalItemMotion';
-import { getVisualPhysicsProfile } from '../../domain/visualPhysicsProfiles';
+import {
+  getProductPhysicsProfile,
+  colliderHalfHeight,
+  spawnCenterY,
+  isSupportedByBelt,
+  computeBeltDriveForce,
+  isInvalidProductState,
+  recordInvalidProductState,
+  JUNCTION_ENTRY_S,
+  BELT_SPEED_MPS,
+  type ProductPhysicsPhase,
+} from '../../domain/productPhysicsProfiles';
 import { resolveItem } from '../../data/resolveItem';
 import { classifyItem } from '../../domain/classifier';
 import { receiverContains } from '../../domain/receiverVolumes';
@@ -32,23 +42,21 @@ import { recordDropResult, physicsSimClock } from './SorterPhysics';
 import { getModelAsset } from '../../data/modelAssets';
 import { isProductAssetReady } from './RealItemModel';
 
-type Authority = 'kinematic' | 'dynamic' | 'frozen';
+type Authority = 'preparing' | 'physical_conveyor' | 'junction' | 'frozen' | 'fault_kinematic';
 
-/** Controlled settle budget after handoff — in PHYSICS-simulated seconds,
- *  not domain ms: under render lag domain time races ahead of the stepper,
- *  and a domain-ms budget would freeze items mid-flight (§14.2). */
 const SETTLE_BUDGET_SEC = 4.5;
+const TELEMETRY_INTERVAL_MS = 200;
 
-function colliderDensity(profile: ReturnType<typeof getVisualPhysicsProfile>): number {
-  if (profile.collider === 'cuboid' && profile.cuboidHalfExtents) {
-    const [hx, hy, hz] = profile.cuboidHalfExtents;
-    return profile.approximateMassKg / (8 * hx * hy * hz);
+function colliderDensity(profile: ReturnType<typeof getProductPhysicsProfile>): number {
+  const c = profile.collider;
+  if (c.type === 'cuboid') {
+    const [hx, hy, hz] = c.halfExtents;
+    return profile.massKg / (8 * hx * hy * hz);
   }
-  const [r, hh] = profile.capsule ?? [0.05, 0.1];
-  const volume = profile.collider === 'capsule'
-    ? Math.PI * r * r * (2 * hh + (4 / 3) * r)
-    : Math.PI * r * r * 2 * hh;
-  return profile.approximateMassKg / volume;
+  const volume = c.type === 'capsule'
+    ? Math.PI * c.radius * c.radius * (2 * c.halfHeight + (4 / 3) * c.radius)
+    : Math.PI * c.radius * c.radius * 2 * c.halfHeight;
+  return profile.massKg / Math.max(volume, 1e-6);
 }
 
 export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhysics({
@@ -70,18 +78,24 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   const classification = useMemo(() => classifyItem(itemData), [itemData]);
   const category = classification.category as 'B' | 'C' | 'D';
   const itemId = itemData.id.replace('-LC', '');
-  const profile = getVisualPhysicsProfile(itemId);
+  const profile = getProductPhysicsProfile(itemId);
+  const halfH = colliderHalfHeight(profile);
   const handoffMs = getDropHandoffTimeMs(classification.category, caseData.faultType);
+  const isFault = Boolean(caseData.faultType);
 
   const bodyRef = useRef<RapierRigidBody>(null);
-  const traceEnabled = useRef(
-    typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('trace') === '1',
-  );
-  const authority = useRef<Authority>('kinematic');
+  const authority = useRef<Authority>(isFault ? 'fault_kinematic' : 'preparing');
+  const phaseRef = useRef<ProductPhysicsPhase>('preparing');
   const frozenPose = useRef<{ p: [number, number, number]; q: THREE.Quaternion } | null>(null);
   const handedOffAtSimSec = useRef<number | null>(null);
   const verified = useRef(false);
+  const activated = useRef(false);
+  const invalidLogged = useRef(false);
+  const lastTelemetryMs = useRef(0);
+  const forceScratch = useRef({ x: 0, y: 0, z: 0 });
+  const elapsedMsRef = useRef(elapsedMs);
+  elapsedMsRef.current = elapsedMs;
+
   const asset = getModelAsset(itemId);
   const needsRealAsset = Boolean(asset?.defaultRealAsset && asset?.runtimePath);
   const [spawned, setSpawned] = useState(
@@ -101,6 +115,24 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     jitter,
   });
 
+  const spawnPose = useMemo(() => {
+    const p = getPhysicalItemPose({
+      caseId: caseData.id,
+      slotIndex,
+      dimensionsMm: itemData.dimensionsMm,
+      targetCategory: classification.category,
+      elapsedMs: 0,
+      faultType: caseData.faultType,
+      jitter,
+    });
+    const y = spawnCenterY(profile);
+    return {
+      position: [p.position[0], y, p.position[2]] as [number, number, number],
+      rotation: p.rotation,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseData.id, profile.productId]);
+
   const handoffPose = useMemo(() => {
     if (handoffMs == null) return null;
     return getPhysicalItemPose({
@@ -115,16 +147,14 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handoffMs, caseData.id]);
 
-  // Reset authority whenever a new case mounts this body. The Rapier body is
-  // reused across cases, so a case that ended while still DYNAMIC (settle
-  // budget cut short under render lag) must be forced back to kinematic —
-  // otherwise setNextKinematicTranslation is a no-op and the next case's item
-  // is stuck invisibly mid-scene.
   useEffect(() => {
-    authority.current = 'kinematic';
+    authority.current = isFault ? 'fault_kinematic' : 'preparing';
+    phaseRef.current = 'preparing';
     frozenPose.current = null;
     handedOffAtSimSec.current = null;
     verified.current = false;
+    activated.current = false;
+    invalidLogged.current = false;
     const ready = !needsRealAsset || isProductAssetReady(asset?.runtimePath);
     setSpawned(ready);
     const body = bodyRef.current;
@@ -132,24 +162,136 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       body.setBodyType(RigidBodyType.KinematicPositionBased, false);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      const p = pose.position;
+      const p = spawnPose.position;
       body.setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
-      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
+      const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
       body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on case id only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseData.id]);
+
+  const activateDynamic = useCallback((body: RapierRigidBody) => {
+    const p = spawnPose.position;
+    body.setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
+    const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
+    const q = new THREE.Quaternion().setFromEuler(e);
+    body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    body.setBodyType(RigidBodyType.Dynamic, true);
+    body.wakeUp();
+    activated.current = true;
+    authority.current = 'physical_conveyor';
+    phaseRef.current = 'physical_conveyor';
+  }, [spawnPose]);
+
+  useBeforePhysicsStep(() => {
+    const body = bodyRef.current;
+    if (!body || !spawned) return;
+    if (authority.current !== 'physical_conveyor') {
+      body.resetForces(true);
+      return;
+    }
+
+    const t = body.translation();
+    const lv = body.linvel();
+    const av = body.angvel();
+    const position: [number, number, number] = [t.x, t.y, t.z];
+    const linearVelocity: [number, number, number] = [lv.x, lv.y, lv.z];
+    const angularVelocity: [number, number, number] = [av.x, av.y, av.z];
+
+    if (isInvalidProductState({ position, linearVelocity, angularVelocity })) {
+      if (!invalidLogged.current) {
+        recordInvalidProductState();
+        invalidLogged.current = true;
+        if (import.meta.env.DEV) {
+          console.warn('[physics] invalid product state', itemId, position);
+        }
+      }
+      body.resetForces(true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.setBodyType(RigidBodyType.KinematicPositionBased, false);
+      authority.current = 'frozen';
+      phaseRef.current = 'invalid';
+      return;
+    }
+
+    // Temporary junction handoff: stop belt drive; keep dynamic body for drop.
+    if ((handoffMs != null && elapsedMsRef.current >= handoffMs) || t.x >= JUNCTION_ENTRY_S) {
+      body.resetForces(true);
+      if (authority.current === 'physical_conveyor') {
+        if (handoffPose) {
+          // Align only once at handoff — no per-frame kinematic competition.
+          const hp = body.translation();
+          // Prefer live physical X/Z; keep Y from body (no teleport).
+          void hp;
+        }
+        body.setLinvel({ x: Math.max(lv.x, BELT_SPEED_MPS * 0.85), y: lv.y, z: lv.z }, true);
+        authority.current = 'junction';
+        phaseRef.current = 'junction';
+        handedOffAtSimSec.current = physicsSimClock.simSec;
+      }
+      return;
+    }
+
+    const supported = isSupportedByBelt({
+      position,
+      halfHeight: halfH,
+      phase: 'physical_conveyor',
+      linearVelY: lv.y,
+    });
+
+    body.resetForces(true);
+    if (!supported) return;
+
+    const sample = computeBeltDriveForce({
+      massKg: profile.massKg,
+      linearVelocity,
+      maxBeltAccelerationMps2: profile.maxBeltAccelerationMps2,
+      applyLateralCorrection: t.x < JUNCTION_ENTRY_S,
+    });
+
+    forceScratch.current.x = sample.force[0] + sample.lateralCorrection[0];
+    forceScratch.current.y = sample.force[1] + sample.lateralCorrection[1];
+    forceScratch.current.z = sample.force[2] + sample.lateralCorrection[2];
+    body.addForce(forceScratch.current, true);
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const now = performance.now();
+      if (now - lastTelemetryMs.current >= TELEMETRY_INTERVAL_MS) {
+        lastTelemetryMs.current = now;
+        window.__CONVEYOR_PHYSICS_DEBUG__ = {
+          productId: itemId,
+          profileId: profile.productId,
+          physicsPhase: phaseRef.current,
+          supportedByBelt: supported,
+          currentDownstreamSpeed: sample.currentDownstreamSpeed,
+          targetSpeed: BELT_SPEED_MPS,
+          appliedAcceleration: sample.appliedAcceleration,
+          appliedForceMagnitude: Math.hypot(
+            forceScratch.current.x,
+            forceScratch.current.y,
+            forceScratch.current.z,
+          ),
+          lateralSpeed: lv.z,
+          angularSpeed: Math.hypot(av.x, av.y, av.z),
+          bodyPosition: position,
+          invalidState: false,
+        };
+      }
+    }
+  });
 
   useFrame(() => {
     const body = bodyRef.current;
     if (!body) return;
 
-    // PREPARING: hold at spawn pose, zero velocity, keep invisible until visual ready.
     if (!spawned) {
-      const p = pose.position;
+      const p = spawnPose.position;
       body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
-      const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
+      const e = new THREE.Euler(spawnPose.rotation[0], spawnPose.rotation[1], spawnPose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
       body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -157,34 +299,12 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       return;
     }
 
-    if (authority.current === 'kinematic') {
-      // Physics handoff at pusher contact / belt edge — never for fault cases.
-      // MUST be checked BEFORE the kinematic drive: under render lag a single
-      // frame can jump several seconds past handoffMs, and pose(elapsedMs) is
-      // then already deep inside the receiver. Applying setNextKinematic*
-      // from that pose in the same frame as the dynamic switch teleports the
-      // body (forbidden) — the next-step kinematic target still applies.
-      if (handoffMs != null && handoffPose && elapsedMs >= handoffMs) {
-        const hp = handoffPose.position;
-        body.setTranslation({ x: hp[0], y: hp[1], z: hp[2] }, true);
-        const he = new THREE.Euler(handoffPose.rotation[0], handoffPose.rotation[1], handoffPose.rotation[2]);
-        const hq = new THREE.Quaternion().setFromEuler(he);
-        body.setRotation({ x: hq.x, y: hq.y, z: hq.z, w: hq.w }, true);
-        body.setBodyType(RigidBodyType.Dynamic, true);
-        // Deterministic initial velocity: belt carry-over only — for C/D the
-        // Z motion comes from the kinematic paddle CONTACT (Stage 2B §13).
-        body.setLinvel({ x: 1.0, y: 0, z: 0 }, true);
-        if (profile.canRoll && category === 'B') {
-          body.setAngvel({ x: 2.0, y: 0.4, z: 0 }, true);
-        } else {
-          body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        }
-        authority.current = 'dynamic';
-        handedOffAtSimSec.current = physicsSimClock.simSec;
-        return;
-      }
+    if (authority.current === 'preparing' && !activated.current && !isFault) {
+      activateDynamic(body);
+      return;
+    }
 
-      // Kinematic drive: domain pose is truth (belt travel, inspection dwell).
+    if (authority.current === 'fault_kinematic') {
       const p = pose.position;
       const e = new THREE.Euler(pose.rotation[0], pose.rotation[1], pose.rotation[2]);
       const q = new THREE.Quaternion().setFromEuler(e);
@@ -193,25 +313,13 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
       return;
     }
 
-    if (authority.current === 'dynamic') {
+    if (authority.current === 'junction') {
       const slept = body.isSleeping();
       const lv = body.linvel();
       const av = body.angvel();
       const slow = Math.hypot(lv.x, lv.y, lv.z) < 0.2 && Math.hypot(av.x, av.y, av.z) < 1.0;
-      if (traceEnabled.current) {
-        const t = body.translation();
-        const w = window as unknown as { __ITEM_TRACE?: unknown[] };
-        w.__ITEM_TRACE = w.__ITEM_TRACE ?? [];
-        const arr = w.__ITEM_TRACE as { e: number; x: number; y: number; z: number; lv: number; slept: boolean }[];
-        if (arr.length === 0 || arr[arr.length - 1].e < elapsedMs - 200) {
-          arr.push({ e: Math.round(elapsedMs), x: +t.x.toFixed(3), y: +t.y.toFixed(3), z: +t.z.toFixed(3), lv: +Math.hypot(lv.x, lv.y, lv.z).toFixed(2), slept });
-          if (arr.length > 120) arr.shift();
-        }
-      }
       const timedOut = handedOffAtSimSec.current != null
         && physicsSimClock.simSec - handedOffAtSimSec.current > SETTLE_BUDGET_SEC;
-      // §14.2: freeze only after actual rest (sleep) or a timeout WITH low
-      // velocities — never freeze a body that is still moving/flying.
       if ((slept || (timedOut && slow)) && !verified.current) {
         verified.current = true;
         const t = body.translation();
@@ -231,12 +339,12 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
         body.setLinvel({ x: 0, y: 0, z: 0 }, false);
         body.setAngvel({ x: 0, y: 0, z: 0 }, false);
         authority.current = 'frozen';
+        phaseRef.current = 'settled';
       }
       return;
     }
 
-    // frozen: hold the verified rest pose (no drift across replays).
-    if (frozenPose.current) {
+    if (authority.current === 'frozen' && frozenPose.current) {
       const { p, q } = frozenPose.current;
       body.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
       body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
@@ -246,38 +354,45 @@ export const PhysicalPlaybackItemPhysics = memo(function PhysicalPlaybackItemPhy
   if (elapsedMs < 0) return null;
 
   const density = colliderDensity(profile);
-  // CCD for small/fast items (pen) and thin items (plate) — mirrors the sim.
-  const ccd = profile.approximateMassKg < 0.05 || itemData.dimensionsMm.height < 50;
+  const enabledRotations: [boolean, boolean, boolean] = [
+    !profile.lockRotationX,
+    !profile.lockRotationY,
+    !profile.lockRotationZ,
+  ];
 
   return (
     <RigidBody
       ref={bodyRef}
       type="kinematicPosition"
       colliders={false}
-      friction={profile.friction}
+      friction={profile.beltFriction}
       restitution={profile.restitution}
       linearDamping={profile.linearDamping}
       angularDamping={profile.angularDamping}
-      ccd={ccd}
-      enabledRotations={[true, true, true]}
-      position={pose.position}
+      ccd={profile.ccd}
+      canSleep={false}
+      gravityScale={1}
+      enabledRotations={enabledRotations}
+      position={spawnPose.position}
+      rotation={spawnPose.rotation}
     >
-      {/* Colliders only after visual ready — avoids stale/orphan contact. */}
-      {spawned && profile.collider === 'cuboid' && profile.cuboidHalfExtents && (
-        <CuboidCollider args={profile.cuboidHalfExtents} density={density} />
+      {spawned && profile.collider.type === 'cuboid' && (
+        <CuboidCollider args={profile.collider.halfExtents} density={density} friction={profile.beltFriction} />
       )}
-      {spawned && profile.collider === 'capsule' && profile.capsule && (
+      {spawned && profile.collider.type === 'capsule' && (
         <CapsuleCollider
-          args={[profile.capsule[1], profile.capsule[0]]}
+          args={[profile.collider.halfHeight, profile.collider.radius]}
           density={density}
-          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+          friction={profile.beltFriction}
+          rotation={profile.collider.axis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
-      {spawned && profile.collider === 'cylinder' && profile.capsule && (
+      {spawned && profile.collider.type === 'cylinder' && (
         <CylinderCollider
-          args={[profile.capsule[1], profile.capsule[0]]}
+          args={[profile.collider.halfHeight, profile.collider.radius]}
           density={density}
-          rotation={profile.colliderAxis === 'x' ? [0, 0, Math.PI / 2] : undefined}
+          friction={profile.beltFriction}
+          rotation={profile.collider.axis === 'x' ? [0, 0, Math.PI / 2] : undefined}
         />
       )}
       <group visible={spawned}>

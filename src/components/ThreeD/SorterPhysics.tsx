@@ -1,26 +1,26 @@
 /**
- * Stage 2 — physics world for the sorter drop segment.
+ * Physics world for the sorter — single step authority via @react-three/rapier.
  *
- * Hybrid authority (docs/stage2_real_sorter/physics-architecture.md):
- *  - items on the belt are KINEMATIC (domain pose is truth);
- *  - at the drop handoff (pusher contact / belt edge) the body switches to
- *    DYNAMIC with deterministic initial velocity;
- *  - static colliders mirror the visible chute / receiver geometry
- *    (documented hidden colliders, same dimensions as the visuals).
- *
- * Determinism: fixed dt = 1/60, max 4 substeps/frame, no unseeded randomness.
- * Physics freezes when the domain clock is paused (documented simulation
- * assumption — belt, gate and items halt together; EMERGENCY_STOP creates no
- * new impulses).
- *
- * Stage 2E: Rapier step timing via PhysicsPerfSampler (?perf=1 | ?physicsPerf=1).
- * Render time is NOT included in physics p95.
+ * Physics is mounted `paused` so FrameStepper does not auto-step. RapierStepper
+ * is the only caller of context.step(), which runs before/after hooks, fixed
+ * substeps, and mesh sync. Playback speed scales the clamped frame delta.
  */
 import { useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Physics, RigidBody, CuboidCollider, useRapier } from '@react-three/rapier';
+import {
+  Physics,
+  RigidBody,
+  CuboidCollider,
+  useRapier,
+  useAfterPhysicsStep,
+} from '@react-three/rapier';
 import { getStaticColliders } from '../../domain/physicsWorldLayout';
-import { PHYSICS_TIMESTEP_SEC } from '../../domain/physicsTimestep';
+import {
+  PHYSICS_TIMESTEP_SEC,
+  PHYSICS_MAX_SUBSTEPS,
+  MAX_FRAME_DELTA_SEC,
+  PHYSICS_GRAVITY,
+} from '../../domain/physicsTimestep';
 import {
   PhysicsPerfSampler,
   isPhysicsPerfQueryEnabled,
@@ -28,7 +28,7 @@ import {
 } from '../../domain/physicsPerf';
 
 export const PHYSICS_DT = PHYSICS_TIMESTEP_SEC;
-export const PHYSICS_MAX_SUBSTEPS = 4;
+export { PHYSICS_MAX_SUBSTEPS };
 const MAX_SUBSTEPS = PHYSICS_MAX_SUBSTEPS;
 
 /**
@@ -59,6 +59,7 @@ declare global {
     __DROP_RESULTS?: DropResult[];
     __PHYSICS_PERF__?: PhysicsPerfSnapshot;
     __PHYSICS_PERF_RESET__?: () => void;
+    __CONVEYOR_PHYSICS_DEBUG__?: Record<string, unknown>;
   }
 }
 
@@ -73,7 +74,6 @@ function readWorldMeta(world: {
   colliders?: { len: () => number };
 }): { activeBodies: number; sleepingBodies: number; colliders: number; contactPairs: number } {
   try {
-    // @react-three/rapier wraps Rapier world; body counts via forEach when available
     const w = world as unknown as {
       forEachRigidBody?: (cb: (b: { isSleeping: () => boolean; numColliders: () => number }) => void) => void;
       bodies?: { len: () => number };
@@ -102,14 +102,24 @@ function readWorldMeta(world: {
   }
 }
 
-/** Steps the Rapier world with a fixed dt, scaled by domain playback speed. */
+/**
+ * Sole physics-step authority: calls Rapier context.step (not raw world.step)
+ * so before/after hooks and rigid-body mesh sync run once per substep batch.
+ */
+function PhysicsSimClock() {
+  useAfterPhysicsStep(() => {
+    physicsSimClock.simSec += PHYSICS_DT;
+  });
+  return null;
+}
+
 function RapierStepper({ running, speed }: { running: boolean; speed: number }) {
-  const { world } = useRapier();
-  const accumulator = useRef(0);
+  const { step, world } = useRapier();
+  const wasRunning = useRef(false);
   const sampler = useRef(new PhysicsPerfSampler(PHYSICS_DT, MAX_SUBSTEPS));
   const perfOn = useRef(false);
+  const stepsThisFrame = useRef(0);
 
-  // Latch query once (and expose reset) — no React state.
   if (typeof window !== 'undefined' && !perfOn.current) {
     perfOn.current = isPhysicsPerfQueryEnabled();
     if (perfOn.current) {
@@ -118,34 +128,37 @@ function RapierStepper({ running, speed }: { running: boolean; speed: number }) 
   }
 
   useFrame((_, delta) => {
-    if (!running) return;
-    accumulator.current += Math.min(delta, 0.1) * speed;
-    let steps = 0;
-    let framePhysicsMs = 0;
-    while (accumulator.current >= PHYSICS_DT && steps < MAX_SUBSTEPS) {
-      if (perfOn.current) {
-        const t0 = performance.now();
-        world.step();
-        framePhysicsMs += performance.now() - t0;
-      } else {
-        world.step();
-      }
-      physicsSimClock.simSec += PHYSICS_DT;
-      accumulator.current -= PHYSICS_DT;
-      steps += 1;
+    if (!running) {
+      // Pause: do not step; do not accumulate paused wall-clock time.
+      wasRunning.current = false;
+      return;
     }
+
+    // On resume, ignore the (possibly huge) first frame delta.
+    const frameDelta = wasRunning.current
+      ? Math.min(delta, MAX_FRAME_DELTA_SEC)
+      : Math.min(delta, PHYSICS_DT);
+    wasRunning.current = true;
+
+    const scaled = frameDelta * speed;
+    const capped = Math.min(scaled, MAX_SUBSTEPS * PHYSICS_DT);
+    const simBefore = physicsSimClock.simSec;
+    const before = performance.now();
+    step(capped);
+    const steps = Math.max(
+      0,
+      Math.round((physicsSimClock.simSec - simBefore) / PHYSICS_DT),
+    );
+    stepsThisFrame.current = steps;
     if (perfOn.current && steps > 0) {
-      // Record per-frame physics cost (sum of substeps this frame), not render.
-      sampler.current.pushStepMs(framePhysicsMs, steps);
+      sampler.current.pushStepMs(performance.now() - before, steps);
       window.__PHYSICS_PERF__ = sampler.current.snapshot(readWorldMeta(world));
     }
-    if (steps === MAX_SUBSTEPS) accumulator.current = 0;
   });
   return null;
 }
 
-/** Static colliders for the whole working area (fixed bodies, cheap cuboids).
- *  Layout data lives in domain/physicsWorldLayout — shared with headless tests. */
+/** Static colliders for the whole working area (fixed bodies, cheap cuboids). */
 export function SorterStaticColliders() {
   return (
     <RigidBody type="fixed" colliders={false}>
@@ -172,7 +185,14 @@ export function SorterPhysicsWorld({
   children: ReactNode;
 }) {
   return (
-    <Physics updateLoop="independent" paused timeStep={PHYSICS_DT} gravity={[0, -9.81, 0]}>
+    <Physics
+      updateLoop="independent"
+      paused
+      timeStep={PHYSICS_DT}
+      gravity={PHYSICS_GRAVITY}
+      interpolate
+    >
+      <PhysicsSimClock />
       <RapierStepper running={running} speed={speed} />
       <SorterStaticColliders />
       {children}
