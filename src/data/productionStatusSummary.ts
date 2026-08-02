@@ -175,7 +175,8 @@ export const CURRENT_LIMITATIONS = [
   'Per-SKU physical parameters still require profiling/calibration.',
   'Author CAD horn / transmission incomplete in active GLB.',
   'Official compliance is partial: missing extracted task PDF; scoring PDF not re-parsed this pass.',
-  'Repository retains only the web twin, author CAD, official sources, and active tests.',
+  'Real CV prototype lives in cv/ (WORKING_PROTOTYPE) and is not connected to the live website.',
+  'Live CV validation requires Intel RealSense D415 hardware.',
 ] as const;
 
 /** @deprecated alias — historical Gate wording retained for acquisition-pack note */

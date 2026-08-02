@@ -1,110 +1,97 @@
-# OZON Sorter Digital Twin
+# OWL PRIME — Ozon Tech Track 3
 
-Complete Track 3 Ozon Tech solution in one repository: a web digital twin of the sorting line, plus a real RealSense/OpenCV CV prototype.
+## О проекте
+
+OWL PRIME — инженерный контур предварительной сортировки товаров: веб-цифровой двойник конвейерной линии, классификация B/C/D, физическая маршрутизация в симуляции, рабочий CV-прототип на RealSense D415 и экспериментальный физический стенд.
+
+Это не сертифицированный промышленный ПАК, а воспроизводимое решение хакатона: цифровой twin на проде, CV-прототип в репозитории, CAD/ассеты и документация для проверки судьями.
+
+## Состав решения
+
+1. **Web digital twin** — React/Three.js симуляция конвейера, измерения, classifier, diverters.
+2. **CV-прототип** — `cv/`: RealSense D415 + OpenCV → габариты / круг → B/C/D.
+3. **CAD и runtime 3D** — авторский FreeCAD и GLB/STL для деплоя.
+4. **Физический стенд** — лента, рама, камера над полотном, электроника/SCADA.
+5. **Документация** — `/documentation`, `docs/ENGINEERING.md`.
+6. **Презентация** — `presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf`.
+
+## Демо
 
 **Production:** https://arhipovdan.ru
 
-## 1. Overview
-
-This repository delivers a continuous web simulation of an Ozon conveyor sorter: CAD conveyor, product models, camera/measurement stage, B/C/D classification, diverters, and Rapier physics. The public demo runs on https://arhipovdan.ru with routes `/` (simulation) and `/documentation` (engineering status).
-
-Separately, `cv/` contains a **working hardware prototype** that reads Intel RealSense D415 depth, measures parcels with OpenCV, classifies B/C/D, and can publish results over MQTT. It is **not** wired into the live website.
-
-Both paths share the same Track 3 classification domain (exclusive 10×10×10 … 450×320×320 mm, roundness K > 0.8). The web twin uses a digital sensor simulation; the CV folder uses real depth frames.
-
-`main` is the canonical complete solution. Developers do not need other branches to run the web app or inspect/run the CV prototype.
-
-Large submission artifacts (presentation, video, optional CAD/model mirrors) belong in team cloud storage; runtime assets required by deploy stay in Git.
-
-## 2. Submission components
-
-| Component | Location | Notes |
-|---|---|---|
-| Web digital twin | `src/`, `public/` | Production-integrated |
-| Real CV prototype | `cv/` | WORKING_PROTOTYPE, not live-integrated |
-| Author CAD | `3d_models/conveer.FCStd` | FreeCAD source |
-| Official materials | `input_info/`, `official_sources/` | PDFs/ZIPs cited by docs/code |
-| Production domain | https://arhipovdan.ru | Docker + nginx |
-| Presentation / video | cloud (owner) | Links TBD — see §17 |
-
-## 3. Production demo
-
-- **URL:** https://arhipovdan.ru
-- **`/`** — continuous digital-twin simulation
-- **`/documentation`** — canonical engineering status
-- Unknown routes redirect to `/`
-
-Device behavior on current baseline:
-
-- **Desktop:** interactive WebGL 3D
-- **Mobile:** lightweight **2D** fallback (not full WebGL 3D)
-
-Build identity: `/version.json`.
-
-## 4. Web capabilities
-
-- Three-module CAD conveyor (clean → camera → sorter)
-- Camera / measurement simulation and Track 3 classifier
-- B / C / D routing with CAD diverters (−45° / +45°)
-- Rapier product physics (contact sorting **not** fully validated)
-- Continuous playback HUD + documentation page
-
-## 5. Real CV prototype
-
-| Field | Value |
+| Route | Назначение |
 |---|---|
-| Path | `cv/` |
-| Origin | `drho1y-mvp_1` / `vision_classifier/` |
-| Technology | RealSense D415 + OpenCV (depth segmentation + metrics) |
-| Status | WORKING_PROTOTYPE |
-| Integration | **Not** connected to production web runtime |
+| `/` | Непрерывная симуляция |
+| `/documentation` | Инженерный статус |
+| `*` | Редирект на `/` |
 
-See **[cv/README.md](cv/README.md)** for install, demo, live camera, and MQTT.
+- **Desktop:** интерактивный WebGL 3D.
+- **Mobile:** облегчённый 2D fallback (как в текущем baseline).
 
-## 6. Architecture
+Идентичность сборки: `/version.json`.
+
+## Основные возможности
+
+- непрерывный CAD-конвейер и STL-товары;
+- цифровой этап камеры / измерения;
+- rule-based classifier B/C/D;
+- CAD-дивертеры LEFT/RIGHT (−45° / +45°);
+- физика Rapier (лента 1 м/с);
+- CV-прототип depth→B/C/D (не в live web);
+- инженерная документация в приложении.
+
+## Правила классификации
+
+Официальные границы (`official_sources/doc-1783095831.pdf`), реализованы в web (`src/domain/classifier.ts`) и CV (`cv/classify.py`):
+
+1. Габариты строго **> 10×10×10 мм** и **< 450×320×320 мм**, иначе → **C**.
+2. Если габариты OK и **K > 0.8** (круг) → **D**.
+3. Иначе → **B**.
+4. **C-priority:** негабарит + круг → только **C**.
+
+## Архитектура
+
+**Web**
 
 ```
-Real device path:
-  RealSense D415 → depth preprocess → segmentation → measurement
-  → B/C/D → optional MQTT / hardware
-
-Web path:
-  Digital product → simulated sensor → classifier
-  → physical digital twin → B/C/D receiver visualization
+Product → measurement (digital) → classifier → route → twin → B/C/D receiver
 ```
 
-Shared: B/C/D semantics and official dimension/roundness rules.
-Not shared today: live camera frames into the website.
-
-## 7. Repository structure
+**CV**
 
 ```
-.github/                 CI (build, unit, e2e)
-3d_models/               Author CAD (conveer.FCStd)
-cv/                      Real CV prototype (Python)
-docs/                    Engineering notes
-e2e/                     Playwright smoke/routes
-input_info/              Official Ozon input packs
-official_sources/        Classifier bounds PDF
-public/                  Runtime static assets (GLB/STL/draco)
-src/                     React/Three web twin
-Dockerfile               Web production image
-docker-compose.server.yml
-nginx.conf
-package.json / lock
-vite / vitest / playwright / tsconfig
-README.md
+RealSense D415 → depth → segmentation → L×W×H + K → B/C/D → optional MQTT
 ```
 
-No other top-level product directories are required to run or understand the solution.
+CV **не подключён** к https://arhipovdan.ru. Общее — домен правил B/C/D, не live-канал кадров.
 
-## 8. Requirements
+## Технологии
 
-**Web:** Node.js 20+, npm (`package-lock.json`).
-**CV:** Python 3.10+, ffmpeg, V4L2; RealSense D415 for live mode (`cv/requirements.txt`).
-**Hardware (CV live / MQTT):** D415 USB3; optional MQTT broker + servo/motor controllers on site network.
+| Слой | Стек |
+|---|---|
+| Web | React, TypeScript, Three.js / R3F, Rapier, Vite, Vitest, Playwright |
+| CV | Python, OpenCV, RealSense D415 (V4L2), optional MQTT (`paho-mqtt`) |
 
-## 9. Web quick start
+## Структура репозитория
+
+```
+.github/           CI
+3d_models/         Авторский CAD (conveer.FCStd)
+cv/                CV-прототип RealSense + OpenCV
+docs/              Engineering notes
+e2e/               Playwright smoke/routes
+input_info/        Официальные входные пакеты
+official_sources/  PDF с границами classifier
+presentation/      Финальная презентация (один PDF)
+public/            Runtime GLB/STL/draco
+src/               Web twin
+```
+
+Конфиги деплоя: `Dockerfile`, `docker-compose.server.yml`, `nginx.conf`, `package.json`.
+
+## Запуск web
+
+Node.js 20+.
 
 ```bash
 npm ci
@@ -114,100 +101,78 @@ npm run build
 npm run preview      # http://127.0.0.1:3100
 ```
 
-## 10. CV quick start
+## Запуск CV
+
+Python 3.10+. Live-режим требует Intel RealSense D415 и ffmpeg.
 
 ```bash
 cd cv
-./demo.sh            # venv + deps; HUD on :8080 (needs D415 for live view)
-# without camera:
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python test_classify.py
-.venv/bin/python test_geometry.py
-# live pipeline (hardware):
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp config.example.yaml config.yaml   # MQTT выключен по умолчанию
+
+# без камеры:
+python test_classify.py
+python test_geometry.py
+
+# с камерой:
+./demo.sh                 # HUD http://127.0.0.1:8080/
 ./run.sh --preview --no-mqtt --no-motor
 ```
 
-`npm install` does **not** install CV dependencies.
+Подробности: [`cv/README.md`](cv/README.md). `npm` CV-зависимости не ставит.
 
-## 11. Configuration
+## Конфигурация
 
-**Web (build-time, optional):** `VITE_BUILD_COMMIT`, `VITE_BUILD_BRANCH`, `VITE_BUILD_RELEASE` → `/version.json`. No runtime secrets.
+- `.env` **не** коммитится.
+- Web: опционально `VITE_BUILD_COMMIT` / `VITE_BUILD_BRANCH` / `VITE_BUILD_RELEASE` для `/version.json`.
+- CV: `cv/config.example.yaml` → локальный `cv/config.yaml` (gitignored). MQTT/motor/routing **disabled by default**. Секреты не хранить в Git.
 
-**CV:** copy `cv/config.example.yaml` → `cv/config.yaml` (gitignored). MQTT/motor/routing **disabled by default**. Never commit real passwords or broker credentials.
+## CAD и модели
 
-## 12. Classification rules
-
-Verified in web (`src/domain/classifier.ts`) and CV (`cv/classify.py`):
-
-- dimensions strictly **> 10×10×10 mm** and **< 450×320×320 mm**
-- circular when **K > 0.8** (web) / `circle_ratio ≥ 0.8` (CV)
-- order: dimensions fail → **C**; else circular → **D**; else **B**
-
-Official citation: `official_sources/doc-1783095831.pdf` (present; not re-parsed on every doc pass). Missing extracted brief PDF is not claimed.
-
-## 13. Physics (accepted `main`)
-
-From current source (not superseded experimental branches):
-
-- belt speed **1.0 m/s** (`CONVEYOR_SPEED_MPS`)
-- fixed timestep **1/60 s** (`PHYSICS_TIMESTEP_SEC`)
-- CCD for light/thin product bodies
-- diverters LEFT **−45°**, RIGHT **+45°**
-- full contact-only junction sorting through CAD: **not fully validated**
-
-## 14. CAD and assets
-
-| Asset | Path |
+| Файл | Роль |
 |---|---|
-| Author CAD | `3d_models/conveer.FCStd` |
-| Runtime GLB | `public/models/sorter/conveyor-clean.glb` |
-| Products | `public/models/*.stl` |
+| `3d_models/conveer.FCStd` | Авторский CAD |
+| `public/models/sorter/conveyor-clean.glb` | Runtime конвейер |
+| `public/models/*.stl` | Модели товаров |
 
-Keep runtime assets in Git for deploy. Mirror large CAD/models/presentation/video to cloud for submission.
+Крупные материалы для сдачи дополнительно зеркалируйте в облако; runtime-ассеты для деплоя остаются в Git.
 
-SHA-256 (frozen):
+## Физика (текущий main)
 
-```
-3d_models/conveer.FCStd
-90c1844a4ca05e26def783d6130fc4b993430dde14307534ef8fbb21c9fac2e6
+- скорость ленты **1.0 м/с**;
+- timestep **1/60 с**;
+- CCD для лёгких/тонких тел;
+- diverters −45° / +45°;
+- полный contact-only junction sorting **не fully validated**.
 
-public/models/sorter/conveyor-clean.glb
-1dc7a8d7891bfe756e277ad5368df74cb73410156b2fe0f92845afb8a56f285a
-```
-
-## 15. Testing
+## Проверка
 
 ```bash
-npm test -- --run
-# current release result: 196/196
-npm run build
-PLAYWRIGHT_BASE_URL=http://127.0.0.1:3101 npm run test:e2e -- e2e/routes.spec.ts e2e/smoke.spec.ts
+npm ci && npm test -- --run && npm run build
+# E2E: preview :3101 + e2e/routes.spec.ts + e2e/smoke.spec.ts
 
-cd cv && .venv/bin/python test_classify.py && .venv/bin/python test_geometry.py
+cd cv && python -m compileall . && python test_classify.py && python test_geometry.py
 ```
 
-## 16. Deployment
+Актуальный релиз: unit **196/196**, build PASS, focused E2E PASS, CV compile + unit без камеры PASS. Прод: `/` и `/documentation` → 200.
 
-Nginx terminates TLS for `arhipovdan.ru` and proxies to Docker `owl-web-1` (`docker-compose.server.yml` + `Dockerfile`) on `127.0.0.1:3100`. Deploy from `main` with build-args for `/version.json`. CV is **not** part of the web container.
+## Ограничения
 
-## 17. Submission materials
+- инженерный прототип, не industrial-certified ПАК;
+- CV не live-интегрирован в web;
+- live CV требует D415; на CI — только unit/compile;
+- параметры симуляции требуют калибровки на стенде;
+- mobile — 2D lite fallback;
+- облачная ссылка на доп. материалы — по решению владельца.
 
-| Material | Status |
-|---|---|
-| Presentation URL | REQUIRED_FROM_OWNER |
-| Video demo URL | REQUIRED_FROM_OWNER |
-| Cloud folder URL | REQUIRED_FROM_OWNER |
+## Материалы
 
-Do not invent links. Runtime site assets remain in Git even when mirrored to cloud.
+- Презентация: [`presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf`](presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf)
+- Production: https://arhipovdan.ru
+- Cloud folder: `[ДОБАВИТЬ ССЫЛКУ]`
 
-## 18. Known limitations
+## Статус
 
-- Mobile uses 2D lite fallback on current baseline
-- CV is a prototype and is not live-integrated into arhipovdan.ru
-- Simulation physics is engineering-derived; hardware calibration still required
-- Contact routing through CAD diverters not fully validated
-- Large presentation/video must be uploaded to cloud by owner
-
-## 19. Branch history policy
-
-**`main` is the canonical complete solution** (web + cleaned CV under `cv/`). Historical branches (`dan_branch`, `drho1y-mvp_1`, …) may remain for audit but are not required to run the product.
+**`main` — каноническое полное решение.** Другие ветки исторические и не нужны для запуска web или CV.

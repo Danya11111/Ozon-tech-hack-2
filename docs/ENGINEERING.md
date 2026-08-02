@@ -20,8 +20,11 @@ Companion to `README.md` and `/documentation`. Not a stage changelog.
 | `OPENING_SAFETY_MARGIN_SEC` | 0.15 | same |
 | Contact / clear planes | ≈1.0538 / 1.6000 | `buildDiverterPlanes` + mount hinge |
 | Classifier min/max | exclusive 10³ / 450×320×320 | `src/domain/classifier.ts` |
-| Roundness | K > 0.8 | same |
+| Roundness | K > 0.8 (web); CV code uses ≥ 0.8 | `classifier.ts` / `cv/classify.py` |
+| Belt speed (sim) | 1.0 m/s | runtime / physics helpers |
+| Physics timestep | 1/60 s | Rapier world step |
 | `CONVEYOR_CAD_URL` | `/models/sorter/conveyor-clean.glb` | `ConveyorCadModel.tsx` |
+| Presentation | `presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf` | 10 slides |
 
 ## Active source tree (runtime)
 
@@ -69,10 +72,10 @@ Grounded only in present sources + current `main` code/tests (not a full officia
 |---|---|---|---|---|
 | B/C/D bounds & roundness | `official_sources/doc-1783095831.pdf` | web `classifier.ts`, CV `cv/classify.py` | unit tests | PARTIAL (PDF not re-parsed each pass) |
 | Digital twin demo | workspace PDFs in `input_info/` | `/` + `/documentation` | e2e smoke/routes, production | PASS (demo present) |
-| CAD conveyor | author pack / STL references | `3d_models/`, `conveyor-clean.glb` | checksums in README | PASS (assets present) |
+| CAD conveyor | author pack / STL references | `3d_models/`, `conveyor-clean.glb` | checksums in `/documentation` | PASS (assets present) |
 | Real measurement CV | Track 3 camera intent in briefs | `cv/` RealSense+OpenCV | `cv/README.md`, `test_classify.py` | PARTIAL (prototype, not live web) |
 | Physical industrial line | scoring/workspace PDFs | web physics + optional MQTT CV | code; contact not fully validated | PARTIAL |
-| Presentation / video | platform rules | cloud links | README §17 | NOT_VERIFIED (links missing) |
+| Presentation | platform rules | `presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf` | 10-page PDF in repo | PASS (file present) |
 
 ## Real CV prototype
 
