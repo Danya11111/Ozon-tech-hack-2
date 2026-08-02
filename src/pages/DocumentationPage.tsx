@@ -1,30 +1,37 @@
 import AppNav from '../components/AppNav';
 import {
+  ARCHITECTURE,
   CAD_PROVENANCE,
   CLASSIFIER_BOUNDS,
   CONFIRMED_LAYOUT,
   CURRENT_LIMITATIONS,
+  CV_PROTOTYPE,
   DIVERTER_KINEMATICS,
+  MOBILE_BEHAVIOR,
   OFFICIAL_SOURCE_MATRIX,
+  PHYSICAL_STAND,
   PHYSICS_STATUS,
   PRODUCTION_STATUS,
+  REPOSITORY_LAYOUT,
   ROUTE_MAPPING,
   RUNTIME_FLOW,
+  SOLUTION_COMPONENTS,
   VALIDATION_BOARD,
 } from '../data/productionStatusSummary';
 
 const SECTIONS = [
-  { id: 'about', title: '1. Цель проекта' },
-  { id: 'runtime-flow', title: '2. Runtime flow' },
-  { id: 'layout', title: '3. Активная линия' },
-  { id: 'classifier', title: '4. Классификация' },
-  { id: 'routes', title: '5. Маршруты B/C/D' },
-  { id: 'diverter', title: '6. Diverter state machine' },
-  { id: 'cad', title: '7. CAD provenance' },
-  { id: 'physics', title: '8. Физика' },
-  { id: 'validation', title: '9. Validation status' },
-  { id: 'official', title: '10. Official-source matrix' },
-  { id: 'limits', title: '11. Known limitations' },
+  { id: 'about', title: '1. Обзор проекта' },
+  { id: 'production-web', title: '2. Production web' },
+  { id: 'cv', title: '3. Real CV prototype' },
+  { id: 'classifier', title: '4. Официальная классификация' },
+  { id: 'stand', title: '5. Физический стенд' },
+  { id: 'twin', title: '6. Digital twin' },
+  { id: 'architecture', title: '7. Архитектура' },
+  { id: 'repository', title: '8. Репозиторий' },
+  { id: 'validation', title: '9. Validation' },
+  { id: 'limits', title: '10. Ограничения' },
+  { id: 'routes', title: '11. Маршруты B/C/D' },
+  { id: 'official', title: '12. Official sources' },
 ] as const;
 
 function TocList({ onNavigate }: { onNavigate?: () => void }) {
@@ -55,15 +62,15 @@ export default function DocumentationPage() {
             O
           </span>
           <div className="product-brand-text">
-            <div className="product-brand-title">Ozon Tech Sorter</div>
-            <div className="product-brand-sub">Цифровой двойник линии сортировки</div>
+            <div className="product-brand-title">OWL PRIME</div>
+            <div className="product-brand-sub">Ozon Tech Track 3 — документация</div>
           </div>
         </div>
         <AppNav variant="solid" />
         <div className="product-telemetry docs-topbar-meta">
           <div className="product-tele-item">
-            <span className="product-tele-label">Раздел</span>
-            <span className="product-tele-value">Документация</span>
+            <span className="product-tele-label">Ветка</span>
+            <span className="product-tele-value">{PRODUCTION_STATUS.canonicalBranch}</span>
           </div>
         </div>
       </header>
@@ -75,7 +82,7 @@ export default function DocumentationPage() {
           </span>
           <div>
             <h1 className="docs-title">Документация</h1>
-            <p className="docs-subtitle">Текущее состояние веб-симуляции и инженерный статус</p>
+            <p className="docs-subtitle">Финальный инженерный статус решения OWL PRIME</p>
           </div>
         </div>
         <AppNav variant="solid" />
@@ -99,144 +106,158 @@ export default function DocumentationPage() {
         <main className="docs-main">
           <section className="docs-status-banner" data-testid="docs-production-status">
             <div className="docs-status-label">Текущий статус</div>
-            <div className="docs-status-value">{PRODUCTION_STATUS.acquisitionPackStatus}</div>
+            <div className="docs-status-value">{PRODUCTION_STATUS.projectStatus}</div>
             <p className="docs-status-note">
-              Web twin: {PRODUCTION_STATUS.webTwinStatus}. Unit tests {PRODUCTION_STATUS.unitTests},
-              build {PRODUCTION_STATUS.productionBuild}. Contact physics:{' '}
-              {PRODUCTION_STATUS.contactPhysics}. Official compliance:{' '}
-              {PRODUCTION_STATUS.officialCompliance}.
+              Web: {PRODUCTION_STATUS.webTwinStatus}. CV: {PRODUCTION_STATUS.cvStatus} (live
+              integrated: {PRODUCTION_STATUS.cvLiveIntegrated ? 'YES' : 'NO'}). Unit tests{' '}
+              {PRODUCTION_STATUS.unitTests}, CV tests {PRODUCTION_STATUS.cvTests}, build{' '}
+              {PRODUCTION_STATUS.productionBuild}. Domain: {PRODUCTION_STATUS.productionUrl}. Contact
+              physics: {PRODUCTION_STATUS.contactPhysics}.
             </p>
           </section>
 
           <section id="about" className="docs-section">
             <h2>{SECTIONS[0].title}</h2>
             <p>
-              Цифровой двойник линии сортировки Ozon Tech: конвейер, камера/классификация, физическая
-              маршрутизация и три приёмные категории (B / C / D). Страница <code>/</code> — рабочая
-              веб-симуляция; эта страница — каноническая сводка текущего состояния. Реальный
-              CV-прототип (RealSense D415) лежит в <code>cv/</code> и не подключён к live-сайту.
+              OWL PRIME — инженерный прототип предварительной сортировки товаров для Ozon Tech Track
+              3: веб-цифровой двойник, реальный CV-прототип, физический экспериментальный стенд,
+              авторский CAD и единые правила классификации B/C/D.
             </p>
+            <ul>
+              {SOLUTION_COMPONENTS.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </section>
 
-          <section id="runtime-flow" className="docs-section">
+          <section id="production-web" className="docs-section">
             <h2>{SECTIONS[1].title}</h2>
-            <p>{RUNTIME_FLOW.join(' → ')}</p>
-          </section>
-
-          <section id="layout" className="docs-section">
-            <h2>{SECTIONS[2].title}</h2>
+            <p>
+              Production: <a href={PRODUCTION_STATUS.productionUrl}>{PRODUCTION_STATUS.productionUrl}</a>
+            </p>
             <ul>
               <li>
-                Рабочая зона (чертёж): {CONFIRMED_LAYOUT.workspaceMm.length} ×{' '}
-                {CONFIRMED_LAYOUT.workspaceMm.width} мм; лента {CONFIRMED_LAYOUT.conveyorWidthMm} мм /
-                высота верха {CONFIRMED_LAYOUT.conveyorHeightMm} мм.
+                <code>/</code> — непрерывная симуляция конвейера
               </li>
-              <li>Модули CAD: {CONFIRMED_LAYOUT.modules.join(', ')}.</li>
+              <li>
+                <code>/documentation</code> — эта инженерная документация
+              </li>
+            </ul>
+            <p>
+              На desktop — интерактивный WebGL 3D twin: CAD-конвейер, цифровое измерение,
+              классификация B/C/D, CAD-дивертеры и физика Rapier. Mobile: {MOBILE_BEHAVIOR.mobile}.
+            </p>
+            <ul>
+              <li>
+                Рабочая зона: {CONFIRMED_LAYOUT.workspaceMm.length} × {CONFIRMED_LAYOUT.workspaceMm.width}{' '}
+                мм; лента {CONFIRMED_LAYOUT.conveyorWidthMm} мм / высота{' '}
+                {CONFIRMED_LAYOUT.conveyorHeightMm} мм.
+              </li>
+              <li>Модули: {CONFIRMED_LAYOUT.modules.join(', ')}.</li>
               <li>Приёмники: {CONFIRMED_LAYOUT.receivers.join(', ')}.</li>
+              <li>Runtime flow: {RUNTIME_FLOW.join(' → ')}</li>
+            </ul>
+          </section>
+
+          <section id="cv" className="docs-section">
+            <h2>{SECTIONS[2].title}</h2>
+            <p>
+              Path: <code>{CV_PROTOTYPE.path}</code>. Status:{' '}
+              <code>{CV_PROTOTYPE.status}</code>. Hardware: {CV_PROTOTYPE.hardware}. Software:{' '}
+              {CV_PROTOTYPE.software}.
+            </p>
+            <p>Pipeline: {CV_PROTOTYPE.pipeline.join(' → ')}</p>
+            <ul>
+              {CV_PROTOTYPE.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
             </ul>
           </section>
 
           <section id="classifier" className="docs-section">
             <h2>{SECTIONS[3].title}</h2>
             <p>
-              Status: <code>{CLASSIFIER_BOUNDS.status}</code>
+              Status: <code>{CLASSIFIER_BOUNDS.status}</code>. Source:{' '}
+              <code>{CLASSIFIER_BOUNDS.officialSourceReference}</code>.
             </p>
             <ul>
               <li>Min: {CLASSIFIER_BOUNDS.display.min}</li>
               <li>Max: {CLASSIFIER_BOUNDS.display.max}</li>
               <li>Roundness: {CLASSIFIER_BOUNDS.display.roundness}</li>
+              <li>
+                Boundary: <strong>{CLASSIFIER_BOUNDS.display.exactBoundary}</strong>
+              </li>
               <li>Order: {CLASSIFIER_BOUNDS.checkOrder}</li>
+              <li>Oversized circular product still goes to C (C priority).</li>
             </ul>
             <p>
-              OFFICIAL_SOURCE_REFERENCE: <code>{CLASSIFIER_BOUNDS.officialSourceReference}</code>
-              {CLASSIFIER_BOUNDS.officialSourceParsedThisPass
-                ? ''
-                : ' — PDF not re-parsed in this documentation pass; bounds match current code/tests.'}
+              Web (<code>src/domain/classifier.ts</code>) and CV (<code>cv/classify.py</code>) both use
+              strict <code>K &gt; 0.8</code>.
             </p>
           </section>
 
-          <section id="routes" className="docs-section">
+          <section id="stand" className="docs-section">
             <h2>{SECTIONS[4].title}</h2>
-            <div className="docs-table-scroll">
-              <table className="docs-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Physical route</th>
-                    <th>CAD diverter</th>
-                    <th>Angle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ROUTE_MAPPING.map((row) => (
-                    <tr key={row.category}>
-                      <td>{row.category}</td>
-                      <td>
-                        <code>{row.physicalRoute}</code>
-                      </td>
-                      <td>{row.activeDiverter}</td>
-                      <td>{row.signedAngleDeg}°</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p>
+              Status: <code>{PHYSICAL_STAND.status}</code>. {PHYSICAL_STAND.purpose}
+            </p>
+            <ul>
+              {PHYSICAL_STAND.elements.map((el) => (
+                <li key={el}>{el}</li>
+              ))}
+            </ul>
           </section>
 
-          <section id="diverter" className="docs-section">
+          <section id="twin" className="docs-section">
             <h2>{SECTIONS[5].title}</h2>
-            <p>{DIVERTER_KINEMATICS.phases.join(' → ')}</p>
-            <ul>
-              <li>Rotation duration: {DIVERTER_KINEMATICS.rotationDurationSec.toFixed(2)} s</li>
-              <li>Safety margin: {DIVERTER_KINEMATICS.openingSafetyMarginSec.toFixed(2)} s</li>
-              <li>Contact plane S: {DIVERTER_KINEMATICS.contactPlaneS}</li>
-              <li>Clear plane S: {DIVERTER_KINEMATICS.clearPlaneS.toFixed(4)}</li>
-              <li>Route command bound to productId; one active product at a time</li>
-              <li>Close after rear-clear of clear plane</li>
-              <li>
-                Invented sorter drive mesh active:{' '}
-                {DIVERTER_KINEMATICS.generatedMechanismActive ? 'YES' : 'NO'}
-              </li>
-            </ul>
-          </section>
-
-          <section id="cad" className="docs-section">
-            <h2>{SECTIONS[6].title}</h2>
             <ul>
               <li>
-                Author: <code>{CAD_PROVENANCE.authorFcstd}</code>
-                <br />
-                SHA-256: <code>{CAD_PROVENANCE.authorSha256}</code>
+                Author CAD: <code>{CAD_PROVENANCE.authorFcstd}</code>
               </li>
               <li>
-                Runtime: <code>{CAD_PROVENANCE.runtimeGlb}</code>
-                <br />
-                SHA-256: <code>{CAD_PROVENANCE.runtimeSha256}</code>
+                Runtime conveyor: <code>{CAD_PROVENANCE.runtimeGlb}</code>
               </li>
-              <li>Author servo/holder nodes used in sorter module only.</li>
-              <li>Invented sorter drive mesh inactive; author CAD diverters only.</li>
-              <li>Horn / transmission in GLB: {CAD_PROVENANCE.hornTransmissionInGlb}.</li>
+              <li>Product STL models in <code>public/models/</code></li>
+              <li>Same B/C/D classifier rules as CV</li>
+              <li>Rapier physics + CAD diverters (−45° / +45°)</li>
+              <li>Synchronized digital routing into B/C/D receivers</li>
             </ul>
-          </section>
-
-          <section id="physics" className="docs-section">
-            <h2>{SECTIONS[7].title}</h2>
-            <h3>IMPLEMENTED</h3>
+            <h3>Physics</h3>
+            <h4>IMPLEMENTED</h4>
             <ul>
               {PHYSICS_STATUS.implemented.map((x) => (
                 <li key={x}>{x}</li>
               ))}
             </ul>
-            <h3>NOT FULLY VALIDATED</h3>
+            <h4>NOT FULLY VALIDATED</h4>
             <ul>
               {PHYSICS_STATUS.notFullyValidated.map((x) => (
                 <li key={x}>{x}</li>
               ))}
             </ul>
-            <h3>PLANNED</h3>
+            <p>
+              Diverter phases: {DIVERTER_KINEMATICS.phases.join(' → ')} (
+              {DIVERTER_KINEMATICS.rotationDurationSec.toFixed(2)} s rotation).
+            </p>
+          </section>
+
+          <section id="architecture" className="docs-section">
+            <h2>{SECTIONS[6].title}</h2>
+            <h3>REAL PATH</h3>
+            <p>{ARCHITECTURE.realPath.join(' → ')}</p>
+            <h3>DIGITAL PATH</h3>
+            <p>{ARCHITECTURE.digitalPath.join(' → ')}</p>
+          </section>
+
+          <section id="repository" className="docs-section">
+            <h2>{SECTIONS[7].title}</h2>
+            <p>
+              Canonical branch: <code>{PRODUCTION_STATUS.canonicalBranch}</code>. Other branches are
+              historical and not required to run the solution.
+            </p>
             <ul>
-              {PHYSICS_STATUS.planned.map((x) => (
-                <li key={x}>{x}</li>
+              {REPOSITORY_LAYOUT.map((line) => (
+                <li key={line}>{line}</li>
               ))}
             </ul>
           </section>
@@ -265,8 +286,45 @@ export default function DocumentationPage() {
             </div>
           </section>
 
-          <section id="official" className="docs-section">
+          <section id="limits" className="docs-section" data-testid="docs-blockers">
             <h2>{SECTIONS[9].title}</h2>
+            <ul className="docs-blocker-list">
+              {CURRENT_LIMITATIONS.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section id="routes" className="docs-section">
+            <h2>{SECTIONS[10].title}</h2>
+            <div className="docs-table-scroll">
+              <table className="docs-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Physical route</th>
+                    <th>CAD diverter</th>
+                    <th>Angle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ROUTE_MAPPING.map((row) => (
+                    <tr key={row.category}>
+                      <td>{row.category}</td>
+                      <td>
+                        <code>{row.physicalRoute}</code>
+                      </td>
+                      <td>{row.activeDiverter}</td>
+                      <td>{row.signedAngleDeg}°</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="official" className="docs-section">
+            <h2>{SECTIONS[11].title}</h2>
             <div className="docs-table-scroll">
               <table className="docs-table">
                 <thead>
@@ -293,15 +351,6 @@ export default function DocumentationPage() {
                 </tbody>
               </table>
             </div>
-          </section>
-
-          <section id="limits" className="docs-section" data-testid="docs-blockers">
-            <h2>{SECTIONS[10].title}</h2>
-            <ul className="docs-blocker-list">
-              {CURRENT_LIMITATIONS.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
-            </ul>
           </section>
         </main>
       </div>

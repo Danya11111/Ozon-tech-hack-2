@@ -79,13 +79,14 @@ def classify(
     """
     Порядок ТЗ:
     1) габариты → иначе C (приоритет над кругом)
-    2) если r_in/r_out >= 0.8 в любом сечении → D
+    2) если r_in/r_out > 0.8 в любом сечении → D
+       (K == 0.8 НЕ круг — как в web classifier.ts)
     3) иначе → B
     """
     dims = _sorted_dims(measurement.length_mm, measurement.width_mm, measurement.height_mm)
     passes = check_size(dims, min_mm, max_mm)
     ratio = float(measurement.circle_ratio)
-    circular = ratio >= float(circle_ratio_threshold)
+    circular = ratio > float(circle_ratio_threshold)
     clipped = bool(getattr(measurement, "clipped_by_frame", False))
 
     if not passes or clipped:
@@ -112,7 +113,7 @@ def classify(
             circle_ratio=ratio,
             passes_size=True,
             is_circular=True,
-            reason=f"круг в сечении: r_in/r_out={ratio:.3f} >= {circle_ratio_threshold}",
+            reason=f"круг в сечении: r_in/r_out={ratio:.3f} > {circle_ratio_threshold}",
         )
 
     return ClassificationResult(
@@ -121,7 +122,7 @@ def classify(
         circle_ratio=ratio,
         passes_size=True,
         is_circular=False,
-        reason=f"габариты OK, круга нет: r_in/r_out={ratio:.3f} < {circle_ratio_threshold}",
+        reason=f"габариты OK, круга нет: r_in/r_out={ratio:.3f} <= {circle_ratio_threshold}",
     )
 
 

@@ -43,11 +43,40 @@ def test_lying_bottle_must_be_D_not_B():
     assert r.category.zone == "D"
 
 
-def test_border_circle():
-    r = classify_from_dims(100, 50, 50, circle_ratio=0.8)
+def test_strict_circle_boundary():
+    """Официально: круг только при K > 0.8. K == 0.8 → B (не D)."""
+    below = classify_from_dims(100, 50, 50, circle_ratio=0.799999)
+    assert below.category == Category.SUITABLE
+    assert below.category.zone == "B"
+    assert below.is_circular is False
+
+    exact = classify_from_dims(100, 50, 50, circle_ratio=0.8)
+    assert exact.category == Category.SUITABLE
+    assert exact.category.zone == "B"
+    assert exact.is_circular is False
+
+    above = classify_from_dims(100, 50, 50, circle_ratio=0.800001)
+    assert above.category == Category.NEED_PACK
+    assert above.category.zone == "D"
+    assert above.is_circular is True
+
+
+def test_normal_non_circular_B():
+    r = classify_from_dims(120, 80, 40, circle_ratio=0.5)
+    assert r.category == Category.SUITABLE
+    assert r.category.zone == "B"
+
+
+def test_normal_circular_above_threshold_D():
+    r = classify_from_dims(100, 50, 50, circle_ratio=0.81)
     assert r.category == Category.NEED_PACK
-    r2 = classify_from_dims(100, 50, 50, circle_ratio=0.799)
-    assert r2.category == Category.SUITABLE
+    assert r.category.zone == "D"
+
+
+def test_oversized_circular_still_C():
+    r = classify_from_dims(500, 100, 100, circle_ratio=0.95)
+    assert r.category == Category.OVERSIZE
+    assert r.category.zone == "C"
 
 
 def test_border_dims_strict():
@@ -80,7 +109,10 @@ if __name__ == "__main__":
     test_too_small()
     test_need_pack_cylinder()
     test_lying_bottle_must_be_D_not_B()
-    test_border_circle()
+    test_strict_circle_boundary()
+    test_normal_non_circular_B()
+    test_normal_circular_above_threshold_D()
+    test_oversized_circular_still_C()
     test_border_dims_strict()
     test_dims_order_independent()
     print("OK: all classification tests passed")

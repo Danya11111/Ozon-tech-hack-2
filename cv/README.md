@@ -36,8 +36,8 @@ Primary modules: `main.py` (live), `demo.py` (HUD), `classify.py` (rules), `meas
 ## Classification rules (Track 3)
 
 1. Dimensions must be strictly **> 10×10×10 mm** and **< 450×320×320 mm** → else **C**
-2. Else if circularity exceeds the official threshold **0.8** → **D**
-   (web twin uses strict `K > 0.8`; this prototype uses `circle_ratio >= 0.8`)
+2. Else if `circle_ratio > 0.8` → **D**
+   (`K == 0.8` is **not** circular — same strict rule as web `classifier.ts`)
 3. Else → **B**
 
 Stabilization: median window + vote → **LOCK**. Uncertain cases fall back to zone **C** after N frames.

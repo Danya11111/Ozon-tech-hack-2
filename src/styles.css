@@ -3312,17 +3312,24 @@ button:disabled {
 }
 
 /* =========================================================
-   Documentation page
+   Documentation page — light readable surface (Ozon blue)
    ========================================================= */
 
 .docs-page {
+  --docs-bg: #f5f8fc;
+  --docs-panel: #ffffff;
+  --docs-text: #101828;
+  --docs-muted: #344054;
+  --docs-heading: #0b1f3a;
+  --docs-blue: #005bff;
+  --docs-magenta: #f91155;
+  --docs-line: #d0d5dd;
+  --docs-status-bg: #e8f1ff;
   min-height: 100dvh;
   max-width: 100vw;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.12), transparent 32%),
-    linear-gradient(180deg, #07111d 0%, #050910 100%);
-  color: var(--text);
+  background: var(--docs-bg);
+  color: var(--docs-text);
 }
 
 .docs-header {
@@ -3336,9 +3343,8 @@ button:disabled {
   gap: 12px 20px;
   min-height: 56px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(5, 9, 16, 0.92);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--docs-line);
+  background: #ffffff;
 }
 
 .docs-brand {
@@ -3354,9 +3360,9 @@ button:disabled {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: var(--cyan);
+  background: rgba(0, 91, 255, 0.1);
+  border: 1px solid rgba(0, 91, 255, 0.35);
+  color: var(--docs-blue);
   font-weight: 800;
   flex: 0 0 auto;
 }
@@ -3364,11 +3370,13 @@ button:disabled {
 .docs-title {
   font-size: 1.25rem;
   line-height: 1.2;
+  color: var(--docs-heading);
 }
 
 .docs-subtitle {
-  color: var(--muted);
+  color: var(--docs-muted);
   font-size: 0.85rem;
+  opacity: 1;
 }
 
 .docs-layout {
@@ -3385,9 +3393,9 @@ button:disabled {
   top: 84px;
   align-self: start;
   padding: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--docs-line);
   border-radius: 12px;
-  background: rgba(10, 19, 31, 0.7);
+  background: var(--docs-panel);
   font-size: 0.85rem;
 }
 
@@ -3405,16 +3413,17 @@ button:disabled {
 
 .docs-toc-desktop a,
 .docs-toc-mobile a {
-  color: var(--muted);
+  color: var(--docs-muted);
   text-decoration: none;
   display: inline-flex;
   min-height: 36px;
   align-items: center;
+  opacity: 1;
 }
 
 .docs-toc-desktop a:hover,
 .docs-toc-mobile a:hover {
-  color: var(--cyan);
+  color: var(--docs-blue);
 }
 
 .docs-main {
@@ -3432,31 +3441,39 @@ button:disabled {
 }
 
 .docs-status-banner {
-  border: 1px solid rgba(74, 222, 128, 0.35);
-  background: rgba(20, 48, 32, 0.45);
+  border: 1px solid rgba(0, 91, 255, 0.28);
+  background: var(--docs-status-bg);
 }
 
 .docs-status-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--docs-blue);
+  opacity: 1;
 }
 
 .docs-status-value {
   margin-top: 6px;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--green);
+  color: var(--docs-heading);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .docs-status-note {
   margin-top: 10px;
-  color: var(--muted);
+  color: var(--docs-muted);
   font-size: 0.92rem;
   line-height: 1.5;
+  opacity: 1;
+}
+
+.docs-section h2,
+.docs-section h3,
+.docs-section h4 {
+  color: var(--docs-heading);
 }
 
 .docs-section h2 {
@@ -3464,9 +3481,19 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.docs-section a {
+  color: var(--docs-blue);
+}
+
+.docs-section strong {
+  color: var(--docs-magenta);
+  font-weight: 700;
+}
+
 .docs-section p,
 .docs-section li {
-  color: #c9d8e8;
+  color: var(--docs-text);
+  opacity: 1;
   font-size: 0.98rem;
   line-height: 1.5;
 }
@@ -3480,19 +3507,22 @@ button:disabled {
 .docs-section code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.88em;
-  color: var(--cyan-hover);
+  color: var(--docs-blue);
+  background: rgba(0, 91, 255, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .docs-conflict {
   margin-top: 12px;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  background: rgba(48, 32, 10, 0.4);
+  border: 1px solid rgba(249, 17, 85, 0.35);
+  background: #fff5f8;
 }
 
 .docs-blocker-list li {
-  color: #ffd0d5;
+  color: var(--docs-text);
 }
 
 .docs-table-scroll {
@@ -3507,20 +3537,24 @@ button:disabled {
   min-width: 420px;
   border-collapse: collapse;
   font-size: 0.92rem;
+  background: var(--docs-panel);
 }
 
 .docs-table th,
 .docs-table td {
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--docs-line);
   text-align: left;
   vertical-align: top;
-  white-space: nowrap;
+  white-space: normal;
+  color: var(--docs-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .docs-table th {
-  background: rgba(12, 23, 37, 0.9);
-  color: var(--muted);
+  background: #eef4ff;
+  color: var(--docs-heading);
   font-weight: 600;
 }
 
@@ -3689,8 +3723,7 @@ button:disabled {
     background: #070d16;
   }
 
-  .main-page--product .product-topbar,
-  .docs-page .product-topbar {
+  .main-page--product .product-topbar {
     position: relative;
     z-index: 30;
     flex: 0 0 auto;
@@ -3704,6 +3737,41 @@ button:disabled {
     border-bottom: 1px solid rgba(56, 189, 248, 0.18);
     background: rgba(6, 12, 20, 0.88);
     backdrop-filter: blur(14px);
+  }
+
+  .docs-page .product-topbar {
+    position: relative;
+    z-index: 30;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    height: 68px;
+    max-height: 72px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--docs-line);
+    background: #ffffff;
+    backdrop-filter: none;
+  }
+
+  .docs-page .product-brand-mark {
+    border-color: rgba(0, 91, 255, 0.35);
+    background: rgba(0, 91, 255, 0.1);
+    color: var(--docs-blue);
+  }
+
+  .docs-page .product-brand-title {
+    color: var(--docs-heading);
+  }
+
+  .docs-page .product-brand-sub,
+  .docs-page .product-tele-label {
+    color: var(--docs-muted);
+  }
+
+  .docs-page .product-tele-value {
+    color: var(--docs-text);
   }
 
   .product-brand {
@@ -3742,8 +3810,7 @@ button:disabled {
     color: #8aa0b8;
   }
 
-  .main-page--product .app-nav-solid,
-  .docs-page .product-topbar .app-nav-solid {
+  .main-page--product .app-nav-solid {
     flex: 0 0 auto;
     display: inline-flex;
     gap: 4px;
@@ -3753,12 +3820,36 @@ button:disabled {
     background: rgba(8, 16, 26, 0.7);
   }
 
-  .main-page--product .app-nav-link,
-  .docs-page .product-topbar .app-nav-link {
+  .docs-page .product-topbar .app-nav-solid,
+  .docs-page .docs-header .app-nav-solid {
+    flex: 0 0 auto;
+    display: inline-flex;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--docs-line);
+    background: #f2f6ff;
+  }
+
+  .main-page--product .app-nav-link {
     min-height: 34px;
     padding: 0 16px;
     font-size: 13px;
     border-radius: 8px;
+  }
+
+  .docs-page .product-topbar .app-nav-link,
+  .docs-page .docs-header .app-nav-link {
+    min-height: 34px;
+    padding: 0 16px;
+    font-size: 13px;
+    border-radius: 8px;
+    color: var(--docs-heading);
+  }
+
+  .docs-page .app-nav-link.active {
+    background: var(--docs-blue);
+    color: #ffffff;
   }
 
   .product-telemetry {
@@ -3940,11 +4031,9 @@ button:disabled {
     white-space: normal;
   }
 
-  /* Documentation desktop grid aligned to product chrome */
+  /* Documentation desktop grid — keep light readable surface */
   .docs-page {
-    background:
-      radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.1), transparent 34%),
-      linear-gradient(180deg, #07111d 0%, #050910 100%);
+    background: var(--docs-bg);
   }
 
   .docs-layout {
@@ -3960,6 +4049,8 @@ button:disabled {
     top: 88px;
     padding: 14px 12px;
     font-size: 0.84rem;
+    background: var(--docs-panel);
+    border-color: var(--docs-line);
   }
 
   .docs-main {

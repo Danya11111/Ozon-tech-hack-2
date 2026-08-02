@@ -113,12 +113,13 @@ class DecisionStabilizer:
         top_m = _median(self._tops)
         sec_m = _median(self._secs)
         ratio_p75 = _percentile(self._ratios, 75)
-        # устойчивый круг: медиана >= 0.8 ИЛИ (медиана сечений >= 0.8 и ≥ половины окна сильные)
+        # устойчивый круг: медиана > 0.8 ИЛИ (медиана сечений > 0.8 и ≥ половины окна сильные)
+        # K == 0.8 официально НЕ круг (строгое > threshold)
         sec_strong = (
-            sum(1 for x in self._secs if x >= self.enter_circle) / max(1, len(self._secs))
+            sum(1 for x in self._secs if x > self.enter_circle) / max(1, len(self._secs))
         )
-        circular = ratio >= self.enter_circle or (
-            sec_m >= self.enter_circle and sec_strong >= 0.55
+        circular = ratio > self.enter_circle or (
+            sec_m > self.enter_circle and sec_strong >= 0.55
         )
         ratio_show = max(ratio, sec_m) if circular else ratio
 
@@ -153,7 +154,7 @@ class DecisionStabilizer:
                 reason=(
                     f"круг: med={ratio:.3f} p75={ratio_p75:.3f} "
                     f"top={top_m:.3f} sec={sec_m:.3f} strong={sec_strong:.0%} "
-                    f">= {self.enter_circle}"
+                    f"> {self.enter_circle}"
                 ),
             )
         else:
@@ -165,7 +166,7 @@ class DecisionStabilizer:
                 is_circular=False,
                 reason=(
                     f"не круг: med={ratio:.3f} sec={sec_m:.3f} "
-                    f"strong={sec_strong:.0%} < {self.enter_circle}"
+                    f"strong={sec_strong:.0%} <= {self.enter_circle}"
                 ),
             )
 

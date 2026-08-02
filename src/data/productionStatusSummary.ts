@@ -4,15 +4,28 @@
  * Unverified / planned items are labeled explicitly — never implied complete.
  */
 
-/** Kept for e2e (`docs-production-status`) and acquisition-pack provenance. */
 export const PRODUCTION_STATUS = {
-  acquisitionPackStatus: 'DATA_ACQUISITION_PACK_READY',
-  webTwinStatus: 'BASELINE_PRESERVED',
+  projectStatus: 'FINAL_ENGINEERING_PROTOTYPE_READY',
+  webTwinStatus: 'PRODUCTION_LIVE',
+  cvStatus: 'WORKING_PROTOTYPE',
+  cvLiveIntegrated: false,
   unitTests: '196/196',
+  cvTests: 'PASS (no camera)',
   productionBuild: 'PASS',
+  productionUrl: 'https://arhipovdan.ru',
   contactPhysics: 'NOT_FULLY_VALIDATED',
   officialCompliance: 'PARTIAL_SOURCES_PRESENT',
+  canonicalBranch: 'main',
 } as const;
+
+export const SOLUTION_COMPONENTS = [
+  'Web digital twin (https://arhipovdan.ru)',
+  'Real CV working prototype (cv/, RealSense D415 + OpenCV)',
+  'Physical experimental conveyor stand',
+  'Author CAD (3d_models/conveer.FCStd)',
+  'Official B/C/D classifier (web + CV, K > 0.8)',
+  'Engineering documentation (/documentation)',
+] as const;
 
 export const CONFIRMED_LAYOUT = {
   workspaceMm: { length: 10000, width: 6000 },
@@ -23,7 +36,7 @@ export const CONFIRMED_LAYOUT = {
 } as const;
 
 export const CLASSIFIER_BOUNDS = {
-  status: 'CURRENT_IMPLEMENTATION_VERIFIED_IN_CODE' as const,
+  status: 'ALIGNED_WEB_AND_CV' as const,
   officialSourceReference: 'official_sources/doc-1783095831.pdf',
   officialSourceParsedThisPass: false,
   minExclusiveMm: { width: 10, depth: 10, height: 10 },
@@ -33,8 +46,63 @@ export const CLASSIFIER_BOUNDS = {
     min: '> 10×10×10 мм',
     max: '< 450×320×320 мм',
     roundness: 'K > 0.8',
+    exactBoundary: 'K = 0.8 → B (not circular), not D',
   },
-  checkOrder: 'dimensions→C, else circular→D, else B' as const,
+  checkOrder: 'dimensions→C, else circular (K>0.8)→D, else B' as const,
+} as const;
+
+export const CV_PROTOTYPE = {
+  path: 'cv/',
+  status: 'WORKING_PROTOTYPE',
+  hardware: 'Intel RealSense D415',
+  software: 'Python + OpenCV (+ optional MQTT)',
+  liveIntegrated: false,
+  pipeline: [
+    'depth frame',
+    'segmentation',
+    'object contour',
+    'L×W×H',
+    'roundness K',
+    'B/C/D',
+    'optional MQTT',
+  ] as const,
+  notes: [
+    'CV works as a separate prototype under cv/ on main.',
+    'CV is not connected directly to the live public website.',
+    'Hardware live validation requires RealSense D415.',
+    'No-camera unit tests and compileall run in CI/local verification.',
+  ],
+} as const;
+
+export const PHYSICAL_STAND = {
+  status: 'EXPERIMENTAL_PROTOTYPE',
+  elements: [
+    'Physical belt conveyor',
+    'Camera mounting structure above the belt',
+    'Intel RealSense D415',
+    'Electronics / control nodes',
+    'Experimental actuators and printed components',
+  ] as const,
+  purpose: 'Measurements, calibration, and hardware validation — not claimed as industrial end-to-end certified sorting.',
+} as const;
+
+export const ARCHITECTURE = {
+  realPath: [
+    'physical product',
+    'RealSense D415',
+    'OpenCV measurement',
+    'classifier (K > 0.8)',
+    'B/C/D result',
+    'optional MQTT/controller',
+  ] as const,
+  digitalPath: [
+    'digital product',
+    'simulated measurement',
+    'same classifier rules',
+    'route command',
+    'digital twin',
+    'B/C/D receiver',
+  ] as const,
 } as const;
 
 export const ROUTE_MAPPING = [
@@ -72,6 +140,7 @@ export const PHYSICS_STATUS = {
     'Synchronized CAD diverter visual / kinematic targets',
     'CCD enabled for light/thin SKUs in runtime and headless sim',
     'Visual/physics spawn gating via product asset preload',
+    'Belt speed target 1.0 m/s; physics timestep 1/60 s',
   ],
   notFullyValidated: [
     'Complete contact-only routing through CAD diverters',
@@ -83,18 +152,26 @@ export const PHYSICS_STATUS = {
   planned: [
     'Visual full belt loop with surface-velocity coupling',
     'Controlled tangential friction at 1 m/s',
-    'Dynamic rigid bodies for divert segment with fixed timestep',
     'Per-SKU collider, damping, and friction profiles',
   ],
 } as const;
 
+export const MOBILE_BEHAVIOR = {
+  desktop: 'Interactive WebGL 3D digital twin',
+  mobile:
+    'Capability-based tier: WebGL when viable; SVG/2D lite fallback on low FPS / missing WebGL (not claimed as full 3D)',
+} as const;
+
 export const VALIDATION_BOARD = [
-  { item: 'Unit tests', status: '196/196 PASS' },
+  { item: 'Web unit tests', status: '196/196 PASS' },
   { item: 'Production build', status: 'PASS' },
-  { item: 'Active routes / + /documentation', status: 'PASS' },
+  { item: 'Focused E2E (/ + /documentation)', status: 'PASS' },
+  { item: 'CV compileall', status: 'PASS' },
+  { item: 'CV classify/geometry tests', status: 'PASS (no camera)' },
+  { item: 'Production / and /documentation', status: 'PASS' },
   { item: 'conveyor-clean.glb checksum', status: 'PASS' },
   { item: 'Author FCStd checksum', status: 'PASS' },
-  { item: 'Frozen diverter angles / 0.50 s', status: 'PASS' },
+  { item: 'Classifier K > 0.8 (web + CV)', status: 'ALIGNED' },
   { item: 'Full contact physics', status: 'NOT_FULLY_VALIDATED' },
 ] as const;
 
@@ -146,7 +223,14 @@ export const OFFICIAL_SOURCE_MATRIX = [
     purpose: 'Classifier bounds authority cited by code',
     present: true,
     canonical: true,
-    usage: 'Referenced by classifier.ts; not re-parsed this pass',
+    usage: 'Referenced by classifier.ts and cv/classify.py',
+  },
+  {
+    source: 'presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf',
+    purpose: 'Final presentation (10 slides)',
+    present: true,
+    canonical: true,
+    usage: 'Single presentation PDF in repository',
   },
   {
     source: 'input_info/extracted/Постановка_Задача_3_сжато_2.pdf',
@@ -169,15 +253,24 @@ export const RUNTIME_FLOW = [
   'RECEIVER',
 ] as const;
 
-export const CURRENT_LIMITATIONS = [
-  'Full physical contact sorting through CAD diverters is not fully validated.',
-  'Belt surface-velocity drive at exactly 1 m/s is planned, not complete.',
-  'Per-SKU physical parameters still require profiling/calibration.',
-  'Author CAD horn / transmission incomplete in active GLB.',
-  'Official compliance is partial: missing extracted task PDF; scoring PDF not re-parsed this pass.',
-  'Real CV prototype lives in cv/ (WORKING_PROTOTYPE) and is not connected to the live website.',
-  'Live CV validation requires Intel RealSense D415 hardware.',
+export const REPOSITORY_LAYOUT = [
+  'src/ — web digital twin',
+  'cv/ — RealSense + OpenCV prototype',
+  '3d_models/ — author CAD',
+  'public/ — runtime GLB/STL/draco',
+  'docs/ — engineering notes',
+  'presentation/ — final PDF',
+  'e2e/ + Vitest — tests',
+  'Docker / nginx — deployment',
 ] as const;
 
-/** @deprecated alias — historical Gate wording retained for acquisition-pack note */
-export const DATA_ACQUISITION_SEQUENCE = ['MEASURE', 'VERIFY', 'FREEZE', 'DESIGN'] as const;
+export const CURRENT_LIMITATIONS = [
+  'Engineering prototype, not an industrial-certified PAK.',
+  'Real CV prototype is not live-integrated into the public website.',
+  'Live camera mode requires Intel RealSense D415 hardware.',
+  'Physical stand parameters still require calibration against the digital twin.',
+  'Full physical contact sorting through CAD diverters is not fully validated.',
+  'Belt surface-velocity drive at exactly 1 m/s is not fully validated.',
+  'Author CAD horn / transmission incomplete in active GLB.',
+  'Cloud presentation/video links for the platform form are provided separately by the team.',
+] as const;
