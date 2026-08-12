@@ -79,7 +79,7 @@ Grounded only in present sources + current `main` code/tests (not a full officia
 
 ## Real CV prototype
 
-Path `cv/` — OpenCV + RealSense D415 depth pipeline. Same B/C/D domain as the web twin. **Not** consumed by https://arhipovdan.ru. Details: `cv/README.md`.
+Path `cv/` — OpenCV + RealSense D415 depth pipeline. Same B/C/D domain as the web twin. **Not** consumed by https://ozon-tech-sorter.ru. Details: `cv/README.md`.
 
 ## Layout drawing
 

@@ -17,7 +17,7 @@ OWL PRIME — инженерный контур предварительной �
 
 ## Демо
 
-**Production:** https://arhipovdan.ru
+**Production:** https://ozon-tech-sorter.ru
 
 | Route | Назначение |
 |---|---|
@@ -64,7 +64,7 @@ Product → measurement (digital) → classifier → route → twin → B/C/D re
 RealSense D415 → depth → segmentation → L×W×H + K → B/C/D → optional MQTT
 ```
 
-CV **не подключён** к https://arhipovdan.ru. Общее — домен правил B/C/D, не live-канал кадров.
+CV **не подключён** к https://ozon-tech-sorter.ru. Общее — домен правил B/C/D, не live-канал кадров.
 
 ## Технологии
 
@@ -171,7 +171,7 @@ cd cv && python -m compileall . && python test_classify.py && python test_geomet
 ## Материалы
 
 - Презентация: [`presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf`](presentation/Owl_Prime_Ozon_Tech_Track_3_FINAL.pdf)
-- Production: https://arhipovdan.ru
+- Production: https://ozon-tech-sorter.ru
 - Cloud folder: `[ДОБАВИТЬ ССЫЛКУ]`
 
 ## Статус

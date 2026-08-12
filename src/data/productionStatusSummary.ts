@@ -12,14 +12,14 @@ export const PRODUCTION_STATUS = {
   unitTests: '196/196',
   cvTests: 'PASS (no camera)',
   productionBuild: 'PASS',
-  productionUrl: 'https://arhipovdan.ru',
+  productionUrl: 'https://ozon-tech-sorter.ru',
   contactPhysics: 'NOT_FULLY_VALIDATED',
   officialCompliance: 'PARTIAL_SOURCES_PRESENT',
   canonicalBranch: 'main',
 } as const;
 
 export const SOLUTION_COMPONENTS = [
-  'Web digital twin (https://arhipovdan.ru)',
+  'Web digital twin (https://ozon-tech-sorter.ru)',
   'Real CV working prototype (cv/, RealSense D415 + OpenCV)',
   'Physical experimental conveyor stand',
   'Author CAD (3d_models/conveer.FCStd)',

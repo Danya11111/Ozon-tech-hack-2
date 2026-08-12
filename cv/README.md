@@ -1,7 +1,7 @@
 # Real CV prototype — RealSense D415 + OpenCV
 
 **Status:** WORKING_PROTOTYPE
-**Production integrated:** NO (https://arhipovdan.ru does **not** consume this pipeline)
+**Production integrated:** NO (https://ozon-tech-sorter.ru does **not** consume this pipeline)
 **Source:** consolidated from branch `drho1y-mvp_1` (`vision_classifier/`) into `cv/`
 
 Same Track 3 B/C/D rules as the web twin; different input path (real depth camera vs simulated sensor).
