@@ -1,6 +1,8 @@
 services:
   web:
+    image: ozon-tech-sorter-web:latest
     build: .
+    container_name: ozon-tech-sorter-web
     ports:
       - "127.0.0.1:3100:80"
     restart: unless-stopped
